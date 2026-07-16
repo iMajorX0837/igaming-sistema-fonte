@@ -1,0 +1,309 @@
+{
+  "Active": "Ativo",
+  "Archive": "Arquivo",
+  "How to play": "Como jogar?",
+  "Tasks": "Tarefas",
+  "Tickets": "Bilhetes",
+  "Start:": "Inicia:",
+  "End:": "Termina:",
+  "Players": "Jogadores",
+  "Scored": "Pontuou",
+  "By joining the event, you are agreeing to the:": "Ao aderir a este evento, concorda com os:",
+  "Get more information on participating:": "Obter mais informações sobre a participação:",
+  "Leaderboard": "Tabela de classificação",
+  "LEADERBOARD": "TABELA DE CLASSIFICAÇÃO",
+  "No players yet :(": "Ainda não há jogadores :(",
+  "You can be one of the first!": "Pode ser um dos primeiros!",
+  "Total Players": "Total de jogadores",
+  "Total Prizes": "Total dos prémios",
+  "Detailed rules": "Regras detalhadas",
+  "Other Information": "Outras informações",
+  "challenge starts:": "{{challenge}} inicia:",
+  "challenge ends:": "{{challenge}} termina:",
+  "Min. Bet:": "Aposta mín.:",
+  "Prizes": "Prémios",
+  "Left": "Restante",
+  "Freebet": "Aposta grátis",
+  "Points scored": "Pontuação",
+  "Position": "Posição",
+  "Place": "Lugar",
+  "Prize pool": "Prémio total",
+  "Show all": "Mostrar tudo",
+  "No Active Tickets. Yet!": "Sem tickets ativos. Ainda!",
+  "No Archive Tickets. Yet!": "Sem tickets de arquivo. Ainda!",
+  "Joining the Challenge requires Ticket": "Participar no Desafio requer Bilhete",
+  "action": {
+    "Back to top": "Voltar ao início",
+    "Take my Prize": "Ficar com o meu prémio",
+    "Join": "Entrar"
+  },
+  "challengeDetailsMessages": {
+    "xRace": {
+      "You have successfully joined the xRace. Wait for the start.": "🥳 Entrou com sucesso na xRace. Aguarde pelo início.",
+      "You've already claimed your prize! See you at the next challenge": "Já recebeu o seu prémio! Vemo-nos no próximo desafio 😊",
+      "Oops! The xRace is paused. It will be resumed shortly": "Ups! A xRace está parada. Recomeçará em breve 😕",
+      "xRace is over! See you at the next challenge": "A xRace terminou! Vemo-nos no próximo desafio 😊",
+      "xRace is over! Try harder next time!": "A xRace terminou! 😕 Dê o seu melhor na próxima!",
+      "Your bet is below the {{amount}} {{currency}} minimum for the xRace! Progress is paused.": "Sua aposta está abaixo do mínimo de {{amount}} {{currency}} para a xRace! O progresso está pausado."
+    },
+    "xMission": {
+      "You have successfully joined the xMission. Wait for the start.": "🥳 Entrou com sucesso na xMission. Aguarde pelo início.",
+      "You've already claimed your prize! See you at the next challenge": "Já recebeu o seu prémio! Vemo-nos no próximo desafio 😊",
+      "Oops! The xMission is paused. It will be resumed shortly": "Ups! A xMission está parada. Recomeçará em breve 😕",
+      "xMission is over! See you at the next challenge": "A xMission terminou! Vemo-nos no próximo desafio 😊",
+      "xMission is over! Try harder next time!": "A xMission terminou! 😕 Dê o seu melhor na próxima!",
+      "Your bet is below the {{amount}} {{currency}} minimum for the xMission! Progress is paused.": "Sua aposta está abaixo do mínimo de {{amount}} {{currency}} para a xMission! O progresso está pausado."
+    },
+    "xTournament": {
+      "You have successfully joined the xTournament. Wait for the start.": "🥳 Entrou com sucesso no xTournament. Aguarde pelo início.",
+      "You've already claimed your prize! See you at the next challenge": "Já recebeu o seu prémio! Vemo-nos no próximo desafio 😊",
+      "Oops! The xTournament is paused. It will be resumed shortly": "Ups! A xTournament está parada. Recomeçará em breve 😕",
+      "xTournament is over! See you at the next challenge": "O xTournament terminou! Vemo-nos no próximo desafio 😊",
+      "xTournament is over! Try harder next time!": "A xTournament terminou! 😕 Dê o seu melhor na próxima!",
+      "Your bet is below the {{amount}} {{currency}} minimum for the xTournament! Progress is paused.": "Sua aposta está abaixo do mínimo de {{amount}} {{currency}} para o xTournament! O progresso está pausado."
+    }
+  },
+  "howToPlay": {
+    "xRace": {
+      "title": "Como jogar?",
+      "Welcome": "Bem-vindo à xRace, o modo emocionante do Aviator! Prepare-se para embarcar em desafios emocionantes e ganhar recompensas fantásticas.",
+      "Here’s how it works:": "O funcionamento é o seguinte:",
+      "joinTheChallenge": {
+        "title": "Entre na corrida",
+        "text": "Quando sai o anúncio da xRace, basta clicar no botão \"Entrar\" para confirmar a sua participação. Não perca a oportunidade!"
+      },
+      "taskProgress": {
+        "title": "Progresso da tarefa",
+        "text": "Quando a xRace começa, aparece uma barra de progresso que regista a conclusão das tarefas. Jogue e execute as tarefas específicas atribuídas à xRace."
+      },
+      "fightForYourPrize": {
+        "title": "Lute pelo seu Prémio",
+        "text": "Apresse-se! O fundo de prémios para a xRace é limitado, por isso, quanto mais depressa completar todas as tarefas, mais hipóteses terá de receber recompensas."
+      },
+      "challengeCompletion": {
+        "title": "Conclusão da xRace",
+        "text": "Quando tiver concluído com êxito todas as tarefas para a xRace, será elegível para receber os seus prémios. Empolgante, não é?"
+      },
+      "Join the xRace, play your best, and aim to be one of the winners. Good luck on your xRace!": "Junte-se à xRace, dê o seu melhor e tente ser um dos vencedores. Boa sorte para a sua xRace!",
+      "Detailed rules": "Regras detalhadas"
+    },
+    "xMission": {
+      "title": "Como jogar?",
+      "Welcome": "Bem-vindo à xMission, o modo emocionante do Aviator! Prepare-se para embarcar em desafios emocionantes e ganhar recompensas fantásticas.",
+      "Here’s how it works:": "O funcionamento é o seguinte:",
+      "joinTheChallenge": {
+        "title": "Junte-se à xMission",
+        "text": "Quando sai o anúncio da xMission, basta clicar no botão \"Entrar\" para confirmar a sua participação. Não perca a oportunidade!"
+      },
+      "taskProgress": {
+        "title": "Progresso da tarefa",
+        "text": "Quando a xMission começa, aparece uma barra de progresso que regista a conclusão das tarefas. Jogue e execute as tarefas específicas atribuídas à xMission."
+      },
+      "fightForYourPrize": {
+        "title": "Lute pelo seu prémio",
+        "text": "Depressa! O tempo é limitado, por isso tem de completar a xMission a tempo de receber o prémio."
+      },
+      "challengeCompletion": {
+        "title": "Conclusão da xMission",
+        "text": "Quando tiver concluído com êxito todas as tarefas para a xMission, será elegível para receber os seus prémios. Empolgante, não é?"
+      },
+      "Join the xMission, play your best, and aim to be one of the winners. Good luck on your xMission!": "Junte-se à xMission, dê o seu melhor e tente ser um dos vencedores. Boa sorte para a sua xMission!",
+      "Detailed rules": "Regras detalhadas"
+    },
+    "xTournament": {
+      "title": "Como jogar?",
+      "Welcome": "Bem-vindo ao xTournament, o modo emocionante do Aviator! Prepare-se para embarcar em desafios emocionantes e ganhar recompensas fantásticas.",
+      "Here’s how it works:": "O funcionamento é o seguinte:",
+      "joinTheChallenge": {
+        "title": "Entre no xTournament",
+        "text": "Quando sai o anúncio do xTournament, basta clicar no botão \"Entrar\" para confirmar a sua participação. Não perca a oportunidade!"
+      },
+      "taskProgress": {
+        "title": "Progresso da tarefa",
+        "text": "Quando o xTournament começa, aparece uma barra de progresso que regista os seus pontos. Jogue e execute as tarefas específicas atribuídas ao xTournament."
+      },
+      "fightForYourPrize": {
+        "title": "Lute pelo seu Prémio",
+        "text": "Despache-se! O fundo de prémios para o xTournament é dividido pelos lugares finais, por isso, quanto mais pontos ganhar, mais hipóteses tem de ganhar o prémio."
+      },
+      "challengeCompletion": {
+        "title": "Conclusão do xTournament",
+        "text": "Assim que o xTournament terminar e os lugares finais forem decididos, poderá ser elegível para receber os seus prémios. Emocionante, não é?"
+      },
+      "Join the xTournament, play your best, and aim to be one of the winners. Good luck on your xTournament!": "Junte-se ao xTournament, dê o seu melhor e tente ser um dos vencedores. Boa sorte para o seu xTournament!",
+      "Detailed rules": "Regras detalhadas"
+    }
+  },
+  "challengeRules": {
+    "xRace": {
+      "title": "REGRAS DA xRACE",
+      "stepInto": "Entre no mundo de Aviator xRaces, onde enfrentará desafios e tarefas emocionantes. Complete-os rapidamente para receber as recompensas. É uma corrida contra o tempo e contra os outros jogadores, com prémios emocionantes para ganhar. Entre agora e mostre as suas capacidades!",
+      "rules": {
+        "title": "Regras",
+        "point1": "Para participar na xRace, clique no botão \"Entrar\" e aguarde que o desafio comece.",
+        "point2": "Para concluir a xRace, cumpra todas as tarefas.",
+        "point3": "Faça as tarefas da xRace, assegurando que todas as ações e apostas cumprem as regras da xRace e os prazos ativos.",
+        "point4": "Apenas as apostas feitas com a moeda selecionada serão elegíveis para a xRace.",
+        "point5": "Se uma ação cumprir os requisitos de várias tarefas, contribui para o êxito de todas elas.",
+        "point6": "Ao participar na xRace, pode utilizar as Apostas Grátis, para além das apostas básicas.",
+        "point7": "Se o operador cancelar a xRace antes da sua conclusão, esta é considerada terminada no momento do cancelamento e serão atribuídos prémios a todos os jogadores que tenham cumprido as condições da xRace.",
+        "point8": "A xRace pode estar pausada devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point9": "Enquanto estiver pausado, o progresso ficará em espera e as ações não contarão para a conclusão.",
+        "point10": "O operador se reserva o direito de cancelar a xRace devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point11": "O operador pode optar por distribuir alguns ou todos os prêmios manualmente, a critério do operador e de acordo com os termos e condições da plataforma."
+      },
+      "tasks": {
+        "title": "Tarefas",
+        "beforeYouBegin": "Antes de começar, reveja os requisitos da xRace:",
+        "WIN_MONEY_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é atingir um total de {{goal}} {{currency}} em prémios.",
+        "CATCH_MULTIPLIERS": "Para completar esta tarefa, o seu objetivo é fazer um cash out {{targetTimes}} vezes com {{targetMinMultiplier}}x ou mais.",
+        "WIN_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer um cash out em {{goal}} ronda(s).",
+        "BET_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é apostar um total de {{goal}} {{currency}}.",
+        "COLLECT_CASH_OUTS_MULTIPLIER_SUM": "Para concluir esta tarefa, o seu objetivo é reunir cash outs que totalizem um multiplicador total de {{goal}}x.",
+        "PLAY_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer uma aposta em {{goal}} rondas(s).",
+        "PLAY_ROUNDS_MAX_REACHED_MULTIPLIER": "Para concluir esta tarefa, o seu objetivo é participar em {{goal}} ronda(s) em que se tenha atingido {{targetMinMultiplier}}x.",
+        "The bet should be at least minBet currency.": "A aposta mínima é de {{minBet}} {{currency}}."
+      },
+      "prizes": {
+        "title": "Prémios",
+        "point1": "Para obter um prémio, conclua a xRace antes de esta terminar, ou antes do prémio total se esgotar.",
+        "point2": "Cada vencedor receberá uma parte igual do montante do prémio com base na ordem de conclusão, até o prémio total ser esvaziado.",
+        "point2-1": "O progresso do desafio é atualizado apenas enquanto o desafio está ativo. Assim que o prêmio for esgotado ou o tempo acabar, o progresso para de ser atualizado.",
+        "point3": "Após concluir com êxito todas as tarefas da xRace no prazo estabelecido, pode obter o seu prémio clicando no botão \"Ficar com o meu prémio\".",
+        "point4": "Se ganhar um prémio, mas não o reclamar, este será adicionado à sua conta automaticamente após o fim da xRace.",
+        "point4-1": "O período de recebimento do Prémio Especial pode variar consoante o operador. Contacte o fornecedor de casino para saber mais.",
+        "point5": "Pode consultar a lista de vencedores na janela modal da Tabela de classificação.",
+        "point6": "Se o operador cancelar a xRace antes da sua conclusão, será considerada terminada no momento do cancelamento e serão atribuídos prémios a todos os jogadores que tenham cumprido as condições da xRace."
+      },
+      "pleaseNote": "Tenha em atenção ao valor mínimo de aposta necessário para participar na xRace. Certifique-se de que a sua aposta cumpre ou excede este limite especificado para se qualificar."
+    },
+    "xMission": {
+      "title": "Regras da xMission",
+      "stepInto": "Entre no mundo das xMissions do Aviator, onde enfrentará desafios e tarefas emocionantes. Complete-os dentro do tempo para receber as recompensas. É uma corrida contra o tempo com prémios emocionantes para ganhar. Entre agora, cumpra a sua missão e receba a sua recompensa!",
+      "rules": {
+        "title": "Regras",
+        "point1": "Para participar na xMission, clique no botão \"Entrar\" e aguarde que a missão comece.",
+        "point2": "Para concluir a missão, cumpra todas as tarefas no tempo permitido.",
+        "point3": "Faça as tarefas da xMission, assegurando que todas as ações e apostas cumprem as regras da xMission e os prazos ativos.",
+        "point4": "Apenas as apostas feitas com a moeda selecionada serão elegíveis para a xMission.",
+        "point5": "Se uma ação cumprir os requisitos de várias tarefas, contribui para o êxito de todas elas.",
+        "point6": "Quando participa em missões, pode utilizar as Apostas Grátis, para além das apostas básicas.",
+        "point7": "Se o operador cancelar a missão antes da sua conclusão, esta é considerada terminada no momento do cancelamento e serão atribuídos prémios a todos os jogadores que tenham cumprido as condições da missão.",
+        "point8": "A xMission pode estar pausada devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point9": "Enquanto estiver pausado, o progresso ficará em espera e as ações não contarão para a conclusão.",
+        "point10": "O operador se reserva o direito de cancelar a xMission devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point11": "O operador pode optar por distribuir alguns ou todos os prêmios manualmente, a critério do operador e de acordo com os termos e condições da plataforma."
+      },
+      "tasks": {
+        "title": "Tarefas",
+        "beforeYouBegin": "Antes de começar, reveja os requisitos da xMission:",
+        "WIN_MONEY_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é atingir um total de {{goal}} {{currency}} em prémios.",
+        "CATCH_MULTIPLIERS": "Para completar esta tarefa, o seu objetivo é fazer um cash out {{targetTimes}} vezes com {{targetMinMultiplier}}x ou mais.",
+        "WIN_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer um cash out em {{goal}} ronda(s).",
+        "BET_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é apostar um total de {{goal}} {{currency}}.",
+        "COLLECT_CASH_OUTS_MULTIPLIER_SUM": "Para concluir esta tarefa, o seu objetivo é reunir cash outs que totalizem um multiplicador total de {{goal}}x.",
+        "PLAY_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer uma aposta em {{goal}} rondas(s).",
+        "PLAY_ROUNDS_MAX_REACHED_MULTIPLIER": "Para concluir esta tarefa, o seu objetivo é participar em {{goal}} ronda(s) em que se tenha atingido {{targetMinMultiplier}}x.",
+        "The bet should be at least minBet currency.": "A aposta mínima é de {{minBet}} {{currency}}."
+      },
+      "prizes": {
+        "title": "Prémios",
+        "point1": "Para receber um prémio, complete a xMission antes que termine.",
+        "point2": "Após concluir com êxito todas as tarefas da xMission no prazo estabelecido, pode obter o seu prémio clicando no botão \"Ficar com o meu prémio\".",
+        "point2-1": "O progresso do desafio é atualizado apenas enquanto o desafio está ativo. Assim que o prêmio for esgotado ou o tempo acabar, o progresso para de ser atualizado.",
+        "point3": "Se ganhar um prémio, mas não o reclamar, este será adicionado à sua conta automaticamente após o fim da xMission.",
+        "point3-1": "O período de recebimento do Prémio Especial pode variar consoante o operador. Contacte o fornecedor de casino para saber mais.",
+        "point4": "Se o operador cancelar a xMission antes da sua conclusão, será considerada terminada no momento do cancelamento e serão atribuídos prémios a todos os jogadores que tenham cumprido as condições da xMission."
+      },
+      "pleaseNote": "Tenha em atenção ao valor mínimo de aposta necessário para participar na xMission. Certifique-se de que a sua aposta cumpre ou excede este limite especificado para se qualificar."
+    },
+    "xTournament": {
+      "title": "Regras do xTournament",
+      "stepInto": "Entre no mundo de Aviator xTournaments, onde enfrentará desafios e tarefas emocionantes. Complete-os rapidamente para receber as recompensas. É uma corrida contra o tempo e contra os outros jogadores, com prémios emocionantes para ganhar. Entre agora e mostre as suas capacidades!",
+      "rules": {
+        "title": "Regras",
+        "point1": "Para participar no xTournament, clique no botão \"Entrar\" e aguarde que o desafio comece.",
+        "point2": "Para ganhar o xTournament, acumule pontos ao completar tarefas e suba na tabela de classificação para ganhar o melhor prémio.",
+        "point3": "Apenas as apostas feitas com a moeda selecionada serão elegíveis para o xTournament.",
+        "point4": "Ao participar no xTournament, pode utilizar as Apostas Grátis, para além das apostas básicas.",
+        "point5": "A xTournament pode estar pausada devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point6": "Enquanto estiver pausado, o progresso ficará em espera e as ações não contarão para a conclusão.",
+        "point7": "O operador se reserva o direito de cancelar o xTournament devido a problemas técnicos ou outras circunstâncias imprevistas.",
+        "point8": "O operador pode optar por distribuir alguns ou todos os prêmios manualmente, a critério do operador e de acordo com os termos e condições da plataforma."
+      },
+      "tasks": {
+        "title": "Tarefas",
+        "beforeYouBegin": "Antes de começar, reveja os requisitos do xTournament:",
+        "WIN_MONEY_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é ganhar {{currency}}. Por cada {{pointsConversionFactor}} {{currency}} ganhos irá receber 1 ponto.",
+        "CATCH_MULTIPLIERS": "Para completar esta tarefa, o seu objetivo é fazer um cash out com {{targetMinMultiplier}}x. Por cada {{pointsConversionFactor}}x recolhido irá receber 1 ponto.",
+        "WIN_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer um cash out. Por cada {{pointsConversionFactor}} ronda(s) ganha(s) irá receber 1 ponto.",
+        "BET_IN_TOTAL": "Para concluir esta tarefa, o seu objetivo é fazer uma aposta. Por cada {{pointsConversionFactor}} {{currency}} apostados irá receber 1 ponto.",
+        "COLLECT_CASH_OUTS_MULTIPLIER_SUM": "Para completar esta tarefa, o seu objetivo é reunir multiplicadores de cash out. Por cada {{pointsConversionFactor}}x recolhido irá receber 1 ponto.",
+        "PLAY_ROUNDS": "Para concluir esta tarefa, o seu objetivo é fazer uma aposta. Por cada {{pointsConversionFactor}} ronda(s) jogada(s) irá receber 1 ponto.",
+        "PLAY_ROUNDS_MAX_REACHED_MULTIPLIER": "Para completar esta tarefa, o seu objetivo é participar numa ronda onde alcançou {{targetMinMultiplier}}x. Por cada {{pointsConversionFactor}} ronda(s) jogada(s) irá receber 1 ponto.",
+        "CATCH_HIGHEST_MULTIPLIER": "Para concluir esta tarefa, o seu objetivo é acumular multiplicadores maiores. Se o seu multiplicador atual for maior que o anterior, será atualizado na classificação."
+      },
+      "prizes": {
+        "title": "Prémios",
+        "point1": "Para reclamar um prémio, compita no xTournament até ao fim.",
+        "point2": "Cada vencedor receberá um prémio conforme a sua posição final.",
+        "point2-1": "O progresso do desafio é atualizado apenas enquanto o desafio está ativo. Assim que o prêmio for esgotado ou o tempo acabar, o progresso para de ser atualizado.",
+        "point3": "Se houver um prémio associado ao lugar final, este será adicionado à sua conta automaticamente após o fim do xTournament.",
+        "point3-1": "O período de recebimento do Prémio Especial pode variar consoante o operador. Contacte o fornecedor de casino para saber mais.",
+        "point4": "Pode consultar a lista de participantes na janela modal da Tabela de classificação."
+      },
+      "pleaseNote": "Tenha em atenção ao valor mínimo de aposta necessário para participar no xTournament. Certifique-se de que a sua aposta cumpre ou excede este limite especificado para se qualificar."
+    }
+  },
+  "tasks": {
+    "CATCH_MULTIPLIERS": "Apanhar {{targetMinMultiplier}}x por {{goal}} vez(es)",
+    "WIN_MONEY_IN_TOTAL": "Ganhar um total de {{goal}} {{currency}}",
+    "WIN_ROUNDS": "Ganhar em {{goal}} rondas",
+    "BET_IN_TOTAL": "Apostar um total de {{goal}} {{currency}}",
+    "PLAY_ROUNDS": "Jogar {{goal}} rondas",
+    "PLAY_ROUNDS_MAX_REACHED_MULTIPLIER": "Jogar {{goal}} rondas em que se atinja {{targetMinMultiplier}}x ou mais",
+    "COLLECT_CASH_OUTS_MULTIPLIER_SUM": "Recolher um multiplicador total de {{goal}}x",
+    "Min. bet": "Aposta mín. - {{minBet}} {{currency}}",
+    "xTournament": {
+      "WIN_MONEY_IN_TOTAL": {
+        "name": "Recolha os ganhos",
+        "description": "Ganhe o maior montante de dinheiro durante o torneio. {{pointsConversionFactor}} {{currency}} = 1 Ponto"
+      },
+      "WIN_ROUNDS": {
+        "name": "Ganhe Rondas",
+        "description": "Ganhe o maior número de rondas durante o torneio. {{pointsConversionFactor}} ronda(s) = 1 Ponto"
+      },
+      "BET_IN_TOTAL": {
+        "name": "Aposte",
+        "description": "Coloque o maior número total de apostas durante o torneio. {{pointsConversionFactor}} {{currency}} = 1 Ponto."
+      },
+      "PLAY_ROUNDS": {
+        "name": "Jogue Rondas",
+        "description": "Jogue o maior número de rondas durante o torneio. {{pointsConversionFactor}} ronda(s) = 1 Ponto."
+      },
+      "PLAY_ROUNDS_MAX_REACHED_MULTIPLIER": {
+        "name": "Jogar rondas em que se atinja {{targetMinMultiplier}}x ou mais",
+        "description": "Jogar o maior número de rondas em que o multiplicador atinja {{{targetMinMultiplier}}}x ou superior. {{pointsConversionFactor}} ronda(s) = 1 Ponto."
+      },
+      "COLLECT_CASH_OUTS_MULTIPLIER_SUM": {
+        "name": "Recolha Multiplicadores ",
+        "description": "Colete o maior valor total de multiplicadores durante o torneio. {{pointsConversionFactor}}x = 1 Ponto."
+      },
+      "CATCH_HIGHEST_MULTIPLIER": {
+        "name": "Capturar Máximo Multiplicador",
+        "description": "Capturar o maior multiplicador único durante o torneio. {{pointsConversionFactor}}x = 1 Ponto."
+      },
+      "Min. bet": "Aposta mín. - {{minBet}} {{currency}}"
+    }
+  },
+  "toastMessage": {
+    "Task completed:": "Tarefa concluída:",
+    "Challenge completed. Take your prize!": "{{challenge}} cumprido. Fique com o seu prémio!",
+    "Prize has been paid. Congratulations!": "O prémio foi pago. Parabéns!",
+    "Challenge ended: all prizes have been won": "{{challenge}} chegou ao fim: todos os prémios foram ganhos",
+    "Challenge has been paused": "{{challenge}} foi interrompido",
+    "Challenge has been resumed": "{{challenge}} foi retomado",
+    "You have been removed from the Challenge by the Administrator": "Foi retirado(a) do {{challenge}} pelo Administrador",
+    "Challenge was canceled": "{{challenge}} foi cancelado"
+  }
+}

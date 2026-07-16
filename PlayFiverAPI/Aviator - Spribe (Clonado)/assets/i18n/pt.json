@@ -1,0 +1,482 @@
+{
+  "canvas": {
+    "flew_away": "VOOU PARA LONGE!"
+  },
+  "game": {
+    "bet-controls": {
+      "bet-control": {
+        "Auto bet": "Aposta automática",
+        "auto cashout": "Levantar Auto",
+        "Auto Play": "Autojogo"
+      },
+      "auto-play": {
+        "Auto play options": "Opções de autojogo",
+        "Number of Rounds:": "Número de Rodadas:",
+        "Stop if cash decreases by": "Parar se o saldo diminuir",
+        "Stop if cash increases by": "Parar se o saldo aumentar",
+        "Stop if single win exceeds": "Parar se o ganho único exceder",
+        "Reset": "Reiniciar",
+        "Start": "Começar"
+      }
+    },
+    "bets-widget": {
+      "All Bets": "Apostas",
+      "Previous": "Anterior",
+      "Round Result": "Resultado da ronda",
+      "Bet": "Aposta",
+      "Bets": "Apostas",
+      "Top": "Topo",
+      "Total win": "Prémio total",
+      "date": "Data",
+      "Player": "Jogador",
+      "fairness": "Imparcialidade",
+      "Win": "Prémio",
+      "Result": "Resultado",
+      "Round max.": "Máximo da ronda",
+      "top": {
+        "Date & Time": "Data e hora",
+        "X": "X",
+        "Win": "Prémio",
+        "Rounds": "Rondas",
+        "Day": "Dia",
+        "Month": "Mês",
+        "Year": "Ano"
+      }
+    },
+    "chat-widget": {
+      "Rules": "Regras",
+      "New messages": "Mensagens novas",
+      "chat-message": {
+        "Good job! 😮": "Bom trabalho! 😮",
+        "Wow! 😮": "Uau! 😮",
+        "Awesome! 🌟": "Fantástico! 🌟",
+        "Cool! 😎": "Fixe! 😎",
+        "That's huge! 🛩": "Incrível! 🛩",
+        "Congratulations 👏": "Parabéns 👏",
+        "Best in this round with HUGE WIN! 👏": "Melhor nesta rodada com ENORME VITÓRIA! 👏",
+        " made a rain! 🌧😊": " fez chover! 🌧😊",
+        "Free bets for everyone! 😊": "Apostas grátis para todos! 😊",
+        "ticket-rain": {
+          "CLAIM": "RECOLHER",
+          "CLAIMED": "RECOLHIDO",
+          "ALL CLAIMED": "TODOS RECOLHIDOS",
+          "Tickets Giveaway": "Sorteio de Bilhetes",
+          "Tickets": "Bilhetes"
+        },
+        "chat-message-ban": {
+          "you": " Você",
+          "have been": " foi",
+          "has been": " foi",
+          "banned-other": " banido",
+          "banned-me": " banido",
+          "from chat": " do chat",
+          "from chat for": " do chat para",
+          "from chat until": " do chat até",
+          "from chat permanently": " do chat permanentemente",
+          "day": "d",
+          "hour": "h",
+          "min": "m",
+          "sec": "s",
+          "reason": ". Motivo: ",
+          "strong language": "Linguagem forte",
+          "spam": "Spam"
+        },
+        "chat-message-restriction": {
+          "Chat access is restricted for players with balance below {amount} {currency}.": "O acesso ao chat está limitado aos jogadores com saldo inferior a {{amount}} {{currency}}",
+          "Chat access is restricted for players with wager amount over the last {duration} days below {amount} {currency}.": "O acesso ao chat está limitado aos jogadores com montante de apostas, durante os últimos {{duration}} dia(s), abaixo de {{amount}} {{currency}}",
+          "Chat access is restricted for players whose account has been active for less than {duration} days.": "O acesso ao chat está limitado aos jogadores cuja conta está ativa há menos de {{duration}} dia(s).",
+          "Message blocked for breaking chat rules. Further violations may result in a ban.": "Mensagem bloqueada devido à violação das regras do chat. Violações subsequentes podem resultar em exclusão.",
+          "You have been banned from chat. Reason: {reason}.": "Foi banido(a) do chat. Motivo: {{reason}}.",
+          "You have been banned from chat until {date}. Reason: {reason}.": "Foi banido(a) do chat até {{date}}. Motivo: {{reason}}."
+        }
+      },
+      "chat-input": {
+        "please wait": "Filtro de spam...",
+        "chat-input-tools": {
+          "chat-input-tool-emoji": {
+            "search emoji": "Procurar emoji...",
+            "favorites": "Favoritos",
+            "people": "Pessoas",
+            "nature": "Natureza",
+            "objects": "Objetos",
+            "places": "Lugares",
+            "symbols": "Símbolos"
+          },
+          "chat-input-tool-gif": {
+            "search gif": "Procurar gif..."
+          },
+          "chat-input-tool-rain": {
+            "description": "Esta funcionalidade dará um montante selecionado a utilizadores aleatórios no chat.",
+            "amount per player": "Montante por jogador,",
+            "number of players": "Número de jogadores"
+          }
+        }
+      },
+      "chat-connector-message": {
+        "Establishing a chat connection...": "A estabelecer ligação para o chat...",
+        "Chat has been disconnected.": "O chat foi interrompido."
+      },
+      "modals": {
+        "chat-rules": {
+          "title": "REGRAS DO CHAT",
+          "point1": "Não envie spam e não utilize letras maiúsculas em demasia.",
+          "point2": "Seja respeitoso; não assedie nem seja ofensivo para os outros jogadores.",
+          "point3": "Não partilhe informações pessoais, suas ou de outros jogadores.",
+          "point4": "Não exija nem peça empréstimos, chuva ou dicas.",
+          "point5": "Evite comportamentos que possam ser vistos como possíveis fraudes.",
+          "point6": "Não faça qualquer tipo de publicidade, transações, vendas, compras ou ofertas.",
+          "point7": "O acesso ao chat está limitado aos jogadores com saldo inferior a {{minBalanceInPlayerCurrency}} {{currency}}",
+          "point8": "O acesso ao chat está limitado aos jogadores com montante de apostas, durante os últimos {{minWagerPeriodInDays}} dias, abaixo de {{minWagerInPlayerCurrency}} {{currency}}",
+          "point9": "O acesso ao chat está limitado aos jogadores cuja conta está ativa há menos de {{minLifetimePeriodInDays}} dia(s)."
+        }
+      }
+    }
+  },
+  "shared": {
+    "acknowledge": "Reconhecer",
+    "animation": "Animação",
+    "archive": "Arquivo",
+    "auto": "Automático",
+    "avatar": "Avatar",
+    "back": "Voltar",
+    "bet": "Aposta",
+    "cancel": "Cancelar",
+    "cash_out": "Retirar",
+    "cashed_out": "Sacou",
+    "Challenge Tickets": "Bilhetes de Desafio",
+    "change": "Mudar",
+    "CHANGE": "MUDAR",
+    "claim": "Reivindicação",
+    "close": "Fechar",
+    "Game Room: Room #": "Sala de Jogo: sala #{{value}}",
+    "Room #": "Sala #{{value}}",
+    "multiplier": "Multiplicador",
+    "continue": "Prosseguir",
+    "emoji": "Emoji",
+    "End balance": "Saldo final",
+    "free_bets": "Apostas grátis",
+    "game_limits": "Limites de jogo",
+    "game_rules": "Regras de jogo",
+    "gif": "Gif",
+    "home": "Início",
+    "how_to_play": "Como jogar",
+    "load_more": "Carregar mais",
+    "music": "Música",
+    "my_bet_history": "Meu histórico de apostas",
+    "notification": "Notificação",
+    "Other_Settings": "Outras definições",
+    "provably_fair_settings": "Configurações comprovadamente justas",
+    "rain": "Chuva",
+    "random": "Aleatório",
+    "reply": "Responder",
+    "round": "Rodada",
+    "round_history": "Histórico da ronda",
+    "save": "Salvar",
+    "Settings": "Definições",
+    "sound": "Som",
+    "Start_balance": "Saldo inicial",
+    "stop": "Parar",
+    "thank_you_for_playing": "Obrigado por jogar",
+    "This_functionality_is_disabled": "Esta funcionalidade está desativada",
+    "total": "Total",
+    "WAITING_FOR_NEXT_ROUND": "A AGUARDAR A PRÓXIMA RONDA",
+    "waiting_for_next_round": "Esperando a próxima rodada",
+    "watch": "Assistir",
+    "what_is_provably_fair": "O que é comprovadamente justo",
+    "win": "Ganho",
+    "Connection...": "Ligação...",
+    "modals": {
+      "free-bets-management": {
+        "title": "GESTÃO DE APOSTAS GRÁTIS",
+        "play with cash": "Jogar com dinheiro",
+        "active free bets": "APOSTAS GRÁTIS ATIVAS",
+        "quantity": "Quantity",
+        "granted": "Concedido:",
+        "min cashout coefficient": "Multiplicador de levantamento mín.:",
+        "expires": "Expira:",
+        "no active free bets": "Sem apostas grátis ativas. Ainda!",
+        "nothing yet": "Nada ainda"
+      },
+      "fairness": {
+        "server seed": "Semente do servidor:",
+        "server tip": "Chave do cliente",
+        "client seed": "Semente do cliente:",
+        "client tip": "Gerada do lado dos jogadores",
+        "player": "Jogador N{{{value}}:",
+        "seed": "Chave:",
+        "not enough": "Não há jogadores suficientes",
+        "hash": "Hash SHA512 combinado:",
+        "hash tip": "As chaves acima combinadas e convertidas para Hash SHA512. Este é o seu resultado de jogo",
+        "hex": "Hexadecimal:",
+        "decimal": "Decimal:",
+        "result": "Resultado:",
+        "help": "Para instruções, consultar"
+      },
+      "fairness-settings": {
+        "tooltip": {
+          "text": "Este jogo utiliza a tecnologia Provably Fair para determinar o resultado do jogo. Esta ferramenta dá-lhe a capacidade de mudar a sua chave e verificar a imparcialidade do jogo."
+        },
+        "seed-change": {
+          "change seed": "ALTERAR A CHAVE",
+          "enter new seed": "Introduza a nova chave:"
+        },
+        "alert": "Não pode mudar a chave enquanto a aposta estiver ativa",
+        "client-part": {
+          "title": "Chave do cliente (o seu):",
+          "text": "O resultado da rodada é determinado pela combinação da chave do servidor e as 3 primeiras apostas da ronda.",
+          "random": "Aleatório em cada novo jogo",
+          "current": "Atual:",
+          "manual": "Introduzir manualmente"
+        },
+        "server seed": "Chave do servidor SHA256:",
+        "bottom": "Pode verificar a imparcialidade de cada aposta a partir do histórico de apostas"
+      },
+      "game-avatar": {
+        "title": "ALTERAR AVATAR"
+      },
+      "Change Room": {
+        "title": "MUDAR DE SALA",
+        "text": "Alterar a sala implica reiniciar o jogo. Pretende continuar?"
+      },
+      "rules": {
+        "game-rules": {
+          "main-text": "O Aviator faz parte de uma nova geração de entretenimento de iGaming. Pode ganhar muito mais vezes, em segundos! O Aviator é construído com o sistema provably fair, que é atualmente a única garantia real de honestidade na indústria do jogo.",
+          "link": "Saiba mais sobre o sistema provably fair",
+          "steps": {
+            "title": "O Aviator é tão fácil de jogar como 1-2-3:",
+            "first-step": " antes de descolar",
+            "second-step": " à medida que o Avião da Sorte descola e os seus ganhos aumentam.",
+            "third-step": "antes que o avião desapareça e ganhe X vezes mais!",
+            "text": "Mas lembre-se, se não tiver tempo de fazer o levantamento antes de o Avião da Sorte voar para longe, a sua aposta será perdida. O Aviator é pura excitação! Arrisque e ganhe. Está tudo nas suas mãos!"
+          },
+          "details": {
+            "title": "Mais detalhes",
+            "point1": "O multiplicador de ganho começa em 1x e aumenta à medida que o Avião da Sorte descola.",
+            "point2": "Os seus ganhos são calculados com o multiplicador no momento em que fizer o levantamento, multiplicado pela sua aposta.",
+            "point3-1": "Antes do início de cada ronda, o nosso gerador de números aleatórios provably fair gera o multiplicador com o qual o Avião da Sorte voará para longe. Pode verificar a honestidade desta geração, clicando no ",
+            "point3-2": " ícone na guia Top.",
+            "multiplierFormula": "A velocidade de aumento do multiplicador varia e pode ser determinada através da fórmula: multiplicador = {{multiplierFormula}}"
+          },
+          "game-functions": {
+            "title": "FUNÇÕES DO JOGO",
+            "bet-cashout": {
+              "title": "Aposta e levantamento",
+              "point1": "Selecione um montante e prima o botão \"Aposta\" para fazer uma aposta.",
+              "point2": "Pode fazer duas apostas em simultâneo, adicionando um segundo painel de aposta. Para adicionar um segundo painel de aposta, prima o ícone de \"mais\", que se encontra no canto superior direito do primeiro painel de aposta.",
+              "point3": "Prima o botão \"Cash Out\" para levantar os seus ganhos. O seu ganho é a sua aposta multiplicada pelo multiplicador do Cash Out.",
+              "point4": "Perderá a aposta, se não fizer o cash out antes de o avião voar para longe.",
+              "point4-example-1": "Por exemplo:",
+              "point4-example-2": "Se o avião cair com um multiplicador de 1,25x, significa que o multiplicador atingiu 1,24x e depois caiu.",
+              "point4-example-3": "1,25x é considerado o multiplicador da queda. Se definir o cashout automático para 1,25x, a sua aposta será perdida porque o avião caiu pouco antes de alcançar o ponto de cashout automático.",
+              "point4-example-4": "Certifique-se sempre que faz o cashout do dinheiro antes do multiplicador de queda para garantir um prémio!",
+              "point5": "É possível cancelar a aposta através do botão \"Cancelar\", se a ronda ainda não tiver começado.",
+              "point6": "Ajuste o valor da aposta através dos botões \"+\" e \"-\" para alterar o valor da aposta. Pode ainda selecionar o valor da aposta através dos valores predefinidos ou introduzir um valor manualmente."
+            },
+            "auto-play-auto-cashout": {
+              "title": "Autojogo e Auto Cash Out",
+              "point1": "O Autojogo é ativado a partir do separador \"Auto\" no Painel de Apostas, premindo o botão \"Autojogo\".",
+              "point2": "No Painel de Autojogo, a opção \"Parar se o saldo diminuir\" para o Autojogo, se o saldo diminuir o montante selecionado.",
+              "point3": "No Painel de Autojogo, a opção \"Parar se o saldo aumentar\" para o Autojogo, se o saldo aumentar o montante selecionado.",
+              "point4": "No Painel de Autojogo, a opção \"Parar se um ganho único exceder\" para o Autojogo, se o ganho único exceder o montante selecionado.",
+              "point5": "O Auto Cash Out está disponível a partir do separador \"Auto\" no Painel de Apostas. Após a ativação, a sua aposta será levantada automaticamente quando atingir o multiplicador introduzido.",
+              "point6": "O Autojogo é ativado a partir do separador \"Auto\" no Painel de Apostas, selecionando a caixa de verificação \"Aposta Automática\". Após a ativação, as apostas são feitas automaticamente, mas para o Cash Out, deverá premir o botão \"Cash Out\" em cada ronda. Se quiser que a aposta seja levantada automaticamente, então utilize a opção \"Auto Cash Out\".",
+              "point5-detailed": "O Levantamento Automático está disponível no separador \"Auto\" no painel de Apostas. Após a ativação, a sua aposta será automaticamente levantada quando atingir o multiplicador introduzido. Se o avião descolar exatamente quando o multiplicador coincidir com o que escolheu para o levantamento automático, a ronda é contabilizada como uma perda. Por exemplo, se o multiplicador de levantamento automático estiver definido para 1,5x e o avião descolar com esse mesmo multiplicador de 1,5x, a ronda é perdida.",
+              "point7": "Antes de iniciar o Autojogo, defina o valor da aposta pretendida. Na secção Aposta e Levantamento encontra os passos necessários para o fazer.",
+              "point8": "Ao configurar o Autojogo, escolha o número de rondas entre as opções fornecidas e uma ou mais condições para parar, tais como \"Parar se o saldo diminuir em\", \"Parar se o saldo aumentar em\", \"Parar se um único ganho exceder\".",
+              "point9": "Pode parar o Autojogo através do botão Stop."
+            },
+            "live-bets-statistics": {
+              "title": "Apostas ao Vivo e Estatísticas",
+              "point1": "No lado esquerdo da interface do jogo (ou no Painel de Aposta no telemóvel), está localizado o painel de Apostas ao Vivo. Aqui pode ver todas as apostas que estão a ser feitas na ronda atual.",
+              "point2-1": "Compartilhe os resultados da rodada clicando no ",
+              "point2-2": " e colando no chat.",
+              "point3": "As estatísticas do jogo estão localizadas no painel \"Top\". Pode navegar pelos ganhos por montante, ou multiplicador de Cash Out, e ver os maiores multiplicadores arredondados."
+            },
+            "in-game-chat": {
+              "title": "Chat no Jogo",
+              "point1": "O Painel de Chat está localizado no lado direito da interface do jogo (ou depois de premir o ícone do Chat, no canto superior direito da interface móvel). Pode falar com outros jogadores no Chat. Além disso, é publicada automaticamente informação relativa a ganhos enormes no Chat."
+            },
+            "free-bets": {
+              "point1": "Pode verificar o estado das Apostas Grátis a partir do Menu de Jogo > Apostas Grátis. As Apostas Grátis são atribuídas pelo operador ou pela Funcionalidade Chuva."
+            },
+            "rain-feature": {
+              "title": "Funcionalidade Chuva",
+              "point1": "O operador pode soltar Apostas Grátis no chat através da funcionalidade Chuva. Para receber estas Apostas Grátis, basta premir o botão \"Receber\" quando surgem no chat.",
+              "point2": "Os jogadores podem largar Apostas Grátis para outros jogadores através do painel \"Chuva\". Para partilhar as Apostas Grátis, prima o botão \"Chuva\" localizado no fundo do chat. Os outros jogadores podem agarrá-las com o botão \"Receber\"."
+            },
+            "randomization": {
+              "title": "Aleatoriedade",
+              "point1": "O multiplicador para cada ronda é gerado por um algoritmo \"Provably Fair\" e é completamente transparente e 100% imparcial. ",
+              "point2": "Pode verificar e modificar as definições Provably Fair a partir do menu Jogo > Definições Provably Fair.",
+              "point3-1": "Pode verificar a imparcialidade de cada ronda ao premir ",
+              "point3-2": " o ícone, ao lado dos resultados, nos separadores \"Minhas apostas\" ou \"Top\"."
+            },
+            "minimum_bet_value": {
+              "title": "Valor da aposta mínima",
+              "point1": "O valor da aposta mínima para este jogo é de {{minBankValue}} {{currency}} (aposta mínima multiplicada por 1,01)."
+            },
+            "return-to-player": {
+              "title": "Retorno para o Jogador",
+              "point1": "O retorno teórico para o jogador é {{returnToPlayer}}%. Isto significa que, em média, por cada 100 rondas, cada {{numberOfRounds}} ronda(s) termina(m) com o Avião da Sorte a voar para longe, logo no início da ronda."
+            },
+            "game-menu": {
+              "title": "Menu do jogo",
+              "point1": "Aceda ao menu do jogo através do botão de menu no canto superior direito do ecrã.",
+              "point2": "Para ligar ou desligar os sons do jogo, ative ou desative o interrutor \"Som\".",
+              "point3": "Para ligar ou desligar a música de fundo, ative ou desative o interrutor \"Música\".",
+              "point4": "Para ligar ou desligar a animação do avião, ative ou desative o interrutor \"Animação\".",
+              "point5": "Para ver os limites das apostas mínimas e máximas, bem como o limite máximo de ganhos, prima o botão \"Limites\".",
+              "point6": "Para ver o histórico das suas apostas, prima o botão \"O meu histórico de apostas\"",
+              "point7": "Para ler as regras detalhadas do jogo, vá a \"Regras do jogo\""
+            },
+            "multi-rooms": {
+              "title": "Salas múltiplas",
+              "point1": "No início de cada sessão de jogo, os jogadores são atribuídos aleatoriamente a uma das salas disponíveis e mantêm-se nessa sala até terminar a sessão. O jogador pode alterar a sala de jogo selecionando uma das salas disponíveis na secção \"Sala do Jogo\", no menu do jogo.",
+              "point2": "Cada sala gera resultados da ronda de forma independente. Para isso, usa definições de Chave de Servidor e Jogador únicas para garantir resultados Provably Fair."
+            },
+            "other": {
+              "title": "Outras",
+              "point1": "Se a ligação à Internet for interrompida quando a aposta estiver ativa, o jogo irá fazer o levantamento automático com o multiplicador atual e o montante ganho é adicionado ao seu saldo.",
+              "point2": "Em caso de mau funcionamento do hardware/software do jogo, todas as apostas e pagamentos afetados são anulados e todas as apostas afetadas são reembolsadas.",
+              "unfinished game": "Nos jogos não terminados, o cash out é feito automaticamente.",
+              "max_win": "O jogo fará o cash out automaticamente se o seu ganho atingir {{maxWin}} {{currency}} ou mais.",
+              "max_user_multiplier": "O jogo fará o cashout automaticamente quando o avião atingir {{maxMultiplier}}x.",
+              "inactivityTime": "Se os jogadores permanecerem inativos por mais de {{min}} minutos, o sistema irá encerrar automaticamente a sessão do jogador inativo."
+            },
+            "version": "Versão"
+          }
+        }
+      },
+      "provably-fair": {
+        "slogan": "JOGO 100% JUSTO",
+        "top text": "O \"Aviator\" é baseado em tecnologia de encriptação chamada \"Provably Fair\". Esta tecnologia garante 100% de imparcialidade do resultado do jogo. Com esta tecnologia, é impossível terceiros interferirem no processo de jogo.",
+        "How does it work": "Como funciona",
+        "Simple": "Explicação rápida:",
+        "text1": "O resultado de cada ronda (o multiplicador de \"Voar para longe\" do jogo) não é gerado nos nossos servidores. É gerado com a ajuda dos jogadores da ronda e é totalmente transparente. Desta forma, é impossível para qualquer pessoa manipular o resultado do jogo. Além disso, qualquer pessoa pode verificar e confirmar a imparcialidade do jogo",
+        "more": "Mais informação:",
+        "text2-1": "O resultado da ronda é gerado por quatro participantes independentes: o operador do jogo e os 3 primeiros apostadores da ronda. O operador está a gerar uma chave de servidor (16 símbolos aleatórios). A versão com hash desta chave de servidor está disponível publicamente antes do início da ronda",
+        "text2-2": "(No menu do utilizador, verifique \"Definições Provably Fair\" e depois \"Próxima chave SHA256 do servidor\")",
+        "text2-3": "A chave do cliente é gerada do lado de cada jogador e quando a ronda começa, os 3 primeiros apostadores participam na geração do resultado da ronda. ",
+        "text2-4": "Quando a rodada começa, o jogo funde a chave do servidor com as chaves dos três clientes. O hash SHA512 é gerado a partir de símbolos fundidos, e a partir deste hash, o resultado do jogo.",
+        "video title": "Como verificar",
+        "stats-1": "Pode verificar a imparcialidade de cada rodada a partir do histórico do jogo, clicando no ícone verde.",
+        "stats-2": "Na janela aberta, verá a chave do servidor, 3 pares de chaves de jogadores, o hash combinado e resultado da rodada.",
+        "settings-1": "A versão com hash da chave do servidor das próximas rondas está disponível publicamente na janela das definições (No menu do utilizador, verifique \"Definições Provably Fair\" e depois \"Próxima chave SHA256 do servidor\").",
+        "settings-2": "Também pode mudar aqui a sua chave de cliente.",
+        "settings-3": "Se quiser participar na geração de resultados da rodada, certifique-se de que se encontra entre os 3 primeiros jogadores a fazer uma aposta nessa rodada."
+      },
+      "quick-help": {
+        "step1": "Faça uma aposta, ou duas ao mesmo tempo e espere que a rodada comece.",
+        "step2": "Esteja atento ao avião da sorte. O seu ganho é a aposta multiplicada pelo coeficiente do avião da sorte.",
+        "step3": "Faça o levantamento antes que o avião voe para longe e o dinheiro é seu!",
+        "details": "regras detalhadas"
+      },
+      "game-limits": {
+        "min-bet": "Aposta mínima",
+        "max-bet": "Aposta máxima",
+        "max-win-one-bet": "Vitoria máxima por uma aposta",
+        "maximum-multiplier-for-one-bet": "Multiplicador máximo para uma aposta"
+      },
+      "other_settings": {
+        "title": "OUTRAS DEFINIÇÕES",
+        "Hide_My_Activity": "Ocultar a minha atividade",
+        "Hide_Live_Bets_and_Statistics": "Ocultar apostas ao vivo e estatísticas"
+      },
+      "notification": {
+        "account_history": "Histórico da conta",
+        "alderney_message": "Este jogo foi testado por um laboratório certificado, licenciado pela UKGC, MGA e outras autoridades.\nOs jogos não são regulados ou controlados pela Alderney Gambling Control Commission e a AGCC não é obrigada a agir em caso de queixas."
+      }
+    },
+    "components": {
+      "connector": {
+        "reconnect": "A tentar ligar...",
+        "slow connection": "Ligação lenta"
+      },
+      "disconnect-message": {
+        "text": "Foi desligado. Verifique a ligação e atualize o seu browser ou volte à página principal",
+        "For your region, the game can only be played with {{allowedCurrencies}} currency(ies)": "Na sua região, o jogo só pode ser jogado com a(s) moeda(s) {{allowedCurrencies}}"
+      }
+    },
+    "ui-components": {
+      "toastr": {
+        "toastr-message": {
+          "Action refused via suspicious activity": "Ação recusada devido à atividade suspeita",
+          "New seed not saved!": "Nova chave não guardada!",
+          "New seed saved!": "Nova chave guardada!",
+          "This bet has already been added": "Esta aposta já foi feita",
+          "Not enough balance": "Saldo insuficiente",
+          "Bad request": "Pedido inválido",
+          "Bet exists": "A aposta existe",
+          "Free bet is not ready to cash out": "A aposta grátis não está pronta para ser levantada",
+          "Bet is already cashed out": "A aposta já foi levantada",
+          "Free bet is not found": "Aposta grátis não encontrada",
+          "No free bets left": "Não restam apostas grátis",
+          "Stage time out": "Fase expirada",
+          "Something went wrong": "Ocorreu um erro",
+          "You have cashed out!": "Cash out realizado!",
+          "Bet {{betId}} has been cashed out!": "A aposta {{betId}} foi levantada!",
+          "Low balance": "Pouco saldo",
+          "chat-low-balance": "Para utilizar o chat, o seu saldo não pode ser 0",
+          "Free bet has expired": "A aposta grátis expirou",
+          "No free bets remaining": "Não restam apostas grátis",
+          "Rain can't be claimed": "A Chuva não pode ser recolhida",
+          "Rain place not found": "Local de chuva não encontrado",
+          "Anti spam delay time has not expired": "O tempo de atraso anti-spam não expirou",
+          "copied": "Copiado!",
+          "copied-for-chat": "Copiado para o chat!",
+          "rain-has-been-dropped": "🌧Choveu. Obtenha a sua parte rapidamente! →",
+          "Please, set number of rounds": "Defina o número de rodadas",
+          "Can't set 0.00 as stop point": "Não pode definir 0,00 como ponto de paragem",
+          "Please, specify decrease or exceed stop point": "Especifice diminuir ou exceder o ponto de paragem",
+          "Loss limit has been reached": "O limite de perdas foi atingido",
+          "Daily loss limit has been reached": "O limite de perdas foi atingido",
+          "Weekly loss limit has been reached": "O limite de perdas semanal foi atingido",
+          "Monthly loss limit has been reached": "O limite de perdas mensal foi atingido",
+          "Yearly loss limit has been reached": "O limite de perdas anual foi atingido",
+          "Min wager in the last {{duration}} min. should be {{amount}} {{currency}}": "A aposta mínima nos últimos {{duration}} minutos deve ser de {{amount}} {{currency}}",
+          "Not enough balance. Min. balance {{minBalance}} {{currency}}": "Saldo insuficiente. O saldo mínimo é {{minBalance}} {{currency}}",
+          "Your freebet was canceled by the administrator": "A sua aposta grátis foi cancelada pelo administrador.",
+          "You have not been active for a while. Place a bet to avoid a disconnection.": "Há já algum tempo que não tem atividade. Faça uma aposta para evitar a desconexão.",
+          "You can claim up to {amount} freebets within the promo": "Você pode reivindicar até {{amount}} apostas grátis dentro da promoção",
+          "You can claim up to {amount} freebets within {duration} days": "Você pode reivindicar até {{amount}} apostas grátis dentro de {{duration}} dias",
+          "You can claim up to {amount} freebets within {duration} hours": "Você pode reivindicar até {{amount}} apostas grátis dentro de {{duration}} horas",
+          "You can claim up to {amount} freebets within {duration} minutes": "Você pode reivindicar até {{amount}} apostas grátis dentro de {{duration}} minutos",
+          "You already have a ticket for this challenge": "Você já tem um bilhete para este desafio",
+          "Last chance to place a bet. Your session will be terminated due to inactivity.": "Última oportunidade de fazer uma aposta. A sua sessão será encerrada por inatividade.",
+          "You've got a Free Bet!": "Tem uma Aposta Grátis!",
+          "You have reached the Maximum Win amount!": "Alcançou o valor de Prémio Máximo!",
+          "To claim the free bet your minimum wager from the last {duration} minutes must be at least {amount} {currency}.": "Para receber a aposta grátis, a aposta mínima dos últimos {{duration}} minutos deve ser, pelo menos, de {{amount}} {{currency}}.",
+          "To claim the free bet your minimum balance must be at least {amount} {currency}.": "Para receber a aposta grátis, o saldo mínimo deve ser, pelo menos, de {{amount}} {{currency}}.",
+          "Message blocked due to prohibited content or spam detection.": "Mensagem bloqueada devido à deteção de conteúdo proibido ou spam.",
+          "The selected room is unavailable. You have been connected to another room.": "A sala selecionada não está disponível. Foi conectado(a) a outra sala."
+        }
+      },
+      "free-bet": {
+        "Free bets available:": "Apostas grátis disponíveis:",
+        "All free bets spent!": "Todas apostas grátis usadas!",
+        "Minimum cashout multiplier:": "Levantamento mín.:",
+        "Manage": "Gerir"
+      }
+    },
+    "date": {
+      "month": {
+        "Jan": "Jan",
+        "Feb": "Fev",
+        "Mar": "Mar",
+        "Apr": "Abr",
+        "May": "Mai",
+        "Jun": "Jun",
+        "Jul": "Jul",
+        "Aug": "Ago",
+        "Sep": "Set",
+        "Oct": "Out",
+        "Nov": "Nov",
+        "Dec": "Dez"
+      }
+    }
+  },
+  "action": {
+    "Bet {{betId}}": "Aposta {{betId}}",
+    "Cash Out": "Cashout"
+  }
+}

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>RTP — Próximas Velas</title>
+  <style>
+    :root {
+      --bg: #0d0f12;
+      --panel: #161a20;
+      --line: #2a313c;
+      --text: #e8edf4;
+      --muted: #8b95a5;
+      --low: #34b4ff;
+      --mid: #9b59ff;
+      --high: #f0b90b;
+      --now: #e9113c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 500px at 50% -10%, rgba(233, 17, 60, 0.18), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      padding: 24px 16px 48px;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .status {
+      text-align: right;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .status .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      margin-right: 6px;
+      vertical-align: middle;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+      animation: pulse 1.6s infinite;
+    }
+
+    .status.offline .dot {
+      background: #ef4444;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+      70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .current {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .current .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .current .mul {
+      font-size: 2.4rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: var(--now);
+      line-height: 1;
+    }
+
+    .current .meta {
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .list {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .list-head {
+      display: grid;
+      grid-template-columns: 64px 1fr 100px;
+      gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 64px 1fr 100px;
+      gap: 8px;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(42, 49, 60, 0.65);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .row:last-child { border-bottom: none; }
+    .row:nth-child(even) { background: rgba(255, 255, 255, 0.015); }
+
+    .idx {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      width: 0;
+      transition: width 0.35s ease;
+    }
+
+    .mul-cell {
+      text-align: right;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .c-low { color: var(--low); }
+    .c-mid { color: var(--mid); }
+    .c-high { color: var(--high); }
+    .b-low { background: var(--low); }
+    .b-mid { background: var(--mid); }
+    .b-high { background: var(--high); }
+
+    .empty {
+      padding: 36px 16px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Próximas velas</h1>
+        <p class="sub">Ordem real das próximas rodadas</p>
+      </div>
+      <div class="status" id="status">
+        <span class="dot"></span>
+        <span id="statusText">conectando…</span>
+      </div>
+    </header>
+
+    <section class="current" id="currentBox">
+      <div>
+        <div class="label">Rodada atual</div>
+        <div class="mul" id="currentMul">—</div>
+      </div>
+      <div class="meta">
+        <div id="currentRound">aguardando jogo</div>
+        <div id="queueCount">0 na fila</div>
+      </div>
+    </section>
+
+    <section class="list">
+      <div class="list-head">
+        <div>#</div>
+        <div>Intensidade</div>
+        <div style="text-align:right">Crash</div>
+      </div>
+      <div id="rows"></div>
+    </section>
+
+    <footer>Atualiza a cada 1s · rota <code>/rtp</code></footer>
+  </div>
+
+  <script>
+    const rowsEl = document.getElementById("rows");
+    const statusEl = document.getElementById("status");
+    const statusText = document.getElementById("statusText");
+    const currentMul = document.getElementById("currentMul");
+    const currentRound = document.getElementById("currentRound");
+    const queueCount = document.getElementById("queueCount");
+
+    function tier(x) {
+      if (x >= 10) return "high";
+      if (x >= 2) return "mid";
+      return "low";
+    }
+
+    function barWidth(x) {
+      const capped = Math.min(x, 50);
+      return Math.max(6, (Math.log10(capped) / Math.log10(50)) * 100);
+    }
+
+    function fmt(x) {
+      return Number(x).toFixed(2) + "x";
+    }
+
+    function render(data) {
+      statusEl.classList.remove("offline");
+      statusText.textContent = "ao vivo";
+
+      const cur = data.current;
+      if (cur && cur.crashX != null) {
+        currentMul.textContent = fmt(cur.crashX);
+        currentMul.className = "mul c-" + tier(cur.crashX);
+        currentRound.textContent = cur.roundId != null ? ("Rodada #" + cur.roundId) : "Rodada em curso";
+      } else {
+        currentMul.textContent = "—";
+        currentMul.className = "mul";
+        currentRound.textContent = "aguardando jogo";
+      }
+
+      const upcoming = data.upcoming || [];
+      queueCount.textContent = upcoming.length + " na fila";
+
+      if (!upcoming.length) {
+        rowsEl.innerHTML = '<div class="empty">Fila vazia</div>';
+        return;
+      }
+
+      rowsEl.innerHTML = upcoming.map(function (v, i) {
+        const x = Number(v.crashX);
+        const t = tier(x);
+        return (
+          '<div class="row">' +
+            '<div class="idx">' + (i + 1) + '</div>' +
+            '<div class="bar"><span class="b-' + t + '" style="width:' + barWidth(x) + '%"></span></div>' +
+            '<div class="mul-cell c-' + t + '">' + fmt(x) + '</div>' +
+          '</div>'
+        );
+      }).join("");
+    }
+
+    function fail() {
+      statusEl.classList.add("offline");
+      statusText.textContent = "offline";
+    }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/rtp", { cache: "no-store" });
+        if (!res.ok) throw new Error("bad status");
+        render(await res.json());
+      } catch (e) {
+        fail();
+      }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
