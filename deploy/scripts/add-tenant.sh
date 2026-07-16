@@ -38,9 +38,9 @@ fi
 
 if [[ ! -f "$ROOT_DIR/nginx/conf.d/$SLUG.conf" ]]; then
   sed \
-    -e "s/zorbybet/$SLUG/g" \
-    -e "s/zorbybet.com/$DOMAIN/g" \
-    "$ROOT_DIR/nginx/conf.d/zorbybet.conf.example" > "$ROOT_DIR/nginx/conf.d/$SLUG.conf"
+    -e "s/___SLUG__/$SLUG/g" \
+    -e "s/___DOMAIN___/$DOMAIN/g" \
+    "$ROOT_DIR/nginx/conf.d/tenant.conf.template" > "$ROOT_DIR/nginx/conf.d/$SLUG.conf"
 fi
 
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
