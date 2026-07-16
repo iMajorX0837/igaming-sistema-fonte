@@ -45,6 +45,10 @@ cp nginx/conf.d/ip-only.conf.example "nginx/conf.d/ip-only.conf"
 sed -i "s/api_venuz/api_$SLUG/g" "nginx/conf.d/ip-only.conf"
 sed -i "s/api-venuz/api-$SLUG/g" "nginx/conf.d/ip-only.conf"
 sed -i "s|/tenants/venuz/|/tenants/$SLUG/|g" "nginx/conf.d/ip-only.conf"
+sed -i '/listen \[::\]/d' "nginx/conf.d/ip-only.conf"
+
+# Só ip-only ativo — evita nginx cair por upstream de tenant parado
+find nginx/conf.d -maxdepth 1 -name '*.conf' ! -name 'ip-only.conf' -delete
 
 COMPOSE_FILE="docker-compose.yml"
 if ! grep -q "api-$SLUG:" "$COMPOSE_FILE"; then
