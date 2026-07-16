@@ -53,6 +53,15 @@ services:
       - ip
       - all
 
+  api-stewgaming:
+    <<: *api-base
+    container_name: api-stewgaming
+    env_file:
+      - ./tenants/stewgaming/env.api
+    profiles:
+      - stewgaming
+      - all
+
 networks:
   venuznet:
     driver: bridge

@@ -45,17 +45,22 @@ fi
 
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
 if [[ -f "$COMPOSE_FILE" ]] && ! grep -q "api-$SLUG:" "$COMPOSE_FILE"; then
-  cat >> "$COMPOSE_FILE" <<YAML
-
-  api-$SLUG:
-    <<: *api-base
-    container_name: api-$SLUG
-    env_file:
-      - ./tenants/$SLUG/env.api
-    profiles:
-      - $SLUG
-      - all
-YAML
+  TMP="$(mktemp)"
+  awk -v slug="$SLUG" '
+    /^networks:/ {
+      print "  api-" slug ":"
+      print "    <<: *api-base"
+      print "    container_name: api-" slug
+      print "    env_file:"
+      print "      - ./tenants/" slug "/env.api"
+      print "    profiles:"
+      print "      - " slug
+      print "      - all"
+      print ""
+    }
+    { print }
+  ' "$COMPOSE_FILE" > "$TMP"
+  mv "$TMP" "$COMPOSE_FILE"
   echo "Serviço api-$SLUG adicionado ao docker-compose.yml"
 fi
 
