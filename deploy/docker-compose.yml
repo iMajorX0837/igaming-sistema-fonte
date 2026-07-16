@@ -16,6 +16,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -40,6 +41,16 @@ services:
       - ./tenants/weavenbet/env.api
     profiles:
       - weavenbet
+      - all
+
+  api-venuz:
+    <<: *api-base
+    container_name: api-venuz
+    env_file:
+      - ./tenants/venuz/env.api
+    profiles:
+      - venuz
+      - ip
       - all
 
 networks:
