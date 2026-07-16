@@ -44,3 +44,10 @@ server {
     proxy_read_timeout 86400;
   }
 }
+
+# HTTPS sem cert ainda: redireciona mantendo o host (admin/site/api corretos)
+server {
+  listen 443 default_server;
+  server_name ___DOMAIN___ www.___DOMAIN___ admin.___DOMAIN___ api.___DOMAIN___;
+  return 301 http://$host$request_uri;
+}
