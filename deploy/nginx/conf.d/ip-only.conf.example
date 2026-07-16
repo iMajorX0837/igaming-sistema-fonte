@@ -9,7 +9,6 @@ upstream api_venuz {
 
 server {
   listen 80 default_server;
-  listen [::]:80 default_server;
   server_name _;
 
   root /var/www/tenants/venuz/front;
