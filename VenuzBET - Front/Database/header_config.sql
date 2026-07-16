@@ -1,0 +1,2 @@
+-- DEPRECATED: execute site_config.sql
+-- Colunas migradas: header_fundo, header_logo_url

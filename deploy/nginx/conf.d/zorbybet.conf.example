@@ -1,0 +1,47 @@
+# Copie para conf.d/zorbybet.conf e ajuste os domínios.
+# Depois: docker compose --profile zorbybet up -d
+
+upstream api_zorbybet {
+  server api-zorbybet:3000;
+}
+
+server {
+  listen 80;
+  server_name zorbybet.com www.zorbybet.com;
+
+  root /var/www/tenants/zorbybet/front;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
+
+server {
+  listen 80;
+  server_name admin.zorbybet.com;
+
+  root /var/www/tenants/zorbybet/admin;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
+
+server {
+  listen 80;
+  server_name api.zorbybet.com;
+
+  location / {
+    proxy_pass http://api_zorbybet;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+}

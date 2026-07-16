@@ -1,0 +1,2 @@
+-- DEPRECATED: execute cms_items.sql
+-- secao migrada: sidebar_card

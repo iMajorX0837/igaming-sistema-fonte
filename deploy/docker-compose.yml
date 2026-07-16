@@ -1,0 +1,47 @@
+name: venuz-platform
+
+x-api-base: &api-base
+  build:
+    context: ../PlayFiverAPI
+    dockerfile: ../deploy/Dockerfile.api
+  image: venuz-api:latest
+  restart: unless-stopped
+  networks:
+    - venuznet
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: venuz-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./tenants:/var/www/tenants:ro
+    networks:
+      - venuznet
+    restart: unless-stopped
+
+  api-zorbybet:
+    <<: *api-base
+    container_name: api-zorbybet
+    env_file:
+      - ./tenants/zorbybet/env.api
+    profiles:
+      - zorbybet
+      - all
+
+  api-weavenbet:
+    <<: *api-base
+    container_name: api-weavenbet
+    env_file:
+      - ./tenants/weavenbet/env.api
+    profiles:
+      - weavenbet
+      - all
+
+networks:
+  venuznet:
+    driver: bridge

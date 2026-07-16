@@ -1,0 +1,19 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+ARG VITE_API_BASE
+ARG VITE_PLAYFIVERS_API_BASE
+
+ENV VITE_API_BASE=$VITE_API_BASE
+ENV VITE_PLAYFIVERS_API_BASE=$VITE_PLAYFIVERS_API_BASE
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+FROM alpine:3.20
+WORKDIR /dist
+COPY --from=builder /app/dist ./

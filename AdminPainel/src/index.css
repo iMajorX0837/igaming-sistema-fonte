@@ -1,0 +1,277 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --admin-bg: #090a0c;
+  --admin-sidebar: #0d0f12;
+  --admin-panel: #111318;
+  --admin-panel-2: #15181e;
+  --admin-panel-3: #1a1e25;
+  --admin-border: #232831;
+  --admin-border-strong: #2e3540;
+  --admin-text: #f3f4f6;
+  --admin-text-soft: #c1c6cf;
+  --admin-muted: #7f8792;
+  --admin-muted-2: #5f6670;
+  --admin-accent: #e7e9ee;
+  --admin-accent-hover: #ffffff;
+  --admin-accent-soft: rgba(231, 233, 238, 0.12);
+  --admin-success: #45b892;
+  --admin-success-soft: rgba(69, 184, 146, 0.12);
+  --admin-danger: #d86a70;
+  --admin-danger-soft: rgba(216, 106, 112, 0.12);
+  --admin-warning: #d3a24c;
+  --admin-warning-soft: rgba(211, 162, 76, 0.12);
+  --admin-info: #6d8fd4;
+  --admin-info-soft: rgba(109, 143, 212, 0.12);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(231, 233, 238, 0.055), transparent 28%),
+    var(--admin-bg);
+  color: var(--admin-text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+html,
+body,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.recharts-tooltip-cursor {
+  fill: transparent !important;
+}
+
+.recharts-active-bar {
+  opacity: 1 !important;
+}
+
+.recharts-bar-rectangle:hover {
+  opacity: 1 !important;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+@layer components {
+  .admin-input {
+    @apply w-full px-4 py-2.5 text-admin-foreground text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/30 transition-colors;
+  }
+
+  .admin-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] transition-colors disabled:opacity-50;
+  }
+
+  .admin-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-admin-panel-2 hover:bg-admin-panel-3 text-admin-foreground-soft hover:text-admin-foreground border border-admin-border transition-colors disabled:opacity-50;
+  }
+
+  .admin-table thead {
+    @apply bg-admin-panel;
+  }
+
+  .admin-table thead tr {
+    @apply border-b border-admin-border;
+  }
+
+  .admin-table th {
+    @apply text-left py-3 px-4 text-admin-foreground-soft font-medium;
+  }
+
+  .admin-table tbody tr {
+    @apply border-b border-admin-border transition-colors;
+  }
+
+  .admin-table tbody tr:nth-child(odd) {
+    @apply bg-admin-panel-2;
+  }
+
+  .admin-table tbody tr:nth-child(even) {
+    @apply bg-admin-panel;
+  }
+
+  .admin-table tbody tr:hover {
+    @apply bg-admin-panel-3/60;
+  }
+
+  .admin-table td {
+    @apply py-3 px-4;
+  }
+
+  .financial-chart-body {
+    @apply px-[18px] pt-[18px] pb-[14px];
+  }
+
+  .financial-chart-summary {
+    @apply flex items-end justify-between gap-4 mb-[18px];
+  }
+
+  .financial-legend-dot {
+    @apply inline-block w-[7px] h-[7px] rounded-full;
+  }
+
+  .financial-legend-dot-deposit {
+    background: var(--admin-accent);
+  }
+
+  .financial-legend-dot-withdraw {
+    background: var(--admin-success);
+  }
+
+  .financial-chart-area {
+    @apply relative grid items-end gap-3 px-1 pt-2 border-b border-admin-border;
+    height: 238px;
+  }
+
+  .financial-chart-gridline {
+    @apply absolute left-0 right-0 border-t border-dashed pointer-events-none;
+    border-color: #22262c;
+  }
+
+  .financial-bars {
+    @apply h-full flex justify-center items-end gap-[5px] relative z-[2];
+  }
+
+  .financial-bar {
+    @apply w-[11px] min-h-[8px] rounded-t transition-all duration-150;
+    border-radius: 4px 4px 1px 1px;
+  }
+
+  .financial-bar:hover {
+    filter: brightness(1.18);
+    transform: translateY(-2px);
+  }
+
+  .financial-bar-deposit {
+    background: linear-gradient(to top, #8f949d, var(--admin-accent));
+  }
+
+  .financial-bar-withdraw {
+    background: linear-gradient(to top, #276f5b, var(--admin-success));
+  }
+
+  .financial-chart-labels {
+    @apply grid gap-3 px-1 pt-2.5 text-center text-[11px] text-admin-muted-2;
+  }
+
+  .icon-on-dark {
+    @apply text-admin-foreground;
+  }
+
+  .icon-on-light {
+    @apply text-[#0d0e10];
+  }
+
+  .icon-muted {
+    @apply text-admin-muted;
+  }
+
+  /* Ícones brancos em superfícies escuras */
+  .bg-admin-bg svg.lucide,
+  .bg-admin-sidebar svg.lucide,
+  .bg-admin-panel svg.lucide,
+  .bg-admin-panel-2 svg.lucide,
+  .bg-admin-panel-3 svg.lucide,
+  .bg-dark-primary svg.lucide,
+  .bg-dark-secondary svg.lucide,
+  .financial-chart-body svg.lucide,
+  [class*='bg-admin-success/'] svg.lucide,
+  [class*='bg-admin-danger/'] svg.lucide,
+  [class*='bg-admin-warning/'] svg.lucide,
+  [class*='bg-admin-info/'] svg.lucide,
+  [class*='bg-admin-accent/'] svg.lucide,
+  [class*='bg-green-600/'] svg.lucide,
+  [class*='bg-red-600/'] svg.lucide,
+  [class*='bg-amber-600/'] svg.lucide,
+  [class*='bg-green-900/'] svg.lucide,
+  [class*='bg-red-900/'] svg.lucide,
+  [class*='bg-gray-700'] svg.lucide,
+  [class*='bg-gray-600/'] svg.lucide,
+  button[class*='bg-admin-panel'] svg.lucide,
+  button[class*='bg-admin-danger/'] svg.lucide,
+  button[class*='bg-green-600/'] svg.lucide,
+  button[class*='bg-red-600/'] svg.lucide,
+  button[class*='bg-amber-600/'] svg.lucide {
+    color: var(--admin-text) !important;
+  }
+
+  /* Ícones pretos em superfícies claras */
+  .bg-admin-accent svg.lucide,
+  .bg-admin-accent-hover svg.lucide,
+  .bg-white svg.lucide,
+  .admin-btn-primary svg.lucide,
+  button.bg-admin-accent svg.lucide,
+  button.bg-admin-accent-hover svg.lucide {
+    color: #0d0e10 !important;
+  }
+}

@@ -1,0 +1,2 @@
+-- DEPRECATED: execute site_config.sql
+-- Colunas migradas: deposito_minimo, deposito_maximo, saque_minimo, saque_maximo

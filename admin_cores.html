@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Casino Operations — Admin</title>
+
+  <style>
+    :root {
+      --bg: #090a0c;
+      --sidebar: #0d0f12;
+      --panel: #111318;
+      --panel-2: #15181e;
+      --panel-3: #1a1e25;
+
+      --border: #232831;
+      --border-strong: #2e3540;
+
+      --text: #f3f4f6;
+      --text-soft: #c1c6cf;
+      --muted: #7f8792;
+      --muted-2: #5f6670;
+
+      --accent: #e7e9ee;
+      --accent-hover: #ffffff;
+      --accent-soft: rgba(231, 233, 238, 0.12);
+
+      --success: #45b892;
+      --success-soft: rgba(69, 184, 146, 0.12);
+
+      --danger: #d86a70;
+      --danger-soft: rgba(216, 106, 112, 0.12);
+
+      --warning: #d3a24c;
+      --warning-soft: rgba(211, 162, 76, 0.12);
+
+      --info: #6d8fd4;
+      --info-soft: rgba(109, 143, 212, 0.12);
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.24);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 86% 0%, rgba(231, 233, 238, 0.055), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 1.8;
+      flex: 0 0 auto;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 20px 14px;
+      background: rgba(13, 15, 18, 0.97);
+      border-right: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 5px 8px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-symbol {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: linear-gradient(145deg, #171a20, #0f1115);
+      border: 1px solid var(--border-strong);
+      color: var(--accent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 13px;
+      letter-spacing: 0.75px;
+      font-weight: 700;
+    }
+
+    .brand-copy span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted-2);
+      font-size: 9px;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+    }
+
+    .nav-group {
+      margin-top: 22px;
+    }
+
+    .nav-title {
+      padding: 0 11px 9px;
+      color: var(--muted-2);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.25px;
+      text-transform: uppercase;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 4px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      gap: 11px;
+      padding: 0 12px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      color: #9198a3;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 520;
+      transition: 0.18s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background: var(--panel-2);
+    }
+
+    .nav-link.active {
+      color: var(--text);
+      background: linear-gradient(90deg, var(--accent-soft), rgba(196, 166, 106, 0.025));
+      border-color: rgba(231, 233, 238, 0.18);
+    }
+
+    .nav-link.active svg {
+      color: var(--accent);
+    }
+
+    .nav-count {
+      margin-left: auto;
+      min-width: 22px;
+      padding: 3px 6px;
+      border-radius: 999px;
+      background: var(--danger-soft);
+      color: var(--danger);
+      font-size: 9px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 16px;
+    }
+
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+    }
+
+    .profile-avatar {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: var(--accent);
+      background: var(--panel-3);
+      border: 1px solid var(--border-strong);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .profile-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .profile-copy strong {
+      display: block;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .profile-copy span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .profile-more {
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      padding: 4px;
+    }
+
+    /* MAIN */
+    .main {
+      min-width: 0;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 80;
+      min-height: 72px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      background: rgba(9, 10, 12, 0.86);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(18px);
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .menu-button {
+      display: none;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border-radius: 10px;
+      color: var(--text-soft);
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .page-heading h1 {
+      font-size: 17px;
+      font-weight: 680;
+      letter-spacing: -0.25px;
+    }
+
+    .page-heading p {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .control-button {
+      min-height: 39px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-soft);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 10px;
+      transition: 0.18s ease;
+    }
+
+    .control-button:hover {
+      color: var(--text);
+      background: var(--panel-2);
+      border-color: var(--border-strong);
+    }
+
+    .icon-control {
+      width: 39px;
+      height: 39px;
+      display: grid;
+      place-items: center;
+      position: relative;
+      padding: 0;
+    }
+
+    .alert-dot {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 3px var(--panel);
+    }
+
+    .content {
+      padding: 26px 28px 34px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .section-heading h2 {
+      font-size: 21px;
+      font-weight: 680;
+      letter-spacing: -0.4px;
+    }
+
+    .section-heading p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .primary-action {
+      min-height: 39px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #0d0e10;
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 9px;
+      font-size: 10px;
+      font-weight: 760;
+      transition: 0.18s ease;
+    }
+
+    .primary-action:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    /* METRICS */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .metric-card {
+      padding: 17px;
+      background: linear-gradient(145deg, rgba(18, 20, 24, 0.98), rgba(14, 16, 19, 0.98));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }
+
+    .metric-card.emphasis {
+      border-color: rgba(231, 233, 238, 0.24);
+      background:
+        linear-gradient(145deg, rgba(231, 233, 238, 0.055), rgba(14, 16, 19, 0.98));
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric-label {
+      color: #8c939d;
+      font-size: 10px;
+      font-weight: 520;
+    }
+
+    .metric-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: #8d949f;
+      background: #171a20;
+      border: 1px solid #242a32;
+    }
+
+    .metric-card.emphasis .metric-icon {
+      color: var(--accent);
+      background: var(--accent-soft);
+      border-color: rgba(231, 233, 238, 0.18);
+    }
+
+    .metric-value {
+      font-size: 23px;
+      line-height: 1;
+      font-weight: 690;
+      letter-spacing: -0.7px;
+      white-space: nowrap;
+    }
+
+    .metric-footer {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .positive {
+      color: var(--success);
+      font-weight: 720;
+    }
+
+    .negative {
+      color: var(--danger);
+      font-weight: 720;
+    }
+
+    /* PANELS */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.8fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel {
+      min-width: 0;
+      overflow: hidden;
+      background: linear-gradient(145deg, rgba(18, 20, 24, 0.98), rgba(14, 16, 19, 0.98));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-header {
+      min-height: 64px;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title h3 {
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .panel-title p {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .secondary-action {
+      padding: 7px 10px;
+      color: var(--text-soft);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 9px;
+      transition: 0.18s ease;
+    }
+
+    .secondary-action:hover {
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    /* CHART */
+    .chart-body {
+      padding: 18px 18px 14px;
+    }
+
+    .chart-summary {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .chart-total strong {
+      display: block;
+      font-size: 21px;
+      font-weight: 680;
+      letter-spacing: -0.4px;
+    }
+
+    .chart-total span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 13px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .chart-area {
+      height: 238px;
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      align-items: end;
+      gap: 12px;
+      padding: 8px 4px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chart-gridline {
+      position: absolute;
+      left: 0;
+      right: 0;
+      border-top: 1px dashed #22262c;
+    }
+
+    .chart-gridline:nth-child(1) { top: 20%; }
+    .chart-gridline:nth-child(2) { top: 44%; }
+    .chart-gridline:nth-child(3) { top: 68%; }
+
+    .bars {
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 5px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .bar {
+      width: 11px;
+      min-height: 8px;
+      border-radius: 4px 4px 1px 1px;
+      transition: 0.18s ease;
+    }
+
+    .bar:hover {
+      filter: brightness(1.18);
+      transform: translateY(-2px);
+    }
+
+    .bar.deposit {
+      background: linear-gradient(to top, #8f949d, var(--accent));
+    }
+
+    .bar.withdraw {
+      background: linear-gradient(to top, #276f5b, var(--success));
+    }
+
+    .chart-labels {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+      padding: 10px 4px 0;
+      color: var(--muted-2);
+      font-size: 8px;
+      text-align: center;
+    }
+
+    /* OPERATIONS */
+    .operations-list {
+      padding: 8px 18px 15px;
+    }
+
+    .operation-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      padding: 13px 0;
+      border-bottom: 1px solid #1d2127;
+    }
+
+    .operation-row:last-child {
+      border-bottom: 0;
+    }
+
+    .operation-name {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--text-soft);
+      font-size: 10px;
+    }
+
+    .operation-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .operation-value {
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .progress {
+      grid-column: 1 / -1;
+      height: 4px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #1b1f25;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+    }
+
+    /* TABLE */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 820px;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #1e2228;
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted-2);
+      background: rgba(255, 255, 255, 0.01);
+      font-size: 8px;
+      font-weight: 760;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    td {
+      color: #a8afb9;
+      font-size: 9px;
+    }
+
+    tbody tr {
+      transition: 0.14s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .player-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .player-avatar {
+      width: 31px;
+      height: 31px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: var(--accent);
+      background: #171a20;
+      border: 1px solid #272d35;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .player-copy strong {
+      display: block;
+      color: var(--text);
+      font-size: 9px;
+      font-weight: 650;
+    }
+
+    .player-copy span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted-2);
+      font-size: 8px;
+    }
+
+    .money-positive {
+      color: var(--success);
+      font-weight: 730;
+    }
+
+    .money-negative {
+      color: var(--danger);
+      font-weight: 730;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 8px;
+      font-weight: 720;
+    }
+
+    .badge::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .badge.approved {
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .badge.pending {
+      color: var(--warning);
+      background: var(--warning-soft);
+    }
+
+    .badge.review {
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .footer {
+      padding-top: 18px;
+      color: #4f555e;
+      font-size: 8px;
+      text-align: center;
+    }
+
+    @media (max-width: 1120px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: fixed;
+        left: -270px;
+        width: 248px;
+        transition: left 0.22s ease;
+      }
+
+      .sidebar.open {
+        left: 0;
+        box-shadow: 24px 0 70px rgba(0, 0, 0, 0.55);
+      }
+
+      .menu-button {
+        display: grid;
+      }
+
+      .topbar {
+        padding: 0 16px;
+      }
+
+      .content {
+        padding: 20px 16px 28px;
+      }
+
+      .date-control {
+        display: none;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .primary-action {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .chart-summary {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .chart-area {
+        gap: 7px;
+      }
+
+      .bar {
+        width: 9px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-symbol">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 3 5.5 10a4.2 4.2 0 0 0 6.5 5.2A4.2 4.2 0 0 0 18.5 10L12 3Z"/>
+            <path d="M9.5 20h5"/>
+            <path d="M12 15.2V20"/>
+          </svg>
+        </div>
+
+        <div class="brand-copy">
+          <strong>CASINO OPS</strong>
+          <span>Management Console</span>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-title">Workspace</div>
+
+        <nav class="nav-list">
+          <a class="nav-link active" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            Visão geral
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            </svg>
+            Jogadores
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="5" width="18" height="14" rx="2"/>
+              <path d="M3 10h18"/>
+              <path d="M7 15h4"/>
+            </svg>
+            Financeiro
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M8.5 9.5h.01"/>
+              <path d="M15.5 9.5h.01"/>
+              <path d="M8.5 14.5h.01"/>
+              <path d="M15.5 14.5h.01"/>
+            </svg>
+            Jogos
+          </a>
+        </nav>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-title">Operação</div>
+
+        <nav class="nav-list">
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2v20"/>
+              <path d="m17 5-5-3-5 3"/>
+              <path d="m17 19-5 3-5-3"/>
+            </svg>
+            Transações
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 19V9"/>
+              <path d="M10 19V5"/>
+              <path d="M16 19v-7"/>
+              <path d="M22 19V3"/>
+            </svg>
+            Relatórios
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 2a7 7 0 0 0-7 7c0 5-2 6-2 6h18s-2-1-2-6a7 7 0 0 0-7-7Z"/>
+              <path d="M10 21h4"/>
+            </svg>
+            Alertas
+            <span class="nav-count">4</span>
+          </a>
+
+          <a class="nav-link" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1V21h-4v-.08a1.7 1.7 0 0 0-.4-1 1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1-.4H3v-4h.08a1.7 1.7 0 0 0 1-.4 1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1V3h4v.08a1.7 1.7 0 0 0 .4 1 1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.36.34.7.6 1 .26.3.6.52 1 .6h.08v4H21a1.7 1.7 0 0 0-1 .4 1.7 1.7 0 0 0-.6 1Z"/>
+            </svg>
+            Configurações
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="profile-card">
+          <div class="profile-avatar">AD</div>
+          <div class="profile-copy">
+            <strong>Administrador</strong>
+            <span>Super Admin</span>
+          </div>
+
+          <button class="profile-more" aria-label="Mais opções">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="5" cy="12" r="1"/>
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="19" cy="12" r="1"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="menu-button" id="menuButton" aria-label="Abrir menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M4 7h16"/>
+              <path d="M4 12h16"/>
+              <path d="M4 17h16"/>
+            </svg>
+          </button>
+
+          <div class="page-heading">
+            <h1>Dashboard executivo</h1>
+            <p>Controle financeiro e operacional da plataforma</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="control-button date-control">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="5" width="18" height="16" rx="2"/>
+              <path d="M16 3v4"/>
+              <path d="M8 3v4"/>
+              <path d="M3 11h18"/>
+            </svg>
+            Últimos 30 dias
+          </button>
+
+          <button class="control-button icon-control" aria-label="Pesquisar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m20 20-3.5-3.5"/>
+            </svg>
+          </button>
+
+          <button class="control-button icon-control" aria-label="Notificações">
+            <span class="alert-dot"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/>
+              <path d="M10 21h4"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="section-heading">
+          <div>
+            <h2>Resumo da operação</h2>
+            <p>Indicadores consolidados e movimentações em tempo real.</p>
+          </div>
+
+          <button class="primary-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 5v14"/>
+              <path d="M5 12h14"/>
+            </svg>
+            Gerar relatório
+          </button>
+        </section>
+
+        <section class="metrics-grid">
+          <article class="metric-card emphasis">
+            <div class="metric-header">
+              <span class="metric-label">Receita líquida</span>
+              <div class="metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M4 19V9"/>
+                  <path d="M10 19V5"/>
+                  <path d="M16 19v-7"/>
+                  <path d="M22 19V3"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value">R$ 284.750</div>
+            <div class="metric-footer">
+              <span class="positive">↗ 12,8%</span>
+              <span>vs. período anterior</span>
+            </div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Total depositado</span>
+              <div class="metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 3v12"/>
+                  <path d="m7 10 5 5 5-5"/>
+                  <path d="M5 21h14"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value">R$ 438.920</div>
+            <div class="metric-footer">
+              <span class="positive">↗ 8,4%</span>
+              <span>nos últimos 30 dias</span>
+            </div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Total sacado</span>
+              <div class="metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 21V9"/>
+                  <path d="m7 14 5-5 5 5"/>
+                  <path d="M5 3h14"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value">R$ 154.170</div>
+            <div class="metric-footer">
+              <span class="negative">↘ 3,1%</span>
+              <span>nos últimos 30 dias</span>
+            </div>
+          </article>
+
+          <article class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Jogadores ativos</span>
+              <div class="metric-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value">8.294</div>
+            <div class="metric-footer">
+              <span class="positive">↗ 630</span>
+              <span>novos jogadores</span>
+            </div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h3>Fluxo financeiro</h3>
+                <p>Comparativo semanal de depósitos e saques</p>
+              </div>
+
+              <button class="secondary-action">Ver relatório</button>
+            </div>
+
+            <div class="chart-body">
+              <div class="chart-summary">
+                <div class="chart-total">
+                  <strong>R$ 592.400</strong>
+                  <span>Volume total movimentado</span>
+                </div>
+
+                <div class="legend">
+                  <span>
+                    <i class="legend-dot" style="background: var(--accent)"></i>
+                    Depósitos
+                  </span>
+                  <span>
+                    <i class="legend-dot" style="background: var(--success)"></i>
+                    Saques
+                  </span>
+                </div>
+              </div>
+
+              <div class="chart-area">
+                <div class="chart-gridline"></div>
+                <div class="chart-gridline"></div>
+                <div class="chart-gridline"></div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:58%"></div>
+                  <div class="bar withdraw" style="height:34%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:70%"></div>
+                  <div class="bar withdraw" style="height:42%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:61%"></div>
+                  <div class="bar withdraw" style="height:38%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:84%"></div>
+                  <div class="bar withdraw" style="height:50%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:73%"></div>
+                  <div class="bar withdraw" style="height:45%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:92%"></div>
+                  <div class="bar withdraw" style="height:58%"></div>
+                </div>
+
+                <div class="bars">
+                  <div class="bar deposit" style="height:80%"></div>
+                  <div class="bar withdraw" style="height:54%"></div>
+                </div>
+              </div>
+
+              <div class="chart-labels">
+                <span>Seg</span>
+                <span>Ter</span>
+                <span>Qua</span>
+                <span>Qui</span>
+                <span>Sex</span>
+                <span>Sáb</span>
+                <span>Dom</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <h3>Status da operação</h3>
+                <p>Indicadores críticos da plataforma</p>
+              </div>
+            </div>
+
+            <div class="operations-list">
+              <div class="operation-row">
+                <div class="operation-name">
+                  <span class="operation-dot" style="background:var(--success)"></span>
+                  Depósitos aprovados
+                </div>
+                <div class="operation-value">94%</div>
+                <div class="progress">
+                  <span style="width:94%; background:var(--success)"></span>
+                </div>
+              </div>
+
+              <div class="operation-row">
+                <div class="operation-name">
+                  <span class="operation-dot" style="background:var(--accent)"></span>
+                  Saques processados
+                </div>
+                <div class="operation-value">82%</div>
+                <div class="progress">
+                  <span style="width:82%; background:var(--accent)"></span>
+                </div>
+              </div>
+
+              <div class="operation-row">
+                <div class="operation-name">
+                  <span class="operation-dot" style="background:var(--warning)"></span>
+                  Análises pendentes
+                </div>
+                <div class="operation-value">14%</div>
+                <div class="progress">
+                  <span style="width:14%; background:var(--warning)"></span>
+                </div>
+              </div>
+
+              <div class="operation-row">
+                <div class="operation-name">
+                  <span class="operation-dot" style="background:var(--danger)"></span>
+                  Transações bloqueadas
+                </div>
+                <div class="operation-value">3%</div>
+                <div class="progress">
+                  <span style="width:3%; background:var(--danger)"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h3>Transações recentes</h3>
+              <p>Últimas movimentações registradas</p>
+            </div>
+
+            <button class="secondary-action">Ver todas</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Jogador</th>
+                  <th>Tipo</th>
+                  <th>Método</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Horário</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="player-cell">
+                      <div class="player-avatar">JD</div>
+                      <div class="player-copy">
+                        <strong>João Duarte</strong>
+                        <span>#PLR-48291</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Depósito</td>
+                  <td>PIX</td>
+                  <td class="money-positive">+ R$ 1.500,00</td>
+                  <td><span class="badge approved">Aprovado</span></td>
+                  <td>14:32</td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="player-cell">
+                      <div class="player-avatar">RM</div>
+                      <div class="player-copy">
+                        <strong>Rafael Martins</strong>
+                        <span>#PLR-11372</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Saque</td>
+                  <td>PIX</td>
+                  <td class="money-negative">- R$ 840,00</td>
+                  <td><span class="badge pending">Em análise</span></td>
+                  <td>14:17</td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="player-cell">
+                      <div class="player-avatar">AS</div>
+                      <div class="player-copy">
+                        <strong>Ana Souza</strong>
+                        <span>#PLR-37620</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Depósito</td>
+                  <td>Cartão</td>
+                  <td class="money-positive">+ R$ 350,00</td>
+                  <td><span class="badge approved">Aprovado</span></td>
+                  <td>13:58</td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="player-cell">
+                      <div class="player-avatar">CF</div>
+                      <div class="player-copy">
+                        <strong>Caio Ferreira</strong>
+                        <span>#PLR-90814</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>Saque</td>
+                  <td>PIX</td>
+                  <td class="money-negative">- R$ 2.100,00</td>
+                  <td><span class="badge review">Revisão</span></td>
+                  <td>13:41</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="footer">
+          Casino Operations Admin • Interface demonstrativa
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const sidebar = document.getElementById("sidebar");
+    const menuButton = document.getElementById("menuButton");
+
+    menuButton.addEventListener("click", () => {
+      sidebar.classList.toggle("open");
+    });
+
+    document.addEventListener("click", (event) => {
+      if (
+        window.innerWidth <= 780 &&
+        !sidebar.contains(event.target) &&
+        !menuButton.contains(event.target)
+      ) {
+        sidebar.classList.remove("open");
+      }
+    });
+
+    document.querySelectorAll(".nav-link").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+
+        document
+          .querySelectorAll(".nav-link")
+          .forEach((item) => item.classList.remove("active"));
+
+        link.classList.add("active");
+
+        if (window.innerWidth <= 780) {
+          sidebar.classList.remove("open");
+        }
+      });
+    });
+  </script>
+</body>
+</html>

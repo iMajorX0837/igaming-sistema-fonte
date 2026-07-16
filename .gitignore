@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Secrets — NUNCA commitar
+.env
+.env.*
+!.env.example
+!**/.env.example
+!deploy/tenants/_template/*.example
+
+# Tenants (configs e assets gerados na VPS)
+deploy/tenants/*/env.api
+deploy/tenants/*/env.front
+deploy/tenants/*/env.admin
+deploy/tenants/*/front/
+deploy/tenants/*/admin/
+deploy/nginx/conf.d/*.conf
+!deploy/nginx/conf.d/*.example
+
+# Logs e cache
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# SSH / AWS
+*.pem
+*.ppk
+
+# IDE
+.vscode/
+.idea/
+
+# Docker volumes locais
+deploy/data/

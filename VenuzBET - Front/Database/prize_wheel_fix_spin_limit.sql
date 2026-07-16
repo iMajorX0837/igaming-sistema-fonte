@@ -1,0 +1,7 @@
+-- Corrige limite de giros da roleta
+-- Execute este arquivo OU re-execute prize_wheel_rpc.sql completo no Supabase SQL Editor
+--
+-- Correções:
+-- 1. Conta giros em cupom_usos (origem='roleta') + prize_wheel_spins
+-- 2. cooldown_horas=0 passa a limitar por dia calendário (BRT)
+-- 3. girar_roleta revalida o limite dentro da mesma transação

@@ -1,0 +1,6 @@
+              </div>
+
+              <div className="rounded-xl p-3 md:p-4 border border-slate-700/50" style={{ backgroundColor: walletCardBg }}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg enableBackground="new 0 0 36 36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" className="w-9 h-9 md:w-10 md:h-10 shrink-0">

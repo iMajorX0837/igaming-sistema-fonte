@@ -1,0 +1,279 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .owner-alert {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+    color: #facc15;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .sidebar-promo-bloom-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .sidebar-promo-bloom {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(36px);
+    will-change: transform, opacity;
+  }
+
+  .sidebar-promo-bloom-1 {
+    width: 72%;
+    height: 140%;
+    left: -18%;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.62;
+    animation: sidebarPromoBloom1 7s ease-in-out infinite;
+  }
+
+  .sidebar-promo-bloom-2 {
+    width: 68%;
+    height: 130%;
+    right: -22%;
+    top: -35%;
+    opacity: 0.48;
+    animation: sidebarPromoBloom2 9s ease-in-out infinite;
+  }
+
+  .sidebar-promo-bloom-3 {
+    width: 50%;
+    height: 100%;
+    left: 35%;
+    bottom: -55%;
+    opacity: 0.38;
+    filter: blur(42px);
+    animation: sidebarPromoBloom3 8.5s ease-in-out infinite;
+  }
+
+  @keyframes sidebarPromoBloom1 {
+    0%,
+    100% {
+      transform: translateY(-50%) translateX(0) scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: translateY(-50%) translateX(1.75rem) scale(1.12);
+      opacity: 0.72;
+    }
+  }
+
+  @keyframes sidebarPromoBloom2 {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 0.38;
+    }
+    50% {
+      transform: translate(-1.5rem, 1.25rem) scale(1.1);
+      opacity: 0.58;
+    }
+  }
+
+  @keyframes sidebarPromoBloom3 {
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 0.28;
+    }
+    50% {
+      transform: translate(-1.25rem, -0.75rem) scale(1.08);
+      opacity: 0.48;
+    }
+  }
+
+  html {
+    overflow: hidden;
+    width: 100%;
+    font-family: Montserrat, sans-serif;
+  }
+
+  body {
+    height: 100%;
+    width: 100%;
+    position: fixed;
+    overflow-y: auto;
+    font-family: Montserrat, sans-serif;
+  }
+
+  #root,
+  button,
+  input,
+  textarea,
+  select {
+    font-family: Montserrat, sans-serif;
+  }
+}
+
+@layer components {
+  .quick-nav-rgb-shell {
+    position: relative;
+    height: 142px;
+    width: 96px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    padding: 1.5px;
+  }
+
+  .quick-nav-rgb-shell::before {
+    content: '';
+    position: absolute;
+    inset: -120%;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 115deg,
+      #ff3366 130deg,
+      #ff9933 155deg,
+      #ffee33 180deg,
+      #33ff66 205deg,
+      #33ddff 230deg,
+      #6633ff 255deg,
+      #ff33cc 280deg,
+      #ff3366 305deg,
+      transparent 328deg,
+      transparent 360deg
+    );
+    animation: quickNavRgbArc 5s linear infinite;
+    animation-play-state: paused;
+    pointer-events: none;
+  }
+
+  .quick-nav-rgb-shell.is-active::before {
+    opacity: 1;
+    animation-play-state: running;
+  }
+
+  @keyframes quickNavRgbArc {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .prize-wheel-widget {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 65;
+    width: 88px;
+    height: 88px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    user-select: none;
+    cursor: pointer;
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+    animation: prizeWheelFloat 3.2s ease-in-out infinite;
+  }
+
+  @media (max-width: 767px) {
+    .prize-wheel-widget {
+      width: 72px;
+      height: 72px;
+      bottom: 96px;
+    }
+  }
+
+  .prize-wheel-widget__image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+
+  @keyframes prizeWheelFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  .prize-wheel-modal__wheel {
+    transform-origin: center center;
+    transition: transform 0.1s linear;
+    will-change: transform;
+  }
+
+  .prize-wheel-modal__wheel.is-spinning {
+    transition: transform 4.8s cubic-bezier(0.12, 0.75, 0.22, 1);
+  }
+
+  .prize-wheel-modal__spin-btn {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 2;
+    display: flex;
+    -webkit-tap-highlight-color: transparent;
+    transform: translate(-50%, -50%);
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+  }
+
+  .prize-wheel-modal__spin-btn:hover:not(:disabled) {
+    transform: translate(-50%, -50%) scale(1.05);
+    filter: brightness(1.1);
+  }
+
+  .prize-wheel-modal__spin-btn:disabled {
+    cursor: default;
+  }
+
+  .prize-wheel-modal__spin-btn.is-spinning {
+    animation: prizeWheelSpinPulse 0.8s ease-in-out infinite;
+  }
+
+  .prize-wheel-modal__spin-btn.is-used {
+    opacity: 0.85;
+    filter: grayscale(0.2);
+  }
+
+  @keyframes prizeWheelSpinPulse {
+    0%,
+    100% {
+      transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+  }
+}

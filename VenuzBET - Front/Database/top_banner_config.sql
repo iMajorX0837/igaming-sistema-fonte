@@ -1,0 +1,2 @@
+-- DEPRECATED: execute site_config.sql
+-- Colunas migradas: top_banner_*
