@@ -1,8 +1,11 @@
-# Gerado por add-tenant.sh — não editar manualmente (use o template).
+# Gerado por add-tenant.sh — use: sed -e 's/___SLUG__/SLUG/g' -e 's/___DOMAIN___/dominio.com/g' tenant.conf.template > SLUG.conf
 
 upstream api___SLUG__ {
   server api-___SLUG__:3000;
 }
+
+# Bloco reutilizável: proxy API (mesmo origin — ideal com Cloudflare Flexible)
+# Cloudflare HTTPS → EC2 HTTP :80 → nginx proxy → api container
 
 server {
   listen 80;
@@ -10,6 +13,37 @@ server {
 
   root /var/www/tenants/___SLUG__/front;
   index index.html;
+
+  location /api/ {
+    proxy_pass http://api___SLUG__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+
+  location /aviator/ {
+    proxy_pass http://api___SLUG__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+
+  location /webhook {
+    proxy_pass http://api___SLUG__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+  }
+
+  location /health {
+    proxy_pass http://api___SLUG__/health;
+  }
 
   location / {
     try_files $uri $uri/ /index.html;
@@ -23,11 +57,30 @@ server {
   root /var/www/tenants/___SLUG__/admin;
   index index.html;
 
+  location /api/ {
+    proxy_pass http://api___SLUG__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+
+  location /aviator/ {
+    proxy_pass http://api___SLUG__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }
 }
 
+# Subdomínio api.* (webhooks externos, Aviator, MisticPay) — precisa nuvem laranja na Cloudflare
 server {
   listen 80;
   server_name api.___DOMAIN___;
@@ -43,11 +96,4 @@ server {
     proxy_set_header Connection "upgrade";
     proxy_read_timeout 86400;
   }
-}
-
-# HTTPS sem cert ainda: redireciona mantendo o host (admin/site/api corretos)
-server {
-  listen 443 default_server;
-  server_name ___DOMAIN___ www.___DOMAIN___ admin.___DOMAIN___ api.___DOMAIN___;
-  return 301 http://$host$request_uri;
 }
