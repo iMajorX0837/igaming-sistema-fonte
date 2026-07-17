@@ -22,12 +22,17 @@ export default function ReferralPage() {
   const [loading, setLoading] = useState(true);
   const [totalReferrals, setTotalReferrals] = useState(0);
   const [qualifiedReferrals, setQualifiedReferrals] = useState(0);
+  const [ganhosTotais, setGanhosTotais] = useState(0);
+  const [recompensa, setRecompensa] = useState(plataformaConfig.indicacao_recompensa);
+  const [depositoMinimo, setDepositoMinimo] = useState(plataformaConfig.indicacao_deposito_minimo);
 
   const referralLink = referralCode ? `https://royall.bet?c=${referralCode}` : 'https://royall.bet?c=';
   const cardBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
-  const recompensa = plataformaConfig.indicacao_recompensa;
-  const depositoMinimo = plataformaConfig.indicacao_deposito_minimo;
-  const ganhosTotais = qualifiedReferrals * recompensa;
+
+  useEffect(() => {
+    setRecompensa(plataformaConfig.indicacao_recompensa);
+    setDepositoMinimo(plataformaConfig.indicacao_deposito_minimo);
+  }, [plataformaConfig.indicacao_recompensa, plataformaConfig.indicacao_deposito_minimo]);
 
   useEffect(() => {
     // Garante que o Iconify escaneia os ícones após renderizar
@@ -48,44 +53,66 @@ export default function ReferralPage() {
       }
 
       try {
-        // Buscar código de indicação do usuário
-        const { data: userData, error: userError } = await supabase
-          .from('usuarios')
-          .select('link_indicação')
-          .eq('id', user.id)
-          .single();
+        const { data: indicacaoConfig, error: indicacaoConfigError } = await supabase.rpc(
+          'obter_indicacao_config_usuario',
+          { p_usuario_id: user.id },
+        );
 
-        if (userError) {
-          console.error('Erro ao buscar código de indicação:', userError);
-        } else if (userData && 'link_indicação' in userData && userData.link_indicação) {
-          const code = userData.link_indicação as string;
-          setReferralCode(code);
+        if (!indicacaoConfigError && indicacaoConfig) {
+          const config = indicacaoConfig as {
+            ok?: boolean;
+            link_indicacao?: string | null;
+            recompensa?: number;
+            deposito_minimo?: number;
+            total_indicados?: number;
+            indicados_qualificados?: number;
+            ganhos_totais?: number;
+          };
 
-          // Buscar total de indicações (usuários que se cadastraram com este código)
-          const { count, error: referralsError } = await supabase
-            .from('usuarios')
-            .select('*', { count: 'exact', head: true })
-            .eq('indicado_por', code);
-
-          if (referralsError) {
-            console.error('Erro ao buscar indicações:', referralsError);
-            setTotalReferrals(0);
-            setQualifiedReferrals(0);
-          } else {
-            const total = count || 0;
-            setTotalReferrals(total);
-
-            const { data: qualifiedData, error: qualifiedError } = await supabase.rpc(
-              'count_qualified_referrals',
-              { referral_code_param: code }
-            );
-
-            if (qualifiedError) {
-              console.error('Erro ao buscar indicações qualificadas:', qualifiedError);
-              setQualifiedReferrals(0);
-            } else {
-              setQualifiedReferrals(Number(qualifiedData) || 0);
+          if (config.ok !== false) {
+            if (config.link_indicacao) {
+              setReferralCode(config.link_indicacao);
             }
+            if (Number.isFinite(Number(config.recompensa))) {
+              setRecompensa(Number(config.recompensa));
+            }
+            if (Number.isFinite(Number(config.deposito_minimo))) {
+              setDepositoMinimo(Number(config.deposito_minimo));
+            }
+            if (Number.isFinite(Number(config.total_indicados))) {
+              setTotalReferrals(Number(config.total_indicados));
+            }
+            if (Number.isFinite(Number(config.indicados_qualificados))) {
+              setQualifiedReferrals(Number(config.indicados_qualificados));
+            }
+            if (Number.isFinite(Number(config.ganhos_totais))) {
+              setGanhosTotais(Number(config.ganhos_totais));
+            }
+          }
+        } else if (indicacaoConfigError) {
+          console.error('Erro ao buscar config de indicação:', indicacaoConfigError);
+
+          const { data: userData, error: userError } = await supabase
+            .from('usuarios')
+            .select('link_indicação')
+            .eq('id', user.id)
+            .single();
+
+          if (!userError && userData?.link_indicação) {
+            const code = userData.link_indicação as string;
+            setReferralCode(code);
+
+            const { count } = await supabase
+              .from('usuarios')
+              .select('*', { count: 'exact', head: true })
+              .eq('indicado_por', code);
+
+            setTotalReferrals(count || 0);
+
+            const { data: qualifiedData } = await supabase.rpc('count_qualified_referrals', {
+              referral_code_param: code,
+            });
+            setQualifiedReferrals(Number(qualifiedData) || 0);
           }
         }
       } catch (err) {

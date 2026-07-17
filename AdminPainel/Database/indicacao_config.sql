@@ -24,6 +24,9 @@ ALTER TABLE public.site_config
 ALTER TABLE public.usuarios
   ADD COLUMN IF NOT EXISTS indicacao_recompensa_paga BOOLEAN NOT NULL DEFAULT false;
 
+ALTER TABLE public.usuarios
+  ADD COLUMN IF NOT EXISTS indicacao_recompensa_valor_pago NUMERIC(12,2);
+
 COMMENT ON COLUMN public.site_config.indicacao_recompensa IS
   'Valor em R$ creditado ao indicador quando o indicado faz o primeiro depósito qualificado.';
 COMMENT ON COLUMN public.site_config.indicacao_deposito_minimo IS
@@ -105,7 +108,9 @@ BEGIN
   WHERE id = v_referrer_id;
 
   UPDATE public.usuarios
-  SET indicacao_recompensa_paga = true
+  SET
+    indicacao_recompensa_paga = true,
+    indicacao_recompensa_valor_pago = v_recompensa
   WHERE id = p_usuario_indicado_id;
 
   RETURN json_build_object(

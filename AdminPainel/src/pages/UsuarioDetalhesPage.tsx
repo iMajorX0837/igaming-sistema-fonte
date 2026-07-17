@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Trophy,
   User,
+  UserPlus,
   Users,
   Wallet,
   XCircle,
@@ -127,13 +128,77 @@ interface RolloverInfo {
   saques_bloqueados: boolean;
 }
 
-type TabKey = 'saldo' | 'transacoes' | 'verificacoes' | 'perfil';
+type TabKey = 'saldo' | 'transacoes' | 'verificacoes' | 'indicacao' | 'perfil';
+
+interface IndicacaoUsuario {
+  link_indicacao: string | null;
+  recompensa_custom: number | null;
+  deposito_minimo_custom: number | null;
+  usa_padrao_plataforma: boolean;
+  global_recompensa: number;
+  global_deposito_minimo: number;
+  recompensa_efetiva: number;
+  deposito_minimo_efetivo: number;
+  total_indicados: number;
+  indicados_qualificados: number;
+  ganhos_totais: number;
+}
 type TransTipo = 'depositos' | 'saques' | 'apostas';
 
 const TRANS_ITEMS_PER_PAGE = 10;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const toNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const normalizeEstatisticas = (
+  raw: unknown,
+  usuario?: UsuarioDetalhe | null,
+  resumo?: Resumo | null,
+): Estatisticas => {
+  const data = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  let total_depositado = toNumber(data.total_depositado);
+  let total_retirado = toNumber(data.total_retirado);
+  let total_apostado = toNumber(data.total_apostado);
+  let total_ganho = toNumber(data.total_ganho);
+  let media_deposito = toNumber(data.media_deposito);
+  let media_saque = toNumber(data.media_saque);
+  let media_aposta = toNumber(data.media_aposta);
+
+  if (total_depositado <= 0 && usuario?.total_depositado) {
+    total_depositado = toNumber(usuario.total_depositado);
+  }
+  if (total_depositado <= 0 && resumo?.valor_depositos) {
+    total_depositado = toNumber(resumo.valor_depositos);
+  }
+  if (total_retirado <= 0 && resumo?.valor_saques) {
+    total_retirado = toNumber(resumo.valor_saques);
+  }
+  if (media_deposito <= 0 && resumo && resumo.total_depositos > 0 && total_depositado > 0) {
+    media_deposito = total_depositado / resumo.total_depositos;
+  }
+  if (media_saque <= 0 && resumo && resumo.total_saques > 0 && total_retirado > 0) {
+    media_saque = total_retirado / resumo.total_saques;
+  }
+  if (media_aposta <= 0 && resumo && resumo.total_apostas > 0 && total_apostado > 0) {
+    media_aposta = total_apostado / resumo.total_apostas;
+  }
+
+  return {
+    total_depositado,
+    total_retirado,
+    total_apostado,
+    total_ganho,
+    media_deposito,
+    media_saque,
+    media_aposta,
+  };
+};
 
 const formatDate = (value: string | null) => {
   if (!value) return 'Não informado';
@@ -246,6 +311,13 @@ export default function UsuarioDetalhesPage() {
     pais: 'BR',
     cargo: 'usuario',
   });
+  const [indicacao, setIndicacao] = useState<IndicacaoUsuario | null>(null);
+  const [indicacaoLoading, setIndicacaoLoading] = useState(false);
+  const [indicacaoForm, setIndicacaoForm] = useState({
+    usaPadraoPlataforma: true,
+    recompensa: '',
+    depositoMinimo: '',
+  });
 
   const loadDetalhes = useCallback(async () => {
     if (!userId) return;
@@ -278,7 +350,7 @@ export default function UsuarioDetalhesPage() {
 
       setUsuario(result.usuario);
       setResumo(result.resumo || null);
-      setEstatisticas(result.estatisticas || null);
+      setEstatisticas(normalizeEstatisticas(result.estatisticas, result.usuario, result.resumo));
       setPerfilForm({
         nome: result.usuario.nome || '',
         email: result.usuario.email || '',
@@ -338,6 +410,38 @@ export default function UsuarioDetalhesPage() {
     }
   }, [userId, transTipo, transPage]);
 
+  const loadIndicacao = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      setIndicacaoLoading(true);
+      const { data, error } = await supabase.rpc('obter_indicacao_usuario_admin', {
+        p_usuario_id: userId,
+      });
+
+      if (error) {
+        console.error(error);
+        showToast('Erro ao carregar Indique e Ganhe. Execute patch_indicacao_usuario.sql.', 'error');
+        return;
+      }
+
+      const result = data as { ok: boolean; error?: string } & IndicacaoUsuario;
+      if (!result?.ok) {
+        showToast(result?.error || 'Erro ao carregar Indique e Ganhe.', 'error');
+        return;
+      }
+
+      setIndicacao(result);
+      setIndicacaoForm({
+        usaPadraoPlataforma: result.usa_padrao_plataforma,
+        recompensa: String(result.recompensa_efetiva ?? result.global_recompensa ?? 0),
+        depositoMinimo: String(result.deposito_minimo_efetivo ?? result.global_deposito_minimo ?? 0),
+      });
+    } finally {
+      setIndicacaoLoading(false);
+    }
+  }, [userId, showToast]);
+
   const loadRollover = useCallback(async () => {
     if (!userId) return;
 
@@ -381,7 +485,10 @@ export default function UsuarioDetalhesPage() {
     if (activeTab === 'transacoes') {
       void loadTransacoes();
     }
-  }, [activeTab, loadTransacoes]);
+    if (activeTab === 'indicacao') {
+      void loadIndicacao();
+    }
+  }, [activeTab, loadTransacoes, loadIndicacao]);
 
   const handleTransTipoChange = (tipo: TransTipo) => {
     setTransTipo(tipo);
@@ -564,6 +671,58 @@ export default function UsuarioDetalhesPage() {
     }
   };
 
+  const handleSaveIndicacao = async () => {
+    if (!userId) return;
+
+    if (!indicacaoForm.usaPadraoPlataforma) {
+      const recompensa = parseFloat(indicacaoForm.recompensa.replace(',', '.'));
+      const depositoMinimo = parseFloat(indicacaoForm.depositoMinimo.replace(',', '.'));
+      if (Number.isNaN(recompensa) || recompensa < 0) {
+        showToast('Informe uma recompensa válida (≥ 0).', 'warning');
+        return;
+      }
+      if (Number.isNaN(depositoMinimo) || depositoMinimo < 0) {
+        showToast('Informe um depósito mínimo válido (≥ 0).', 'warning');
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const payload = indicacaoForm.usaPadraoPlataforma
+        ? {
+            p_usuario_id: userId,
+            p_usar_padrao_plataforma: true,
+            p_recompensa: null,
+            p_deposito_minimo: null,
+          }
+        : {
+            p_usuario_id: userId,
+            p_usar_padrao_plataforma: false,
+            p_recompensa: parseFloat(indicacaoForm.recompensa.replace(',', '.')),
+            p_deposito_minimo: parseFloat(indicacaoForm.depositoMinimo.replace(',', '.')),
+          };
+
+      const { data, error } = await supabase.rpc('atualizar_indicacao_usuario_admin', payload);
+
+      if (error) {
+        showToast('Erro ao salvar Indique e Ganhe.', 'error');
+        return;
+      }
+
+      const result = data as { ok: boolean; error?: string };
+      if (!result?.ok) {
+        showToast(result?.error || 'Erro ao salvar Indique e Ganhe.', 'error');
+        return;
+      }
+
+      showToast('Configuração de indicação salva!', 'success');
+      await loadIndicacao();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSavePerfil = async () => {
     if (!userId) return;
 
@@ -617,6 +776,7 @@ export default function UsuarioDetalhesPage() {
     { key: 'saldo', label: 'Saldo', icon: Wallet },
     { key: 'transacoes', label: 'Transações', icon: Receipt },
     { key: 'verificacoes', label: 'Verificações', icon: ShieldCheck },
+    { key: 'indicacao', label: 'Indique e Ganhe', icon: UserPlus },
     { key: 'perfil', label: 'Perfil', icon: User },
   ];
 
@@ -1143,6 +1303,175 @@ export default function UsuarioDetalhesPage() {
               </div>
             )}
 
+            {activeTab === 'indicacao' && (
+              <div className="max-w-2xl space-y-5">
+                {indicacaoLoading ? (
+                  <div className="flex items-center justify-center py-12 gap-3">
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    <p className="text-gray-500 text-sm">Carregando indicações...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-500 text-sm">
+                      Personalize quanto este usuário ganha por indicação e o depósito mínimo exigido do
+                      indicado. Deixe no padrão da plataforma para usar os valores globais de Configurações.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <IndicacaoStat
+                        label="Indicados"
+                        value={String(indicacao?.total_indicados ?? 0)}
+                      />
+                      <IndicacaoStat
+                        label="Qualificados"
+                        value={String(indicacao?.indicados_qualificados ?? 0)}
+                      />
+                      <IndicacaoStat
+                        label="Ganhos totais"
+                        value={formatCurrency(indicacao?.ganhos_totais ?? 0)}
+                      />
+                    </div>
+
+                    {indicacao?.link_indicacao ? (
+                      <div className="rounded-xl border border-admin-border p-4 bg-admin-panel">
+                        <p className="text-gray-500 text-xs mb-1">Código de indicação</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-white text-sm font-mono flex-1 truncate">
+                            {indicacao.link_indicacao}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => copyId(indicacao.link_indicacao!)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-admin-border bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors shrink-0"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-xl border border-admin-border p-5 bg-admin-panel space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-white font-semibold text-sm">Regras personalizadas</h3>
+                          <p className="text-gray-500 text-xs mt-1">
+                            Padrão da plataforma: recompensa{' '}
+                            {formatCurrency(indicacao?.global_recompensa ?? 0)} · depósito mín.{' '}
+                            {formatCurrency(indicacao?.global_deposito_minimo ?? 0)}
+                          </p>
+                        </div>
+                        {!indicacaoForm.usaPadraoPlataforma ? (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-admin-accent/15 text-admin-accent border border-admin-accent/30 shrink-0">
+                            Personalizado
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <label className="flex items-center gap-2.5 text-gray-300 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={indicacaoForm.usaPadraoPlataforma}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIndicacaoForm({
+                              usaPadraoPlataforma: checked,
+                              recompensa: checked
+                                ? String(indicacao?.global_recompensa ?? 0)
+                                : indicacaoForm.recompensa,
+                              depositoMinimo: checked
+                                ? String(indicacao?.global_deposito_minimo ?? 0)
+                                : indicacaoForm.depositoMinimo,
+                            });
+                          }}
+                          className="rounded"
+                        />
+                        Usar padrão da plataforma
+                      </label>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-gray-300 text-sm font-medium mb-1.5 block">
+                            Recompensa do indicador (R$)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                              R$
+                            </span>
+                            <input
+                              type="number"
+                              value={indicacaoForm.recompensa}
+                              onChange={(e) =>
+                                setIndicacaoForm({ ...indicacaoForm, recompensa: e.target.value })
+                              }
+                              disabled={indicacaoForm.usaPadraoPlataforma}
+                              min="0"
+                              step="0.01"
+                              className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-white/30 border border-admin-border bg-admin-panel disabled:opacity-50"
+                            />
+                          </div>
+                          <p className="text-gray-500 text-xs mt-1.5">
+                            Valor creditado quando o indicado faz o primeiro depósito qualificado.
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="text-gray-300 text-sm font-medium mb-1.5 block">
+                            Depósito mínimo do indicado (R$)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                              R$
+                            </span>
+                            <input
+                              type="number"
+                              value={indicacaoForm.depositoMinimo}
+                              onChange={(e) =>
+                                setIndicacaoForm({ ...indicacaoForm, depositoMinimo: e.target.value })
+                              }
+                              disabled={indicacaoForm.usaPadraoPlataforma}
+                              min="0"
+                              step="0.01"
+                              className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-white/30 border border-admin-border bg-admin-panel disabled:opacity-50"
+                            />
+                          </div>
+                          <p className="text-gray-500 text-xs mt-1.5">
+                            Primeiro depósito do indicado precisa ser igual ou maior que este valor.
+                          </p>
+                        </div>
+                      </div>
+
+                      {!indicacaoForm.usaPadraoPlataforma ? (
+                        <div className="rounded-lg border border-admin-accent/20 bg-admin-accent/5 px-4 py-3 text-xs text-gray-300">
+                          Valores efetivos para este usuário: recompensa{' '}
+                          <span className="text-white font-medium">
+                            {formatCurrency(parseFloat(indicacaoForm.recompensa.replace(',', '.')) || 0)}
+                          </span>{' '}
+                          · depósito mín.{' '}
+                          <span className="text-white font-medium">
+                            {formatCurrency(parseFloat(indicacaoForm.depositoMinimo.replace(',', '.')) || 0)}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <button
+                      onClick={handleSaveIndicacao}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-200 disabled:opacity-50 text-black rounded-lg font-medium transition-colors"
+                    >
+                      {saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      {saving ? 'Salvando...' : 'Salvar indicação'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             {activeTab === 'perfil' && (
               <div className="max-w-xl space-y-5">
                 <p className="text-gray-500 text-sm">
@@ -1551,6 +1880,15 @@ function RolloverSection({
           usuário realize saques até movimentar o valor especificado em apostas.
         </p>
       </div>
+    </div>
+  );
+}
+
+function IndicacaoStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl px-4 py-4 bg-admin-panel border border-admin-border">
+      <p className="text-gray-500 text-xs font-medium">{label}</p>
+      <p className="text-white font-bold text-lg mt-1">{value}</p>
     </div>
   );
 }

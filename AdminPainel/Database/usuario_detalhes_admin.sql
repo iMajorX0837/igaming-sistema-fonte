@@ -33,7 +33,7 @@ DECLARE
   v_valor_saques NUMERIC;
   v_count_depositos_aprovados INT;
   v_count_saques_aprovados INT;
-  v_count_apostas_perdeu INT;
+  v_count_apostas INT;
   v_total_apostado NUMERIC;
   v_total_ganho NUMERIC;
   v_valor_depositos_aprovados NUMERIC;
@@ -76,21 +76,39 @@ BEGIN
   SELECT COUNT(*)::INT, COALESCE(SUM(valor), 0)
   INTO v_count_depositos_aprovados, v_valor_depositos_aprovados
   FROM public.depositos
-  WHERE usuario_id = p_usuario_id AND status = 'aprovado';
+  WHERE usuario_id = p_usuario_id AND LOWER(TRIM(status)) = 'aprovado';
 
   SELECT COUNT(*)::INT, COALESCE(SUM(valor), 0)
   INTO v_count_saques_aprovados, v_valor_saques_aprovados
   FROM public.saques
-  WHERE usuario_id = p_usuario_id AND status = 'aprovado';
+  WHERE usuario_id = p_usuario_id AND LOWER(TRIM(status)) = 'aprovado';
 
+  -- Total apostado: soma de todas as transações (Perdeu + Ganhou)
   SELECT COUNT(*)::INT, COALESCE(SUM(valor), 0)
-  INTO v_count_apostas_perdeu, v_total_apostado
+  INTO v_count_apostas, v_total_apostado
   FROM public.transacoes_jogos
-  WHERE usuario_id = p_usuario_id AND tipo = 'Perdeu';
+  WHERE usuario_id = p_usuario_id;
 
+  -- Total ganho: soma de retornos creditados
   SELECT COALESCE(SUM(retorno), 0) INTO v_total_ganho
   FROM public.transacoes_jogos
-  WHERE usuario_id = p_usuario_id AND tipo = 'Ganhou';
+  WHERE usuario_id = p_usuario_id;
+
+  -- Fallback: se depositos aprovados estiver vazio, usa total_depositado do perfil
+  IF COALESCE(v_valor_depositos_aprovados, 0) <= 0 AND COALESCE(v_usuario.total_depositado, 0) > 0 THEN
+    v_valor_depositos_aprovados := v_usuario.total_depositado;
+    IF v_count_depositos_aprovados <= 0 AND v_total_depositos > 0 THEN
+      v_count_depositos_aprovados := v_total_depositos;
+    END IF;
+  END IF;
+
+  -- Fallback: se saques aprovados estiver vazio, usa total de saques registrados
+  IF COALESCE(v_valor_saques_aprovados, 0) <= 0 AND COALESCE(v_valor_saques, 0) > 0 THEN
+    v_valor_saques_aprovados := v_valor_saques;
+    IF v_count_saques_aprovados <= 0 AND v_total_saques > 0 THEN
+      v_count_saques_aprovados := v_total_saques;
+    END IF;
+  END IF;
 
   RETURN json_build_object(
     'ok', true,
@@ -136,8 +154,8 @@ BEGIN
         ELSE 0
       END,
       'media_aposta', CASE
-        WHEN v_count_apostas_perdeu > 0
-        THEN ROUND(v_total_apostado / v_count_apostas_perdeu, 2)
+        WHEN v_count_apostas > 0
+        THEN ROUND(v_total_apostado / v_count_apostas, 2)
         ELSE 0
       END
     )
