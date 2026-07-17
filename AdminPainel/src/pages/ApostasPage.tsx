@@ -15,6 +15,7 @@ interface Aposta {
   id: string;
   usuario_id: string;
   valor: number;
+  data?: string;
   created_at: string;
   status: string;
   jogo?: string;
@@ -82,6 +83,7 @@ export default function ApostasPage() {
           id,
           usuario_id,
           valor,
+          data,
           created_at,
           status,
           jogo,
@@ -89,7 +91,7 @@ export default function ApostasPage() {
           com_bonus,
           usuarios!inner(nome, cargo)
         `)
-        .order('created_at', { ascending: false })
+        .order('data', { ascending: false })
         .range(from, to);
 
       if (fetchError) {
@@ -97,8 +99,8 @@ export default function ApostasPage() {
         // Tentar buscar sem join caso o relacionamento não esteja configurado
         const { data: apostasData, error: apostasError } = await supabase
           .from('transacoes_jogos')
-          .select('id, usuario_id, valor, created_at, status, jogo, retorno, com_bonus')
-          .order('created_at', { ascending: false })
+          .select('id, usuario_id, valor, data, created_at, status, jogo, retorno, com_bonus')
+          .order('data', { ascending: false })
           .range(from, to);
 
         if (apostasError) {
@@ -347,7 +349,7 @@ export default function ApostasPage() {
                             <span className="text-gray-500 text-sm">-</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-gray-300">{formatDateTime(aposta.created_at)}</td>
+                        <td className="py-3 px-4 text-gray-300">{formatDateTime(aposta.data || aposta.created_at)}</td>
                         <td className="py-3 px-4">
                           {aposta.status ? (
                             <span className={getStatusBadge(aposta.status).className}>

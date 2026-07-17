@@ -209,6 +209,40 @@ async function resolvePlayFiversGameName(providerCode, gameCode) {
   return foundGame?.name || fallback;
 }
 
+/** Normaliza timestamp da PlayFivers para ISO UTC (timestamptz no Supabase). */
+function parsePlayFiverTimestamp(value) {
+  if (value == null || value === '') {
+    return new Date().toISOString();
+  }
+
+  if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
+    const num = Number(value);
+    const ms = num < 1e12 ? num * 1000 : num;
+    const fromUnix = new Date(ms);
+    if (!Number.isNaN(fromUnix.getTime())) return fromUnix.toISOString();
+  }
+
+  const raw = String(value).trim();
+
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) {
+    const fromTz = new Date(raw);
+    if (!Number.isNaN(fromTz.getTime())) return fromTz.toISOString();
+  }
+
+  // PlayFivers costuma enviar "YYYY-MM-DD HH:MM:SS" em horário de Brasília
+  const brMatch = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?$/);
+  if (brMatch) {
+    const fromBr = new Date(`${brMatch[1]}T${brMatch[2]}-03:00`);
+    if (!Number.isNaN(fromBr.getTime())) return fromBr.toISOString();
+  }
+
+  const fallback = new Date(raw);
+  if (!Number.isNaN(fallback.getTime())) return fallback.toISOString();
+
+  console.warn('[PlayFivers] created_at inválido, usando horário atual:', value);
+  return new Date().toISOString();
+}
+
 /** Persiste aposta no Supabase após responder à PlayFivers (evita timeout no game_callback). */
 async function persistGameTransaction({
   usuarioId,
@@ -235,7 +269,7 @@ async function persistGameTransaction({
     retorno: win > 0 ? win : 0,
     status: 'Finalizado',
     com_bonus: 'Não',
-    data: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
+    data: parsePlayFiverTimestamp(createdAt),
   };
 
   const { data: savedTransaction, error: insertError } = await supabase
@@ -249,7 +283,7 @@ async function persistGameTransaction({
     return;
   }
 
-  console.log('💾 Transação salva no banco:', savedTransaction?.id);
+  console.log('💾 Transação salva no banco:', savedTransaction?.id, 'data:', savedTransaction?.data);
 }
 
 function createSlug(text) {
@@ -680,7 +714,7 @@ app.post('/webhook/transaction', async (req, res) => {
       roundType = slot.type; // 'BASE', 'BONUS', etc.
       roundId = slot.round_id;
       txnType = slot.txn_type;
-      createdAt = slot.created_at;
+      createdAt = slot.created_at ?? transaction.created_at ?? null;
     } else {
       // Para outros tipos de jogos (live, etc.), implementar conforme necessário
       return res.status(400).json({
