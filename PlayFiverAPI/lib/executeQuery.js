@@ -58,6 +58,10 @@ export async function executeQuery(client, spec) {
     query = query.limit(spec.limit);
   }
 
+  if (spec.range != null) {
+    query = query.range(spec.range.from, spec.range.to);
+  }
+
   if (spec.single) {
     query = query.single();
   } else if (spec.maybeSingle) {

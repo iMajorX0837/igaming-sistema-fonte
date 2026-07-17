@@ -52,7 +52,6 @@ server {
 
 server {
   listen 8080;
-  listen [::]:8080;
   server_name _;
 
   root /var/www/tenants/venuz/admin;

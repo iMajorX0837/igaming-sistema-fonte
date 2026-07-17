@@ -27,6 +27,7 @@ type QuerySpec = {
   filters?: FilterSpec[];
   orders?: OrderSpec[];
   limit?: number;
+  range?: { from: number; to: number };
   single?: boolean;
   maybeSingle?: boolean;
 };
@@ -185,6 +186,10 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
 
   limit(count: number): QueryBuilder<T> {
     return this.clone({ limit: count });
+  }
+
+  range(from: number, to: number): QueryBuilder<T> {
+    return this.clone({ range: { from, to } });
   }
 
   single(): QueryBuilder<T> {
