@@ -8,6 +8,7 @@ import StatCard from '../components/ui/StatCard';
 import { fetchAviatorRtpPreview, invalidateAviatorQueue, type AviatorScheduleEntry } from '../lib/aviatorEngineApi';
 import {
   Activity,
+  Check,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -107,6 +108,20 @@ const PRESETS: Record<
     recovery: true,
   },
 };
+
+function detectActivePreset(form: ConfigForm): PresetKey | null {
+  const rtp = Number(String(form.rtp_base_pct).replace(',', '.'));
+  const ggr = Number(String(form.ggr_target_pct).replace(',', '.'));
+  if (!Number.isFinite(rtp) || !Number.isFinite(ggr)) return null;
+
+  for (const key of Object.keys(PRESETS) as PresetKey[]) {
+    const preset = PRESETS[key];
+    if (rtp === Number(preset.rtp) && ggr === Number(preset.ggr) && form.recovery_enabled === preset.recovery) {
+      return key;
+    }
+  }
+  return null;
+}
 
 const WINDOW_OPTIONS = [
   { value: '12', label: '12 horas' },
@@ -228,7 +243,6 @@ export default function AviatorRtpPage() {
   const [saving, setSaving] = useState(false);
   const [refreshingPreview, setRefreshingPreview] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activePreset, setActivePreset] = useState<PresetKey | null>(null);
   const [form, setForm] = useState<ConfigForm>(defaultForm);
   const [stats, setStats] = useState<AviatorStats | null>(null);
   const [engine, setEngine] = useState<Record<string, unknown> | null>(null);
@@ -253,7 +267,6 @@ export default function AviatorRtpPage() {
       max_crash: String(config.max_crash),
       queue_size: String(config.queue_size),
     });
-    setActivePreset(null);
   };
 
   const applyPreset = (key: PresetKey) => {
@@ -268,7 +281,6 @@ export default function AviatorRtpPage() {
       ggr_target_pct: preset.ggr,
       recovery_enabled: preset.recovery,
     }));
-    setActivePreset(key);
   };
 
   const loadPreview = useCallback(async () => {
@@ -449,6 +461,7 @@ export default function AviatorRtpPage() {
   const houseGgr = Number(stats?.ggr ?? 0);
   const houseProfit = houseGgr >= 0;
   const ggrTargetPct = Number(form.ggr_target_pct) || 0;
+  const activePreset = detectActivePreset(form);
   const upcomingPreview = upcomingRounds.slice(0, 12);
   const upcomingStats = summarizeUpcoming(upcomingPreview);
 
@@ -527,7 +540,18 @@ export default function AviatorRtpPage() {
           </PagePanel>
 
           <PagePanel>
-            <h2 className="text-white text-lg font-semibold mb-1">Perfis rápidos</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <h2 className="text-white text-lg font-semibold">Perfis rápidos</h2>
+              <span
+                className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                  activePreset
+                    ? 'border-admin-accent/40 bg-admin-accent/10 text-admin-accent'
+                    : 'border-admin-border bg-black/20 text-gray-400'
+                }`}
+              >
+                {activePreset ? `Ativo: ${PRESETS[activePreset].label}` : 'Ativo: Personalizado'}
+              </span>
+            </div>
             <p className="text-sm text-gray-500 mb-4">Clique em um perfil e depois em Salvar. Você pode ajustar depois.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {(Object.keys(PRESETS) as PresetKey[]).map((key) => {
@@ -538,13 +562,22 @@ export default function AviatorRtpPage() {
                     key={key}
                     type="button"
                     onClick={() => applyPreset(key)}
-                    className={`text-left rounded-xl border px-4 py-3 transition-colors ${
+                    aria-pressed={selected}
+                    className={`relative text-left rounded-xl border px-4 py-3 transition-colors ${
                       selected
-                        ? 'border-admin-accent bg-admin-accent/10'
+                        ? 'border-admin-accent bg-admin-accent/10 ring-1 ring-admin-accent/30'
                         : 'border-admin-border bg-admin-panel hover:border-admin-accent/30'
                     }`}
                   >
-                    <p className={`font-medium ${selected ? 'text-admin-accent' : 'text-white'}`}>{preset.label}</p>
+                    {selected && (
+                      <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-admin-accent">
+                        <Check className="w-3 h-3" />
+                        Ativo
+                      </span>
+                    )}
+                    <p className={`font-medium pr-14 ${selected ? 'text-admin-accent' : 'text-white'}`}>
+                      {preset.label}
+                    </p>
                     <p className="text-xs text-gray-500 mt-1">{preset.desc}</p>
                   </button>
                 );
@@ -561,7 +594,6 @@ export default function AviatorRtpPage() {
                 example={`Com ${rtpBaseNum || '—'}%, sua margem teórica é ~${houseEdgeHint}% por aposta.`}
                 value={form.rtp_base_pct}
                 onChange={(v) => {
-                  setActivePreset(null);
                   const base = Number(v.replace(',', '.'));
                   if (Number.isFinite(base) && base > 0 && base < 100) {
                     const limits = deriveRtpLimits(base);
@@ -594,7 +626,6 @@ export default function AviatorRtpPage() {
                       type="checkbox"
                       checked={form.recovery_enabled}
                       onChange={(e) => {
-                        setActivePreset(null);
                         setForm({ ...form, recovery_enabled: e.target.checked });
                       }}
                       className="rounded border-admin-border-strong"
@@ -611,7 +642,6 @@ export default function AviatorRtpPage() {
                       example="3% = de R$ 1.000 apostados, R$ 30 de lucro alvo."
                       value={form.ggr_target_pct}
                       onChange={(v) => {
-                        setActivePreset(null);
                         setForm({ ...form, ggr_target_pct: v });
                       }}
                     />
@@ -621,7 +651,6 @@ export default function AviatorRtpPage() {
                       value={form.recovery_window_hours}
                       options={WINDOW_OPTIONS}
                       onChange={(v) => {
-                        setActivePreset(null);
                         setForm({ ...form, recovery_window_hours: v });
                       }}
                     />
