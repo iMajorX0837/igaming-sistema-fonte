@@ -64,11 +64,14 @@ def utc_now():
 
 
 def _sync_rtp_config(force=False):
-    """Atualiza parâmetros do motor e invalida fila se a config mudou."""
+    """Atualiza parâmetros do motor e invalida fila se RTP/GGR mudou."""
     global _rtp_queue_version
     cfg = refresh_runtime(force=force)
-    version = str(cfg.get("config_version") or "")
+    version = str(cfg.get("engine_version") or cfg.get("version_key") or cfg.get("config_version") or "")
     if version and version != _rtp_queue_version:
+        _rtp_queue_version = version
+        _rtp_upcoming.clear()
+    elif cfg.get("version_changed"):
         _rtp_queue_version = version
         _rtp_upcoming.clear()
     return cfg

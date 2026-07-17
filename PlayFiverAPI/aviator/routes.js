@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 import { createAviatorWallet } from './wallet.js';
 import { createAviatorRounds, MAX_VELAS } from './rounds.js';
 import { createAviatorConfig } from './config.js';
+import { startAviatorRecoveryWatcher } from './recoveryWatcher.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AVIATOR_DIR = path.join(__dirname, '..', 'Aviator - Spribe (Clonado)');
@@ -245,6 +246,17 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
       console.error('[AVIATOR CONFIG] invalidate-queue:', err);
       res.status(500).json({ ok: false, error: 'Erro ao invalidar fila' });
     }
+  });
+
+  async function invalidateAviatorQueueInternal() {
+    aviatorConfig.invalidateCache();
+    await proxyPythonInternal('/api/rtp/invalidate', { method: 'POST', body: {} });
+  }
+
+  startAviatorRecoveryWatcher({
+    aviatorConfig,
+    invalidateQueue: invalidateAviatorQueueInternal,
+    intervalMs: Number(process.env.AVIATOR_RECOVERY_POLL_MS || 5000),
   });
 
   // ── Wallet bridge (Python chama estes endpoints) ──

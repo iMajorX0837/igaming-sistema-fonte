@@ -254,9 +254,20 @@ BEGIN
       v_adjustment := v_adjustment + v_loss_boost;
     END IF;
 
-    IF v_ggr > 0 AND COALESCE(v_config.recovery_profit_trigger_brl, 0) > 0 THEN
-      v_profit_boost := LEAST(1.0, v_ggr / v_config.recovery_profit_trigger_brl)
-        * v_config.recovery_max_adjustment * 0.5;
+    IF v_ggr > 0 THEN
+      v_profit_boost := LEAST(
+        1.0,
+        v_ggr / GREATEST(COALESCE(v_config.recovery_profit_trigger_brl, 10000), 1)
+      ) * v_config.recovery_max_adjustment;
+
+      IF v_ggr_pct > v_config.ggr_target_pct THEN
+        v_profit_boost := v_profit_boost + LEAST(
+          v_config.recovery_max_adjustment,
+          ((v_ggr_pct - v_config.ggr_target_pct) / 100.0)
+            * GREATEST(v_config.recovery_strength, 0.20)
+        );
+      END IF;
+
       v_adjustment := v_adjustment - v_profit_boost;
     END IF;
 
@@ -270,9 +281,12 @@ BEGIN
   v_effective_rtp := GREATEST(v_config.rtp_min, LEAST(v_config.rtp_max, v_effective_rtp));
 
   IF v_config.recovery_enabled THEN
-    IF v_ggr <= -COALESCE(v_config.recovery_loss_trigger_brl, 10000) * 0.5 THEN
+    IF v_ggr < 0 AND ABS(v_ggr) >= COALESCE(v_config.recovery_loss_trigger_brl, 10000) * 0.4 THEN
       v_recovery_mode := 'recovering';
-    ELSIF v_ggr >= COALESCE(v_config.recovery_profit_trigger_brl, 10000) * 0.5 THEN
+    ELSIF v_ggr > 0 AND (
+      v_ggr >= COALESCE(v_config.recovery_profit_trigger_brl, 10000) * 0.4
+      OR v_ggr_pct >= v_config.ggr_target_pct
+    ) THEN
       v_recovery_mode := 'generous';
     END IF;
   END IF;

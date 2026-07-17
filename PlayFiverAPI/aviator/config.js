@@ -1,6 +1,6 @@
 /** Serviço de configuração RTP do Aviator (Supabase + cache). */
 
-const CACHE_TTL_MS = 10_000;
+const CACHE_TTL_MS = 3_000;
 
 const DEFAULT_ENGINE = {
   ok: true,
@@ -56,6 +56,9 @@ export function createAviatorConfig(supabase) {
         max_crash_mul: Number(data.max_crash_mul ?? 50000),
         queue_size: Number(data.queue_size ?? 50),
         config_version: String(data.config_version ?? 'default'),
+        engine_version: String(data.engine_version ?? data.config_version ?? 'default'),
+        recovery_mode: String(data.recovery_mode ?? 'balanced'),
+        ggr: Number(data.ggr ?? data.stats?.ggr ?? 0),
       };
       cacheAt = now;
       return cache;

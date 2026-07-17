@@ -445,6 +445,9 @@ export default function AviatorRtpPage() {
   const rtpBaseNum = Number(form.rtp_base_pct) || 0;
   const houseEdgeHint = Math.max(0, 100 - rtpBaseNum);
   const effectiveRtp = Number(engine?.effective_rtp ?? engine?.rtp_factor ?? 0) * 100;
+  const rtpBaseEngine = Number(engine?.rtp_base ?? 0) * 100;
+  const recoveryMode = String(engine?.recovery_mode ?? 'balanced');
+  const recoveryAdjustment = Number(engine?.recovery_adjustment ?? 0) * 100;
   const houseGgr = Number(stats?.ggr ?? 0);
   const houseProfit = houseGgr >= 0;
   const ggrTargetPct = Number(form.ggr_target_pct) || 0;
@@ -744,6 +747,15 @@ export default function AviatorRtpPage() {
           </div>
 
           <div className="xl:overflow-y-auto xl:flex-1 xl:min-h-0 space-y-4 mt-3">
+            {engine && (
+              <RecoveryModeBanner
+                mode={recoveryMode}
+                effectiveRtp={effectiveRtp}
+                baseRtp={rtpBaseEngine || rtpBaseNum}
+                adjustmentPct={recoveryAdjustment}
+              />
+            )}
+
             <section className="rounded-xl border border-admin-accent/25 bg-admin-accent/[0.06] overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-admin-accent/15 bg-admin-accent/[0.04]">
                 <Radio className="w-3.5 h-3.5 text-admin-accent" />
@@ -842,6 +854,58 @@ export default function AviatorRtpPage() {
           </div>
         </PagePanel>
       </div>
+    </div>
+  );
+}
+
+function RecoveryModeBanner({
+  mode,
+  effectiveRtp,
+  baseRtp,
+  adjustmentPct,
+}: {
+  mode: string;
+  effectiveRtp: number;
+  baseRtp: number;
+  adjustmentPct: number;
+}) {
+  const config = {
+    recovering: {
+      label: 'Recuperando perdas',
+      desc: 'Casa perdendo — motor mais seco, velas tendem a ser baixas.',
+      className: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+    },
+    generous: {
+      label: 'Soltando prêmios',
+      desc: 'Casa lucrando — motor sobe RTP e gera velas mais altas na fila.',
+      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    },
+    balanced: {
+      label: 'Equilibrado',
+      desc: 'Motor no RTP base configurado.',
+      className: 'border-admin-border bg-black/20 text-gray-300',
+    },
+  }[mode] ?? {
+    label: 'Equilibrado',
+    desc: 'Motor no RTP base configurado.',
+    className: 'border-admin-border bg-black/20 text-gray-300',
+  };
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 text-xs ${config.className}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-semibold uppercase tracking-wide">{config.label}</p>
+        <p className="tabular-nums text-[11px] opacity-90">
+          Motor {formatPct(effectiveRtp || baseRtp, 1)}
+          {adjustmentPct !== 0 && (
+            <span className="ml-1 opacity-75">
+              ({adjustmentPct > 0 ? '+' : ''}
+              {adjustmentPct.toFixed(1)}% vs base)
+            </span>
+          )}
+        </p>
+      </div>
+      <p className="mt-1 opacity-80">{config.desc}</p>
     </div>
   );
 }

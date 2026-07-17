@@ -22,7 +22,7 @@ _runtime = {
     "config_version": "",
     "last_fetch_ms": 0,
 }
-_fetch_interval_ms = int(os.environ.get("AVIATOR_CONFIG_REFRESH_MS", "12000"))
+_fetch_interval_ms = int(os.environ.get("AVIATOR_CONFIG_REFRESH_MS", "5000"))
 
 
 def _bridge_url(path: str) -> str:
@@ -63,9 +63,11 @@ def refresh_runtime(force: bool = False) -> dict:
             return dict(_runtime)
 
     with _config_lock:
-        prev_version = str(_runtime.get("config_version") or "")
-        new_version = str(payload.get("config_version") or "")
-        version_changed = bool(new_version and new_version != prev_version)
+        prev_version_key = str(_runtime.get("version_key") or "")
+        new_engine_version = str(payload.get("engine_version") or "")
+        new_config_version = str(payload.get("config_version") or "")
+        version_key = new_engine_version or new_config_version
+        version_changed = bool(version_key and version_key != prev_version_key)
 
         _runtime.update(
             {
@@ -73,11 +75,15 @@ def refresh_runtime(force: bool = False) -> dict:
                 "min_crash_mul": int(payload.get("min_crash_mul") or DEFAULT_MIN_CRASH_MUL),
                 "max_crash_mul": int(payload.get("max_crash_mul") or DEFAULT_MAX_CRASH_MUL),
                 "queue_size": int(payload.get("queue_size") or DEFAULT_QUEUE_SIZE),
-                "config_version": new_version,
+                "config_version": new_config_version,
+                "engine_version": new_engine_version,
+                "version_key": version_key,
+                "recovery_mode": str(payload.get("recovery_mode") or "balanced"),
                 "effective_rtp": float(payload.get("effective_rtp") or payload.get("rtp_factor") or DEFAULT_RTP_FACTOR),
                 "recovery_adjustment": float(payload.get("recovery_adjustment") or 0),
                 "rtp_real_pct": float(payload.get("rtp_real_pct") or 0),
                 "ggr_pct": float(payload.get("ggr_pct") or 0),
+                "ggr": float(payload.get("ggr") or 0),
                 "last_fetch_ms": now_ms,
             }
         )
