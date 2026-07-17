@@ -209,40 +209,6 @@ async function resolvePlayFiversGameName(providerCode, gameCode) {
   return foundGame?.name || fallback;
 }
 
-/** Normaliza timestamp da PlayFivers para ISO UTC (timestamptz no Supabase). */
-function parsePlayFiverTimestamp(value) {
-  if (value == null || value === '') {
-    return new Date().toISOString();
-  }
-
-  if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
-    const num = Number(value);
-    const ms = num < 1e12 ? num * 1000 : num;
-    const fromUnix = new Date(ms);
-    if (!Number.isNaN(fromUnix.getTime())) return fromUnix.toISOString();
-  }
-
-  const raw = String(value).trim();
-
-  if (/[zZ]$/.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) {
-    const fromTz = new Date(raw);
-    if (!Number.isNaN(fromTz.getTime())) return fromTz.toISOString();
-  }
-
-  // PlayFivers costuma enviar "YYYY-MM-DD HH:MM:SS" em horário de Brasília
-  const brMatch = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?$/);
-  if (brMatch) {
-    const fromBr = new Date(`${brMatch[1]}T${brMatch[2]}-03:00`);
-    if (!Number.isNaN(fromBr.getTime())) return fromBr.toISOString();
-  }
-
-  const fallback = new Date(raw);
-  if (!Number.isNaN(fallback.getTime())) return fallback.toISOString();
-
-  console.warn('[PlayFivers] created_at inválido, usando horário atual:', value);
-  return new Date().toISOString();
-}
-
 /** Persiste aposta no Supabase após responder à PlayFivers (evita timeout no game_callback). */
 async function persistGameTransaction({
   usuarioId,
@@ -251,7 +217,7 @@ async function persistGameTransaction({
   win,
   providerCode,
   gameCode,
-  createdAt,
+  processedAt,
 }) {
   let nomeJogo = `Jogo ${gameCode}`;
   try {
@@ -269,7 +235,8 @@ async function persistGameTransaction({
     retorno: win > 0 ? win : 0,
     status: 'Finalizado',
     com_bonus: 'Não',
-    data: parsePlayFiverTimestamp(createdAt),
+    // Horário do servidor (igual Aviator) — created_at da PlayFivers costuma vir 1 dia atrasado
+    data: processedAt,
   };
 
   const { data: savedTransaction, error: insertError } = await supabase
@@ -851,7 +818,10 @@ app.post('/webhook/transaction', async (req, res) => {
       win,
       saldo_anterior: userBeforeBalance,
       saldo_novo: userAfterBalance,
+      playfivers_created_at: createdAt ?? null,
     });
+
+    const processedAt = new Date().toISOString();
 
     // PlayFivers exige resposta rápida no game_callback — responder antes de I/O lento
     res.status(200).json({
@@ -866,7 +836,7 @@ app.post('/webhook/transaction', async (req, res) => {
       win,
       providerCode,
       gameCode,
-      createdAt,
+      processedAt,
     }).catch((error) => {
       console.error('❌ Erro ao persistir transação (background):', error);
     });
