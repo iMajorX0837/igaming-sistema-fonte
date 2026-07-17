@@ -1,4 +1,4 @@
-ï»¿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Gamepad2, Grid3x3 } from 'lucide-react';
 import LoadingScreen from './LoadingScreen';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import BackButton from './BackButton';
 import SearchInput from './SearchInput';
 import FilterDropdown from './FilterDropdown';
 import { GameInfo } from '../App';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { useAllGamesPageConfig } from '../hooks/useAllGamesPageConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { appPageContainerClass } from '../constants/homeLayout';
@@ -88,18 +88,18 @@ const getCategoryFromProvider = (providerName: string, gameName?: string): strin
     return 'table';
   }
   
-  // Por padrÃ£o, a maioria dos jogos sÃ£o slots
+  // Por padrão, a maioria dos jogos são slots
   return 'slots';
 };
 
-// FunÃ§Ã£o para criar slug de URL (normalizar para URL-friendly)
+// Função para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres nÃ£o alfanumÃ©ricos por hÃ­fen
-    .replace(/^-+|-+$/g, ''); // Remove hÃ­fens do inÃ­cio e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres não alfanuméricos por hífen
+    .replace(/^-+|-+$/g, ''); // Remove hífens do início e fim
 };
 
 export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPageProps) {
@@ -138,7 +138,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
         return;
       }
 
-      const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+      const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
 
       const gamesPromises = filteredProviders.map(async (prov) => {
         try {
@@ -201,7 +201,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
     const matchesSearch = game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          game.provider.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Normalizar comparaÃ§Ã£o de provider
+    // Normalizar comparação de provider
     let matchesProvider = true;
     if (selectedProvider !== 'all') {
       const selectedProviderObj = providers.find(p => p.slug === selectedProvider);
@@ -243,7 +243,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
               <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
                 <span className="whitespace-nowrap shrink-0">{pageConfig.titulo}</span>
                 <span
-                  className={`text-violet-400 whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+                  className={`text-brand-light whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
                     selectedProvider !== 'all' ? 'max-w-[500px] opacity-100' : 'max-w-0 opacity-0'
                   }`}
                 >
@@ -280,7 +280,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                 <p className="text-red-400 text-lg mb-4">{error}</p>
                 <button
                   onClick={() => fetchAllGames()}
-                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200"
+                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
                   Tentar novamente
                 </button>
@@ -326,7 +326,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                               <button
                                 type="button"
                                 className="font-bold text-xs px-3 py-1.5 rounded border flex items-center gap-1 hover:brightness-110 transition-all"
-                                style={{ backgroundColor: '#7B3FF2', borderColor: '#9B5FF2', color: '#000000' }}
+                                style={{ backgroundColor: 'var(--brand-primary)', borderColor: 'var(--brand-primary-light)', color: '#000000' }}
                               >
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                                   <path d="M8 5v14l11-7z"/>
@@ -341,7 +341,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                   </div>
                 ) : (
                   <div className="flex items-center justify-center min-h-[360px]">
-                    <p className="text-slate-400 text-lg">NÃ£o possui jogos ativos.</p>
+                    <p className="text-slate-400 text-lg">Não possui jogos ativos.</p>
                   </div>
                 )}
               </div>
@@ -354,7 +354,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                 </p>
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200 shadow-lg"
+                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
                 >
                   Carregar mais
                 </button>

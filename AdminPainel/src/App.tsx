@@ -27,6 +27,7 @@ import TrackingPage from './pages/TrackingPage';
 import SegurancaPage from './pages/SegurancaPage';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
+import { AdminSiteBrandProvider } from './contexts/AdminSiteBrandContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isAdmin, loading, loadingCargo, user } = useAuth();
@@ -89,7 +90,9 @@ function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <AdminSiteBrandProvider>
+              <Layout />
+            </AdminSiteBrandProvider>
           </ProtectedRoute>
         }
       >

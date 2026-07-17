@@ -1,4 +1,4 @@
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { getFreeBonusGameCode } from '../lib/girosJogosPermitidos';
 import {
   findProprietaryGameBySlug,
@@ -112,7 +112,7 @@ export async function resolveGameBySlug(
   const providersData = await fetchProvidersCached();
   if (providersData.status !== 1 || !providersData.data) return null;
 
-  const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+  const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
 
   let foundProvider = null as (typeof filteredProviders)[number] | null;
 
@@ -179,7 +179,7 @@ export async function resolveFreeBonusGameBySlug(
   const providersData = await fetchProvidersCached();
   if (providersData.status !== 1 || !providersData.data) return null;
 
-  const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+  const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
 
   let foundProvider = null as (typeof filteredProviders)[number] | null;
 
@@ -250,7 +250,7 @@ export async function resolveGameByGameCode(gameCode: string): Promise<ResolvedG
   const providersData = await fetchProvidersCached();
   if (providersData.status !== 1 || !providersData.data) return null;
 
-  const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+  const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
   const normalizedCode = String(gameCode).toLowerCase();
 
   for (const prov of filteredProviders) {

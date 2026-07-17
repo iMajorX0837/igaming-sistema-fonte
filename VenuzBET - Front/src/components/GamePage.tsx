@@ -168,11 +168,11 @@ function LoginRequiredPrompt({ onLogin }: { onLogin: () => void }) {
         onClick={onLogin}
         className="relative isolate overflow-hidden rounded-lg text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 flex items-center justify-center"
         style={{
-          backgroundColor: '#7B3FF2',
+          backgroundColor: 'var(--brand-primary)',
           width: '126px',
           height: '48px',
           boxShadow:
-            '0 0 14px rgba(123, 63, 242, 0.48), 0 0 28px rgba(123, 63, 242, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+            '0 0 14px rgb(var(--brand-primary-rgb) / 0.48), 0 0 28px rgb(var(--brand-primary-rgb) / 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
         }}
       >
         <div className="sidebar-promo-bloom-layer" aria-hidden="true">
@@ -261,7 +261,7 @@ function InsufficientBalanceOverlay({
           type="button"
           onClick={onDeposit}
           className="h-8 px-5 rounded-full text-white text-sm font-semibold transition-all duration-200 hover:opacity-90"
-          style={{ backgroundColor: '#7B3FF2' }}
+          style={{ backgroundColor: 'var(--brand-primary)' }}
         >
           Depositar
         </button>
@@ -269,7 +269,7 @@ function InsufficientBalanceOverlay({
           type="button"
           onClick={onPlay}
           className="h-8 px-5 rounded-full text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 border"
-          style={{ backgroundColor: 'transparent', borderColor: '#7B3FF2' }}
+          style={{ backgroundColor: 'transparent', borderColor: 'var(--brand-primary)' }}
         >
           Jogar
         </button>
@@ -655,7 +655,7 @@ export default function GamePage({
                   </div>
                   <button
                     onClick={() => launchGame()}
-                    className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200"
+                    className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                   >
                     Tentar novamente
                   </button>

@@ -1,5 +1,5 @@
 import type { NavigateFunction } from 'react-router-dom';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import {
   AVIATOR_GAME_IMAGE,
   findProprietaryGameByName,
@@ -117,7 +117,7 @@ export async function navigateToGameByName(gameName: string, navigate: NavigateF
       return false;
     }
 
-    const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+    const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
 
     const gamesPromises = filteredProviders.map(async (prov) => {
       try {

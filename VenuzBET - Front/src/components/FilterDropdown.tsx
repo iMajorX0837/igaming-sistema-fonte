@@ -18,7 +18,7 @@ interface FilterDropdownProps {
 
 function ItemIcon() {
   return (
-    <svg className="w-4 h-4 text-violet-400 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <svg className="w-4 h-4 text-brand-light flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     </svg>
   );
@@ -69,7 +69,7 @@ export default function FilterDropdown({
       <button
         type="button"
         onClick={handleToggle}
-        className="w-full h-11 pl-10 pr-10 rounded-lg border border-violet-600/40 text-slate-300 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-all flex items-center justify-between gap-2 min-w-0"
+        className="w-full h-11 pl-10 pr-10 rounded-lg border border-brand/40 text-slate-300 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all flex items-center justify-between gap-2 min-w-0"
         style={{ backgroundColor: homeConfig.fundo }}
         onMouseEnter={(e) => {
           e.currentTarget.style.backgroundColor = hoverBg;
@@ -83,11 +83,11 @@ export default function FilterDropdown({
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-400 pointer-events-none" />
+      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-light pointer-events-none" />
 
       {isOpen && (
         <div
-          className="absolute top-full left-0 right-0 mt-1 border border-violet-600/40 rounded-lg shadow-xl z-[60] overflow-hidden"
+          className="absolute top-full left-0 right-0 mt-1 border border-brand/40 rounded-lg shadow-xl z-[60] overflow-hidden"
           style={{ backgroundColor: homeConfig.fundo }}
         >
           <div className="p-2 border-b border-slate-700">
@@ -99,7 +99,7 @@ export default function FilterDropdown({
             />
           </div>
           <div
-            className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-violet-600 scrollbar-track-slate-800"
+            className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-brand scrollbar-track-slate-800"
             style={{ backgroundColor: homeConfig.fundo }}
           >
             {filteredItems.map((item) => (

@@ -30,11 +30,8 @@ export default function NotFoundPage() {
 
               <button
                 onClick={() => navigate('/')}
-                className="px-8 py-4 rounded-lg text-white font-bold text-base md:text-lg flex items-center gap-2"
-                style={{ 
-                  backgroundColor: '#7B3FF2',
-                  boxShadow: '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset'
-                }}
+                className="px-8 py-4 rounded-lg text-white font-bold text-base md:text-lg flex items-center gap-2 btn-brand-submit"
+                style={{ backgroundColor: 'var(--brand-primary)' }}
               >
                 <span className="iconify" data-icon="solar:home-bold" aria-hidden="true" style={{ fontSize: '20px' }}></span>
                 VOLTAR PARA PAGINA INICIAL

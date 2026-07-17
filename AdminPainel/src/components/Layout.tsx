@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useAdminSiteBrand } from '../contexts/AdminSiteBrandContext';
 
 interface NavItem {
   path: string;
@@ -129,8 +130,14 @@ function loadExpandedGroups(): Record<string, boolean> {
 
 export default function Layout() {
   const { user } = useAuth();
+  const { logoUrl, nomeBet } = useAdminSiteBrand();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(loadExpandedGroups);
+  const [logoBroken, setLogoBroken] = useState(false);
+
+  useEffect(() => {
+    setLogoBroken(false);
+  }, [logoUrl]);
 
   const activeGroupId = useMemo(() => {
     const group = navGroups.find((g) =>
@@ -174,11 +181,16 @@ export default function Layout() {
       <aside className="fixed left-0 top-0 h-full w-64 z-20 flex flex-col bg-admin-sidebar/97 border-r border-admin-border backdrop-blur-[18px] shadow-admin">
         <div className="p-6 border-b border-admin-border flex-shrink-0">
           <Link to="/dashboard" className="block">
-            <img
-              src="https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757715806714.png"
-              alt="RoyalBET Logo"
-              className="h-12 mx-auto transition-transform duration-200 hover:scale-105 cursor-pointer"
-            />
+            {!logoBroken && logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={nomeBet}
+                className="h-12 mx-auto transition-transform duration-200 hover:scale-105 cursor-pointer object-contain max-w-full"
+                onError={() => setLogoBroken(true)}
+              />
+            ) : (
+              <span className="block text-center text-white text-sm font-semibold">{nomeBet}</span>
+            )}
           </Link>
         </div>
 

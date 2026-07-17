@@ -186,7 +186,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                 className={headerNavTabClass}
                 style={{
                   ...headerNavTabTextStyle,
-                  backgroundColor: !isEsportesPage ? '#7B3FF2' : headerConfig.fundo,
+                  backgroundColor: !isEsportesPage ? 'var(--brand-primary)' : headerConfig.fundo,
                 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 16 16" fill="none" className="w-4 h-4">
@@ -200,7 +200,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                 className={headerNavTabClass}
                 style={{
                   ...headerNavTabTextStyle,
-                  backgroundColor: isEsportesPage ? '#7B3FF2' : headerConfig.fundo,
+                  backgroundColor: isEsportesPage ? 'var(--brand-primary)' : headerConfig.fundo,
                 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 13 14" fill="none" className="w-4 h-4">
@@ -274,29 +274,27 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                     </div>
                     <button 
                       onClick={() => setIsDepositOpen(true)} 
-                      className="h-7 w-7 rounded-lg flex items-center justify-center" 
+                      className="h-7 w-7 rounded-lg flex items-center justify-center btn-brand-submit" 
                     style={{ 
                       color: '#FFFFFF', 
-                      backgroundColor: '#7B3FF2',
+                      backgroundColor: 'var(--brand-primary)',
                       outline: 'none', 
                       border: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset',
                       transition: 'none'
                     }}
                     onMouseDown={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7B3FF2';
+                      e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
                     }}
                     onMouseUp={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7B3FF2';
+                      e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7B3FF2';
+                      e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
                       e.currentTarget.style.outline = 'none';
-                      e.currentTarget.style.boxShadow = '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset';
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7B3FF2';
+                      e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
                     }}
                   >
                     <span className="iconify" data-icon="ic:baseline-add" aria-hidden="true" style={{ fontSize: '16px' }}></span>
@@ -426,11 +424,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                   onClick={() => setIsRegisterOpen(true)}
                   className="relative isolate overflow-hidden rounded-lg text-white text-xs md:text-sm font-semibold transition-all duration-200 hover:opacity-90 whitespace-nowrap flex items-center justify-center"
                   style={{
-                    backgroundColor: '#7B3FF2',
+                    backgroundColor: 'var(--brand-primary)',
                     width: '121px',
                     height: '40px',
                     boxShadow:
-                      '0 0 14px rgba(123, 63, 242, 0.48), 0 0 28px rgba(123, 63, 242, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+                      '0 0 14px rgb(var(--brand-primary-rgb) / 0.48), 0 0 28px rgb(var(--brand-primary-rgb) / 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
                   }}
                 >
                   <div className="sidebar-promo-bloom-layer" aria-hidden="true">

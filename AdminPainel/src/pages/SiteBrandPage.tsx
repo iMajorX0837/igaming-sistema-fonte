@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
+import { useAdminSiteBrand } from '../contexts/AdminSiteBrandContext';
+import { ADMIN_IMAGE_SIZES } from '../lib/adminImageSizes';
+import type { AdminImageSizeSpec } from '../lib/adminImageSizes';
+import ImageSizeHint from '../components/ui/ImageSizeHint';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
@@ -31,6 +35,7 @@ function isValidSiteDominio(value: string): boolean {
 
 export default function SiteBrandPage() {
   const { showToast } = useToast();
+  const { setLogoUrl, setNomeBet, refresh } = useAdminSiteBrand();
   const [form, setForm] = useState<SiteBrandForm>(defaultForm);
   const [headerFundo, setHeaderFundo] = useState('#121319');
   const [loading, setLoading] = useState(true);
@@ -51,9 +56,13 @@ export default function SiteBrandPage() {
       }
 
       if (data) {
+        const nextLogo = String(data.header_logo_url || defaultForm.logo_url);
+        const nextNome =
+          String(data.nome_bet || defaultForm.nome_bet).trim() || defaultForm.nome_bet;
+
         setForm({
-          logo_url: String(data.header_logo_url || defaultForm.logo_url),
-          nome_bet: String(data.nome_bet || defaultForm.nome_bet).trim() || defaultForm.nome_bet,
+          logo_url: nextLogo,
+          nome_bet: nextNome,
           site_titulo:
             String(data.site_titulo || defaultForm.site_titulo).trim() || defaultForm.site_titulo,
           site_dominio:
@@ -61,6 +70,8 @@ export default function SiteBrandPage() {
             defaultForm.site_dominio,
         });
         setHeaderFundo(String(data.header_fundo || '#121319'));
+        setLogoUrl(nextLogo);
+        setNomeBet(nextNome);
       }
     } finally {
       setLoading(false);
@@ -116,6 +127,9 @@ export default function SiteBrandPage() {
       }
 
       showToast('Identidade do site salva!', 'success');
+      setLogoUrl(form.logo_url.trim());
+      setNomeBet(nomeBet);
+      await refresh();
     } catch {
       showToast('Erro ao salvar identidade do site.', 'error');
     } finally {
@@ -156,7 +170,10 @@ export default function SiteBrandPage() {
                 label="Nome da bet"
                 hint="Usado em páginas legais, textos do site e rótulo dos jogos originais."
                 value={form.nome_bet}
-                onChange={(v) => setForm({ ...form, nome_bet: v })}
+                onChange={(v) => {
+                  setForm({ ...form, nome_bet: v });
+                  setNomeBet(v);
+                }}
                 placeholder="RoyalBet"
                 maxLength={50}
               />
@@ -215,9 +232,12 @@ export default function SiteBrandPage() {
 
             <Field
               label="URL da logo"
-              hint="Exibida no header, footer e modais. URL completa ou caminho relativo (ex: /assets/logo.png)."
+              sizeHint={ADMIN_IMAGE_SIZES.siteLogo}
               value={form.logo_url}
-              onChange={(v) => setForm({ ...form, logo_url: v })}
+              onChange={(v) => {
+                setForm({ ...form, logo_url: v });
+                setLogoUrl(v);
+              }}
               placeholder="https://exemplo.com/logo.png ou /assets/logo.png"
             />
 
@@ -225,6 +245,7 @@ export default function SiteBrandPage() {
               <div className="mt-4 p-4 rounded-lg border border-admin-border bg-admin-panel">
                 <p className="text-gray-400 text-xs mb-3">Pré-visualização da logo</p>
                 <img
+                  key={form.logo_url}
                   src={form.logo_url}
                   alt={form.nome_bet}
                   className="h-14 w-auto max-w-full object-contain"
@@ -265,6 +286,7 @@ export default function SiteBrandPage() {
                 >
                   {form.logo_url.trim() ? (
                     <img
+                      key={form.logo_url}
                       src={form.logo_url}
                       alt={form.nome_bet}
                       className="h-10 w-auto max-w-[180px] object-contain"
@@ -309,6 +331,7 @@ export default function SiteBrandPage() {
 function Field({
   label,
   hint,
+  sizeHint,
   value,
   onChange,
   placeholder,
@@ -316,6 +339,7 @@ function Field({
 }: {
   label: string;
   hint?: string;
+  sizeHint?: AdminImageSizeSpec;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -324,6 +348,7 @@ function Field({
   return (
     <div>
       <label className="block text-gray-200 text-sm font-medium mb-1">{label}</label>
+      {sizeHint ? <ImageSizeHint spec={sizeHint} /> : null}
       {hint ? <p className="text-gray-500 text-xs mb-2">{hint}</p> : null}
       <input
         type="text"

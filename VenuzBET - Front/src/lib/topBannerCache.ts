@@ -12,7 +12,7 @@ export interface TopBannerConfig {
 
 export const DEFAULT_TOP_BANNER_CONFIG: TopBannerConfig = {
   ativo: true,
-  background_color: '#7B3FF2',
+  background_color: 'var(--brand-primary)',
   emoji: '📲',
   mensagem: 'Faça o download do nosso aplicativo para uma experiência ainda melhor!',
   botao_texto: 'Download',

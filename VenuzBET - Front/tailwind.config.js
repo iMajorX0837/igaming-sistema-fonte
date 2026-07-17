@@ -10,6 +10,13 @@ export default {
       mono: defaultTheme.fontFamily.mono,
     },
     extend: {
+      colors: {
+        brand: {
+          DEFAULT: 'rgb(var(--brand-primary-rgb) / <alpha-value>)',
+          hover: 'rgb(var(--brand-primary-hover-rgb) / <alpha-value>)',
+          light: 'rgb(var(--brand-primary-light-rgb) / <alpha-value>)',
+        },
+      },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },

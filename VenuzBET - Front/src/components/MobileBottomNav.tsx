@@ -75,7 +75,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Navegação principal"
     >
-      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl border px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: '#121319', borderColor: '#7B3FF2' }}>
+      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl border px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: '#121319', borderColor: 'var(--brand-primary)' }}>
         <button type="button" onClick={openMenu} className={`${itemBase} ${inactive}`} aria-label="Abrir menu">
           <Menu className="h-5 w-5 shrink-0 opacity-80" strokeWidth={2.25} />
           <span className={`${labelClass} font-semibold`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -89,7 +89,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           className={`${itemBase} ${isEsporte ? active : inactive}`}
           aria-current={isEsporte ? 'page' : undefined}
         >
-          <Trophy className={`h-5 w-5 shrink-0 ${isEsporte ? 'text-[#7B3FF2]' : 'opacity-80'}`} strokeWidth={2} />
+          <Trophy className={`h-5 w-5 shrink-0 ${isEsporte ? 'text-brand' : 'opacity-80'}`} strokeWidth={2} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Esporte
           </span>
@@ -100,9 +100,9 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           onClick={() => go('/')}
           className="-mt-5 mb-0.5 flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2 shadow-lg transition-transform active:scale-95"
           style={{
-            backgroundColor: '#7B3FF2',
+            backgroundColor: 'var(--brand-primary)',
             borderColor: '#9F6FFF',
-            boxShadow: '0 4px 20px rgba(123, 63, 242, 0.45)',
+            boxShadow: '0 4px 20px rgb(var(--brand-primary-rgb) / 0.45)',
           }}
           aria-current={isCasino ? 'page' : undefined}
           aria-label="Cassino — início"
@@ -122,7 +122,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           className={`${itemBase} ${isLive ? active : inactive}`}
           aria-current={isLive ? 'page' : undefined}
         >
-          <Radio className={`h-5 w-5 shrink-0 ${isLive ? 'text-[#7B3FF2]' : 'opacity-80'}`} strokeWidth={2} />
+          <Radio className={`h-5 w-5 shrink-0 ${isLive ? 'text-brand' : 'opacity-80'}`} strokeWidth={2} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Ao Vivo
           </span>

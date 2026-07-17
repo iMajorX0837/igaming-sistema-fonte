@@ -57,8 +57,20 @@ type GamesStorageMap = Record<string, StorageEntry<ApiGamesResponse>>;
 /** Carteira dos provedores clone (PGSOFT, PRAGMATIC, etc.) em /api/v2/providers */
 export const PLAYFIVERS_SLOTS_WALLET = 'Carteira PlayFiver (Slots)';
 
+/** Carteira dos jogos ao vivo (Evolution, Pragmatic Live, etc.) */
+export const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
+
 export function isPlayFiverSlotsProvider(prov: ApiProvider): boolean {
   return prov.status === 1 && prov.wallet.name === PLAYFIVERS_SLOTS_WALLET;
+}
+
+export function isPlayFiverLiveProvider(prov: ApiProvider): boolean {
+  return prov.status === 1 && prov.wallet.name === PLAYFIVERS_LIVE_WALLET;
+}
+
+/** Slots + cassino ao vivo habilitados na plataforma. */
+export function isPlayFiverEnabledProvider(prov: ApiProvider): boolean {
+  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov);
 }
 
 function normalizeProviderName(name: string): string {

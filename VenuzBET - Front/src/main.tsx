@@ -18,7 +18,7 @@ void (async () => {
     const { data, error } = await supabase
       .from('site_config')
       .select(
-        'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo, site_dominio',
+        'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, deposit_modal_imagem_url, brand_cor_primaria, brand_cor_hover, nome_bet, site_titulo, site_dominio',
       )
       .eq('id', 1)
       .maybeSingle();

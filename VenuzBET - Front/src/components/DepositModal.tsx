@@ -10,6 +10,7 @@ import {
 import { dispatchVipProfileUpdated, formatBRL, type DepositVipResult } from '../lib/vip';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
 import SiteLogo from './SiteLogo';
 import {
   formatCupomBonus,
@@ -54,6 +55,8 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { config } = usePlataformaConfig();
   const { config: homeConfig } = useHomeConfig();
+  const { config: authModalsConfig } = useAuthModalsConfig();
+  const depositImageUrl = authModalsConfig.deposit_imagem_url.trim();
   const minDeposit = config.deposito_minimo;
   const maxDeposit = config.deposito_maximo;
   const [amount, setAmount] = useState('20');
@@ -362,10 +365,20 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
         </button>
 
         <div
-          className="w-full shrink-0 px-4 py-3 flex justify-center"
+          className="relative flex w-full shrink-0 justify-center items-center overflow-hidden"
           style={{ backgroundColor: homeConfig.fundo }}
         >
-          <SiteLogo className="h-12 w-auto max-w-full object-contain" />
+          {depositImageUrl ? (
+            <img
+              src={depositImageUrl}
+              alt="Depósito"
+              className="w-full h-auto object-contain"
+            />
+          ) : (
+            <div className="w-full px-4 py-3 flex justify-center">
+              <SiteLogo className="h-12 w-auto max-w-full object-contain" />
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-4 pb-5">
@@ -392,8 +405,8 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   </div>
                 )}
                 {vipUpgradeInfo?.subiu_nivel && (
-                  <div className="mt-3 rounded-lg border border-violet-500/40 bg-violet-500/10 p-3 text-left">
-                    <p className="text-violet-300 text-sm font-bold">
+                  <div className="mt-3 rounded-lg border border-brand/40 bg-brand/10 p-3 text-left">
+                    <p className="text-brand-light text-sm font-bold">
                       Parabéns! Você subiu para {vipUpgradeInfo.vip_nome}!
                     </p>
                     {(vipUpgradeInfo.bonus_upgrade ?? 0) > 0 && (
@@ -409,7 +422,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 onClick={() => {
                   resetPixState();
                 }}
-                className="w-full h-10 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm transition-all"
+                className="w-full h-10 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm transition-all"
               >
                 Concluir
               </button>
@@ -428,7 +441,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 </div>
               ) : null}
               <div
-                className="rounded-lg border border-dashed border-[#7B3FF2] px-4 py-4 space-y-3 text-center"
+                className="rounded-lg border border-dashed border-brand px-4 py-4 space-y-3 text-center"
                 style={{ backgroundColor: homeConfig.fundo }}
               >
                 <p className="text-white font-bold text-xl">
@@ -440,7 +453,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                     <button
                       type="button"
                       onClick={handleCopyPix}
-                      className="w-full h-10 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm transition-all"
+                      className="w-full h-10 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm transition-all"
                     >
                       {copied ? 'Copiado!' : 'Copiar copia e cola'}
                     </button>
@@ -454,7 +467,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 </p>
                 <div className="h-1.5 w-full rounded-full bg-slate-600/50 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[#7B3FF2] transition-[width] duration-1000 linear"
+                    className="h-full rounded-full bg-brand transition-[width] duration-1000 linear"
                     style={{ width: `${pixPaymentProgressPct}%` }}
                   />
                 </div>
@@ -497,7 +510,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                     onChange={(e) => setAmount(e.target.value)}
                     onBlur={handleAmountBlur}
                     disabled={isSubmitting}
-                    className="w-full h-9 pl-10 pr-3 rounded-lg border-2 border-violet-600 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-600/50 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
+                    className="w-full h-9 pl-10 pr-3 rounded-lg border-2 border-brand text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
                     style={{ backgroundColor: homeConfig.fundo }}
                   />
                 </div>
@@ -505,7 +518,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   type="button"
                   onClick={handleIncrement}
                   disabled={isSubmitting}
-                  className="w-9 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 flex items-center justify-center text-white transition-all font-bold text-lg disabled:opacity-50"
+                  className="w-9 h-9 rounded-lg bg-brand hover:bg-brand-hover flex items-center justify-center text-white transition-all font-bold text-lg disabled:opacity-50"
                 >
                   +
                 </button>
@@ -513,7 +526,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   type="button"
                   onClick={handleDecrement}
                   disabled={isSubmitting}
-                  className="w-9 h-9 rounded-lg bg-violet-600 hover:bg-violet-700 flex items-center justify-center text-white transition-all font-bold text-lg disabled:opacity-50"
+                  className="w-9 h-9 rounded-lg bg-brand hover:bg-brand-hover flex items-center justify-center text-white transition-all font-bold text-lg disabled:opacity-50"
                 >
                   −
                 </button>
@@ -527,7 +540,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   type="button"
                   onClick={() => handlePresetAmount(item.value)}
                   disabled={isSubmitting}
-                  className="relative h-9 rounded-lg bg-[#7B3FF2]/10 hover:bg-[#7B3FF2]/20 border-0 text-[#7B3FF2] font-bold text-xs transition-all flex items-center justify-center disabled:opacity-50"
+                  className="relative h-9 rounded-lg bg-brand/10 hover:bg-brand/20 border-0 text-brand font-bold text-xs transition-all flex items-center justify-center disabled:opacity-50"
                 >
                   {item.label}
                   <span className="absolute -top-1 -right-1 bg-yellow-400 text-slate-900 text-[7px] font-black px-1 py-0 rounded-sm">HOT</span>
@@ -554,7 +567,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
               </button>
             ) : (
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none">
                 <span
                   className="iconify i-streamline:discount-percent-coupon-solid"
                   data-icon="streamline:discount-percent-coupon-solid"
@@ -572,14 +585,14 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 placeholder="Cupom de desconto (opcional)"
                 disabled={isSubmitting}
                 autoFocus
-                className="w-full h-9 pl-9 pr-20 rounded-lg border-2 border-violet-600 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/50 transition-all disabled:opacity-50"
+                className="w-full h-9 pl-9 pr-20 rounded-lg border-2 border-brand text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50"
                 style={{ backgroundColor: homeConfig.fundo }}
               />
               <button
                 type="button"
                 onClick={handleValidateCoupon}
                 disabled={!couponCode || validatingCoupon || isSubmitting}
-                className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 h-7 rounded-md bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 disabled:cursor-not-allowed text-white font-bold text-xs transition-all duration-200"
+                className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 h-7 rounded-md bg-brand hover:bg-brand-hover disabled:bg-brand/50 disabled:cursor-not-allowed text-white font-bold text-xs transition-all duration-200"
               >
                 {validatingCoupon ? 'Validando...' : 'Validar'}
               </button>
@@ -596,10 +609,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="h-[52px] w-full rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98]"
-              style={{
-                boxShadow: '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset'
-              }}
+              className="h-[52px] w-full rounded-lg bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98] btn-brand-submit"
             >
               {isSubmitting ? 'Gerando PIX...' : 'Depositar'}
             </button>

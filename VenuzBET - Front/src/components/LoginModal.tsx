@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { X, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
@@ -11,10 +11,11 @@ interface LoginModalProps {
   onSwitchToRegister: () => void;
 }
 
-function modalInputStyle(fundo: string) {
+function modalInputStyle(fundo: string): React.CSSProperties {
   return {
     backgroundColor: fundo,
     border: '1px solid rgba(255, 255, 255, 0.12)',
+    ['--input-autofill-bg' as string]: fundo,
   };
 }
 
@@ -91,7 +92,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
                 placeholder="E-mail"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all"
+                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
                 style={modalInputStyle(homeConfig.fundo)}
               />
             </div>
@@ -106,7 +107,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
                 placeholder="Digite sua senha"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full h-10 pl-10 pr-10 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all"
+                className="w-full h-10 pl-10 pr-10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
                 style={modalInputStyle(homeConfig.fundo)}
               />
               <button
@@ -129,7 +130,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
             )}
 
             <div className="text-right">
-              <button type="button" className="text-xs text-violet-400 font-bold hover:underline">
+              <button type="button" className="text-xs text-brand-light font-bold hover:underline">
                 Esqueci a senha
               </button>
             </div>
@@ -137,7 +138,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 rounded-lg bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-violet-600/20 hover:shadow-xl hover:shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-10 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Entrando...' : 'ENTRAR'}
             </button>
@@ -193,10 +194,10 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
 
             <div className="text-center pt-2">
               <p className="text-xs text-white font-bold mt-3">
-                Ainda não tem uma conta?
+                Ainda n?o tem uma conta?
               </p>
-              <button type="button" onClick={handleSwitchRegister} className="text-violet-400 font-bold text-xs hover:underline mt-2">
-                Criar uma conta grátis
+              <button type="button" onClick={handleSwitchRegister} className="text-brand-light font-bold text-xs hover:underline mt-2">
+                Criar uma conta gr?tis
               </button>
             </div>
           </form>

@@ -24,6 +24,8 @@ export const PLAYFIVERS_API_V2 = getPlayFiversApiBase();
 
 export const PLAYFIVERS_SLOTS_WALLET = 'Carteira PlayFiver (Slots)';
 
+export const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
+
 
 
 const jsonHeaders = { Accept: 'application/json' };
@@ -89,6 +91,18 @@ export interface ApiGamesResponse {
 export function isPlayFiverSlotsProvider(prov: ApiProvider): boolean {
 
   return prov.status === 1 && prov.wallet.name === PLAYFIVERS_SLOTS_WALLET;
+
+}
+
+export function isPlayFiverLiveProvider(prov: ApiProvider): boolean {
+
+  return prov.status === 1 && prov.wallet.name === PLAYFIVERS_LIVE_WALLET;
+
+}
+
+export function isPlayFiverEnabledProvider(prov: ApiProvider): boolean {
+
+  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov);
 
 }
 

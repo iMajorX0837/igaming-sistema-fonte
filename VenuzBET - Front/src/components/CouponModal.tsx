@@ -219,13 +219,13 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
                       setValidated(false);
                     }}
                     placeholder="Insira o código do cupom"
-                    className="h-[49px] w-full rounded-lg border-2 border-violet-600 pl-10 pr-24 text-sm text-white placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-violet-600/50"
+                    className="h-[49px] w-full rounded-lg border-2 border-brand pl-10 pr-24 text-sm text-white placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-brand/50"
                     style={{ backgroundColor: homeConfig.fundo }}
                   />
                   <button
                     type="button"
                     onClick={handleValidate}
-                    className="absolute right-1.5 top-1/2 flex h-[31px] w-[75px] -translate-y-1/2 items-center justify-center rounded-md bg-violet-600 text-xs font-bold text-white transition-all duration-200 hover:bg-violet-700"
+                    className="absolute right-1.5 top-1/2 flex h-[31px] w-[75px] -translate-y-1/2 items-center justify-center rounded-md bg-brand text-xs font-bold text-white transition-all duration-200 hover:bg-brand-hover"
                   >
                     {validating ? 'Validando...' : 'Validar'}
                   </button>
@@ -240,9 +240,9 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
                 type="submit"
                 className="relative isolate mt-auto flex h-[52px] w-full items-center justify-center overflow-hidden rounded-lg text-sm font-bold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
                 style={{
-                  backgroundColor: '#7B3FF2',
+                  backgroundColor: 'var(--brand-primary)',
                   boxShadow:
-                    '0 0 14px rgba(123, 63, 242, 0.48), 0 0 28px rgba(123, 63, 242, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+                    '0 0 14px rgb(var(--brand-primary-rgb) / 0.48), 0 0 28px rgb(var(--brand-primary-rgb) / 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
                 }}
               >
                 <div className="sidebar-promo-bloom-layer" aria-hidden="true">

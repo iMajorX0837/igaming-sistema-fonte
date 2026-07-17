@@ -17,6 +17,9 @@ import {
   Settings2,
   Trash2,
 } from 'lucide-react';
+import { ADMIN_IMAGE_SIZES } from '../lib/adminImageSizes';
+import type { AdminImageSizeSpec } from '../lib/adminImageSizes';
+import ImageSizeHint from '../components/ui/ImageSizeHint';
 
 type TabKey = 'config' | 'segmentos';
 type StatusFilter = 'all' | 'active' | 'inactive';
@@ -74,11 +77,11 @@ const emptySegmentForm = {
 };
 
 const IMAGE_FIELDS = [
-  { key: 'titulo_imagem_url' as const, label: 'Título', hint: 'Imagem do título acima da roleta.' },
-  { key: 'banner_imagem_url' as const, label: 'Banner prêmio', hint: 'Banner exibido ao ganhar um prêmio.' },
-  { key: 'roleta_imagem_url' as const, label: 'Disco da roleta', hint: 'Imagem circular da roleta.' },
-  { key: 'widget_imagem_url' as const, label: 'Widget flutuante', hint: 'Ícone para abrir a roleta no site.' },
-  { key: 'centro_imagem_url' as const, label: 'Botão girar', hint: 'Imagem central para iniciar o giro.' },
+  { key: 'titulo_imagem_url' as const, label: 'Título', size: ADMIN_IMAGE_SIZES.roletaTitulo },
+  { key: 'banner_imagem_url' as const, label: 'Banner prêmio', size: ADMIN_IMAGE_SIZES.roletaBanner },
+  { key: 'roleta_imagem_url' as const, label: 'Disco da roleta', size: ADMIN_IMAGE_SIZES.roletaDisco },
+  { key: 'widget_imagem_url' as const, label: 'Widget flutuante', size: ADMIN_IMAGE_SIZES.roletaWidget },
+  { key: 'centro_imagem_url' as const, label: 'Botão girar', size: ADMIN_IMAGE_SIZES.roletaCentro },
 ];
 
 const TABS: { key: TabKey; label: string; icon: typeof Settings2; description: string }[] = [
@@ -606,7 +609,7 @@ export default function RoletaPage() {
                         <ImageUrlField
                           key={field.key}
                           label={field.label}
-                          hint={field.hint}
+                          size={field.size}
                           value={configForm[field.key]}
                           onChange={(v) => setConfigForm({ ...configForm, [field.key]: v })}
                         />
@@ -892,18 +895,26 @@ function ImageThumb({ label, url }: { label: string; url: string }) {
 
 function ImageUrlField({
   label,
-  hint,
+  size,
   value,
   onChange,
 }: {
   label: string;
-  hint?: string;
+  size: AdminImageSizeSpec;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
     <div>
-      <Field label={label} hint={hint} value={value} onChange={onChange} placeholder="https://..." />
+      <label className="text-gray-200 text-sm font-medium mb-1 block">{label}</label>
+      <ImageSizeHint spec={size} />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://..."
+        className="w-full px-4 py-2.5 text-white text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
+      />
       {value.trim() ? (
         <div className="mt-2 p-2 rounded-lg border border-white/10 bg-black/20 inline-block">
           <img

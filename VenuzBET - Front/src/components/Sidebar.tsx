@@ -1,4 +1,4 @@
-ï»¿import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import {
@@ -207,7 +207,7 @@ function SidebarPromoCardContent({
   );
 }
 
-// Componente para Ã­cones SVG customizados removido â€” menu usa CMS (iconify/imagem)
+// Componente para ícones SVG customizados removido — menu usa CMS (iconify/imagem)
 
 export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
   const [language, setLanguage] = useState<SidebarLanguage>(getStoredSidebarLanguage);
@@ -392,7 +392,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
                       type="button"
                       onClick={() => handleLanguageSelect(item.code)}
                       className={`relative flex w-full items-center gap-3 h-10 px-3 rounded-lg transition-all duration-200 group text-left ${
-                        isActive ? 'bg-violet-600/15' : ''
+                        isActive ? 'bg-brand/15' : ''
                       }`}
                     >
                       {item.flag ? (
@@ -473,7 +473,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
                     key={item.code}
                     type="button"
                     className={`group flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-200 ${
-                      isActive ? 'ring-2 ring-violet-500/60' : ''
+                      isActive ? 'ring-2 ring-brand/60' : ''
                     }`}
                     style={{
                       color: 'rgba(220, 221, 222, 0.6)',

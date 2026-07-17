@@ -18,9 +18,18 @@ import {
 } from 'lucide-react';
 import SidebarMenuAdmin from './sidebar/SidebarMenuAdmin';
 import SidebarCardsAdmin from './sidebar/SidebarCardsAdmin';
+import { ADMIN_IMAGE_SIZES } from '../lib/adminImageSizes';
+import ImageSizeHint from '../components/ui/ImageSizeHint';
+
+import { resolveBrandColors, DEFAULT_BRAND_PRIMARY, DEFAULT_BRAND_HOVER } from '../lib/brandColors';
 
 type TabKey = 'aparencia' | 'menu' | 'cards';
-type ConfigModal = 'sidebar' | 'header' | 'footer' | 'auth' | null;
+type ConfigModal = 'sidebar' | 'header' | 'footer' | 'auth' | 'brand' | null;
+
+interface BrandColorsForm {
+  primary: string;
+  hover: string;
+}
 
 interface SidebarBackgroundConfig {
   fundo: string;
@@ -39,6 +48,7 @@ interface HeaderBackgroundConfig {
 interface AuthModalsImagesConfig {
   login_imagem_url: string;
   register_imagem_url: string;
+  deposit_imagem_url: string;
 }
 
 const DEFAULT_AUTH_MODAL_IMAGE =
@@ -61,10 +71,16 @@ const defaultHeaderBackground: HeaderBackgroundConfig = {
 const defaultAuthModalsImages: AuthModalsImagesConfig = {
   login_imagem_url: DEFAULT_AUTH_MODAL_IMAGE,
   register_imagem_url: DEFAULT_AUTH_MODAL_IMAGE,
+  deposit_imagem_url: '',
+};
+
+const defaultBrandColors: BrandColorsForm = {
+  primary: DEFAULT_BRAND_PRIMARY,
+  hover: DEFAULT_BRAND_HOVER,
 };
 
 const TABS: { key: TabKey; label: string; icon: typeof Palette; description: string }[] = [
-  { key: 'aparencia', label: 'Aparência', icon: Palette, description: 'Cores da sidebar, header, footer e modais de auth.' },
+  { key: 'aparencia', label: 'Aparência', icon: Palette, description: 'Cores da sidebar, header, footer, destaque da marca e imagens dos modais.' },
   { key: 'menu', label: 'Menu', icon: FolderTree, description: 'Seções e botões da sidebar, organizados por grupo.' },
   { key: 'cards', label: 'Cards', icon: LayoutTemplate, description: 'Banners promocionais roxos no topo da sidebar.' },
 ];
@@ -77,11 +93,13 @@ export default function SidebarCardsPage() {
   const [footerBackground, setFooterBackground] = useState<FooterBackgroundConfig>(defaultFooterBackground);
   const [headerBackground, setHeaderBackground] = useState<HeaderBackgroundConfig>(defaultHeaderBackground);
   const [authModalsImages, setAuthModalsImages] = useState<AuthModalsImagesConfig>(defaultAuthModalsImages);
+  const [brandColors, setBrandColors] = useState<BrandColorsForm>(defaultBrandColors);
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
   const [footerSaving, setFooterSaving] = useState(false);
   const [headerSaving, setHeaderSaving] = useState(false);
   const [authModalsSaving, setAuthModalsSaving] = useState(false);
+  const [brandSaving, setBrandSaving] = useState(false);
 
   const loadSiteColors = async () => {
     try {
@@ -89,7 +107,7 @@ export default function SidebarCardsPage() {
       const { data, error } = await supabase
         .from('site_config')
         .select(
-          'sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, footer_fundo, header_fundo, login_modal_imagem_url, register_modal_imagem_url',
+          'sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, footer_fundo, header_fundo, login_modal_imagem_url, register_modal_imagem_url, deposit_modal_imagem_url, brand_cor_primaria, brand_cor_hover',
         )
         .eq('id', 1)
         .maybeSingle();
@@ -114,6 +132,15 @@ export default function SidebarCardsPage() {
         setAuthModalsImages({
           login_imagem_url: String(data.login_modal_imagem_url || defaultAuthModalsImages.login_imagem_url),
           register_imagem_url: String(data.register_modal_imagem_url || defaultAuthModalsImages.register_imagem_url),
+          deposit_imagem_url: String(data.deposit_modal_imagem_url || ''),
+        });
+        const resolved = resolveBrandColors(
+          data.brand_cor_primaria ? String(data.brand_cor_primaria) : null,
+          data.brand_cor_hover ? String(data.brand_cor_hover) : null,
+        );
+        setBrandColors({
+          primary: resolved.primary,
+          hover: resolved.hover,
         });
       }
     } finally {
@@ -202,6 +229,7 @@ export default function SidebarCardsPage() {
         id: 1,
         login_modal_imagem_url: authModalsImages.login_imagem_url.trim(),
         register_modal_imagem_url: authModalsImages.register_imagem_url.trim(),
+        deposit_modal_imagem_url: authModalsImages.deposit_imagem_url.trim() || null,
         updated_at: new Date().toISOString(),
       });
       if (upsertError) {
@@ -214,6 +242,30 @@ export default function SidebarCardsPage() {
       showToast('Erro ao salvar imagens dos modais.', 'error');
     } finally {
       setAuthModalsSaving(false);
+    }
+  };
+
+  const saveBrandColors = async () => {
+    setBrandSaving(true);
+    try {
+      const resolved = resolveBrandColors(brandColors.primary, brandColors.hover);
+      const { error: upsertError } = await supabase.from('site_config').upsert({
+        id: 1,
+        brand_cor_primaria: resolved.primary,
+        brand_cor_hover: resolved.hover,
+        updated_at: new Date().toISOString(),
+      });
+      if (upsertError) {
+        showToast('Erro ao salvar cores de destaque. Execute patch_brand_colors.sql.', 'error');
+        return;
+      }
+      setBrandColors({ primary: resolved.primary, hover: resolved.hover });
+      showToast('Cores de destaque salvas!', 'success');
+      setConfigModal(null);
+    } catch {
+      showToast('Erro ao salvar cores de destaque.', 'error');
+    } finally {
+      setBrandSaving(false);
     }
   };
 
@@ -292,14 +344,30 @@ export default function SidebarCardsPage() {
                 </ConfigSummaryCard>
 
                 <ConfigSummaryCard
+                  icon={Palette}
+                  title="Cor de destaque"
+                  description="Botões Depositar, bordas, links e elementos roxos do site."
+                  onConfigure={() => setConfigModal('brand')}
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <ColorSwatch color={brandColors.primary} label="Principal" />
+                    <ColorSwatch color={brandColors.hover} label="Hover" />
+                  </div>
+                </ConfigSummaryCard>
+
+                <ConfigSummaryCard
                   icon={ImageIcon}
-                  title="Modais de auth"
-                  description="Imagens dos modais de login e cadastro."
+                  title="Modais"
+                  description="Imagens dos modais de login, cadastro e depósito."
                   onConfigure={() => setConfigModal('auth')}
                 >
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-wrap">
                     <AuthThumb url={authModalsImages.login_imagem_url} label="Login" />
                     <AuthThumb url={authModalsImages.register_imagem_url} label="Cadastro" />
+                    <AuthThumb
+                      url={authModalsImages.deposit_imagem_url || authModalsImages.login_imagem_url}
+                      label="Depósito"
+                    />
                   </div>
                 </ConfigSummaryCard>
               </div>
@@ -434,10 +502,69 @@ export default function SidebarCardsPage() {
       </Modal>
 
       <Modal
+        open={configModal === 'brand'}
+        onClose={() => setConfigModal(null)}
+        title="Cor de destaque da marca"
+        description="Usada em botões (Depositar, JOGAR), bordas de inputs, links e destaques visuais."
+        icon={Palette}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfigModal(null)} disabled={brandSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveBrandColors} loading={brandSaving}>
+              Salvar cores
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ColorField
+              label="Cor principal"
+              value={brandColors.primary}
+              onChange={(v) => setBrandColors({ ...brandColors, primary: v })}
+            />
+            <ColorField
+              label="Cor hover"
+              value={brandColors.hover}
+              onChange={(v) => setBrandColors({ ...brandColors, hover: v })}
+            />
+          </div>
+          <div>
+            <p className="text-gray-400 text-xs mb-2">Pré-visualização</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="h-10 px-5 rounded-lg text-white font-bold text-sm"
+                style={{ backgroundColor: brandColors.primary }}
+              >
+                Depositar
+              </button>
+              <button
+                type="button"
+                className="h-10 px-5 rounded-lg text-white font-bold text-sm"
+                style={{ backgroundColor: brandColors.hover }}
+              >
+                Hover
+              </button>
+              <span
+                className="h-10 px-4 rounded-lg border-2 flex items-center text-sm text-gray-300"
+                style={{ borderColor: brandColors.primary }}
+              >
+                Borda
+              </span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={configModal === 'auth'}
         onClose={() => setConfigModal(null)}
         title="Imagens dos modais"
-        description="Imagens exibidas no topo dos modais de login e cadastro."
+        description="Imagens exibidas no topo dos modais de login, cadastro e depósito."
         icon={ImageIcon}
         size="lg"
         footer={
@@ -454,6 +581,7 @@ export default function SidebarCardsPage() {
         <div className="space-y-5">
           <div>
             <label className="block text-gray-200 text-sm font-medium mb-1">Imagem do modal de Login</label>
+            <ImageSizeHint spec={ADMIN_IMAGE_SIZES.loginModal} />
             <input
               type="url"
               value={authModalsImages.login_imagem_url}
@@ -478,6 +606,7 @@ export default function SidebarCardsPage() {
           </div>
           <div>
             <label className="block text-gray-200 text-sm font-medium mb-1">Imagem do modal de Cadastro</label>
+            <ImageSizeHint spec={ADMIN_IMAGE_SIZES.registerModal} />
             <input
               type="url"
               value={authModalsImages.register_imagem_url}
@@ -492,6 +621,31 @@ export default function SidebarCardsPage() {
                 <img
                   src={authModalsImages.register_imagem_url}
                   alt="Prévia cadastro"
+                  className="w-full max-w-sm h-auto object-contain rounded-md"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-gray-200 text-sm font-medium mb-1">Imagem do modal de Depósito</label>
+            <ImageSizeHint spec={ADMIN_IMAGE_SIZES.depositModal} />
+            <input
+              type="url"
+              value={authModalsImages.deposit_imagem_url}
+              onChange={(e) =>
+                setAuthModalsImages({ ...authModalsImages, deposit_imagem_url: e.target.value })
+              }
+              className="w-full px-4 py-2.5 text-white text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
+              placeholder="https://exemplo.com/deposito.png"
+            />
+            {authModalsImages.deposit_imagem_url.trim() ? (
+              <div className="mt-3 p-3 rounded-lg border border-white/10 bg-black/20">
+                <img
+                  src={authModalsImages.deposit_imagem_url}
+                  alt="Prévia depósito"
                   className="w-full max-w-sm h-auto object-contain rounded-md"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';

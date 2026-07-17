@@ -140,7 +140,7 @@ export default function Banner() {
   return (
     <div
       ref={containerRef}
-      className={`relative w-full aspect-[21/9] max-h-[380px] rounded-3xl overflow-hidden group select-none ${
+      className={`relative w-full aspect-[21/9] max-h-[380px] rounded-3xl overflow-hidden select-none ${
         canDrag ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
       }`}
       onMouseDown={handleMouseDown}
@@ -185,45 +185,21 @@ export default function Banner() {
       </div>
 
       {canDrag && (
-        <>
-          <button
-            type="button"
-            onClick={goToPrevious}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 cursor-pointer"
-            aria-label="Banner anterior"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            onClick={goToNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 cursor-pointer"
-            aria-label="Próximo banner"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-            {banners.map((banner, index) => (
-              <button
-                key={banner.id}
-                type="button"
-                onClick={() => goToBanner(index)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                  index === currentBanner
-                    ? 'bg-white w-8'
-                    : 'bg-white/50 w-2 hover:bg-white/70'
-                }`}
-                aria-label={`Ir para banner ${index + 1}`}
-              />
-            ))}
-          </div>
-        </>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+          {banners.map((banner, index) => (
+            <button
+              key={banner.id}
+              type="button"
+              onClick={() => goToBanner(index)}
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                index === currentBanner
+                  ? 'bg-white w-8'
+                  : 'bg-white/50 w-2 hover:bg-white/70'
+              }`}
+              aria-label={`Ir para banner ${index + 1}`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

@@ -110,7 +110,7 @@ export function getFreeBonusStatusLabel(status: string): string {
 export function getFreeBonusStatusClass(status: string): string {
   const normalized = status.toLowerCase();
   if (normalized === 'pending') return 'bg-emerald-500/20 text-emerald-300';
-  if (normalized === 'active') return 'bg-violet-600/20 text-violet-300';
+  if (normalized === 'active') return 'bg-brand/20 text-brand-light';
   if (normalized === 'completed' || normalized === 'used') return 'bg-slate-500/20 text-slate-400';
   return 'bg-amber-500/20 text-amber-300';
 }

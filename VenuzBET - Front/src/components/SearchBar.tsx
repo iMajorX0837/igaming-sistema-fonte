@@ -1,12 +1,22 @@
-ï»¿import { X } from 'lucide-react';
+import { X } from 'lucide-react';
 import IconifyIcon from './IconifyIcon';
 import LoadingScreen from './LoadingScreen';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { HOME_PAGE_WIDTH_PX } from '../constants/homeLayout';
+import {
+  PROPRIETARY_GAMES,
+  PROPRIETARY_PROVIDER,
+  PROPRIETARY_PROVIDER_ID,
+} from '../lib/proprietaryCatalog';
+import {
+  ensurePlatformGameSettingsLoaded,
+  isPlatformGameEnabled,
+  isPlatformProviderEnabled,
+} from '../lib/platformGames';
 
 interface SearchBarProps {
   onGameSelect: (game: GameInfo) => void;
@@ -63,7 +73,7 @@ const matchesCategory = (game: SearchGame, category: string): boolean => {
       return true;
     case 'Slots':
       return game.category === 'slots';
-    case 'Jogos com bÃ´nus':
+    case 'Jogos com bônus':
       return game.rounds_free === true;
     case 'Novos jogos':
       return game.original === true;
@@ -144,7 +154,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
   const categories = [
     { id: 'todos', label: 'Todos' },
     { id: 'slots', label: 'Slots' },
-    { id: 'bonus', label: 'Jogos com bÃ´nus' },
+    { id: 'bonus', label: 'Jogos com bônus' },
     { id: 'novos', label: 'Novos jogos' },
     { id: 'torneio', label: 'Jogos de torneio' },
     { id: 'mais-jogados', label: 'Mais jogados da semana' },
@@ -161,7 +171,9 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
         return;
       }
 
-      const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+      const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
+
+      const settingsPromise = ensurePlatformGameSettingsLoaded();
 
       const gamesPromises = filteredProviders.map(async (prov) => {
         try {
@@ -187,9 +199,25 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
         }
       });
 
-      const results = await Promise.all(gamesPromises);
+      const [settings, ...results] = await Promise.all([settingsPromise, ...gamesPromises]);
+
+      const proprietaryGames: SearchGame[] = isPlatformProviderEnabled(
+        PROPRIETARY_PROVIDER_ID,
+        settings
+      )
+        ? PROPRIETARY_GAMES.filter((game) =>
+            isPlatformGameEnabled(PROPRIETARY_PROVIDER_ID, game.game_code, settings)
+          ).map((game) => ({
+            name: game.nome,
+            provider: PROPRIETARY_PROVIDER.name,
+            image: game.image_url,
+            category: getCategoryFromProvider(PROPRIETARY_PROVIDER.name, game.nome),
+            game_code: game.game_code,
+          }))
+        : [];
+
       const seen = new Set<string>();
-      const uniqueGames = results.flat().filter((game) => {
+      const uniqueGames = [...results.flat(), ...proprietaryGames].filter((game) => {
         if (seen.has(game.game_code)) return false;
         seen.add(game.game_code);
         return true;
@@ -354,7 +382,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
         onFocus={(e) => {
           handleInputFocus();
           if (!isOpen) {
-            e.currentTarget.style.borderColor = 'rgba(123, 63, 242, 0.45)';
+            e.currentTarget.style.borderColor = 'rgb(var(--brand-primary-rgb) / 0.45)';
           }
         }}
         onBlur={(e) => {
@@ -393,7 +421,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
           onClick={() => setSelectedCategory(category.label)}
           className="px-4 h-8 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-shrink-0"
           style={{
-            backgroundColor: '#7B3FF2',
+            backgroundColor: 'var(--brand-primary)',
             color: '#ffffff',
             opacity: selectedCategory === category.label ? 1 : 0.5,
           }}
@@ -443,7 +471,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                   <span
                     className="font-bold text-[10px] px-2 py-1 rounded border flex items-center gap-1"
-                    style={{ backgroundColor: '#7B3FF2', borderColor: '#9B5FF2', color: '#000000' }}
+                    style={{ backgroundColor: 'var(--brand-primary)', borderColor: 'var(--brand-primary-light)', color: '#000000' }}
                   >
                     <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="currentColor">
                       <path d="M8 5v14l11-7z" />
@@ -525,7 +553,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
             <div className="shrink-0 px-6 py-4">
               {categoriesRow}
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin scrollbar-thumb-violet-600 scrollbar-track-slate-800">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin scrollbar-thumb-brand scrollbar-track-slate-800">
               {gamesGrid}
             </div>
           </div>

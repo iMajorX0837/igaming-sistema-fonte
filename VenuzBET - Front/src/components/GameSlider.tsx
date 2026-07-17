@@ -1,7 +1,8 @@
-Ôªøimport { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { HOME_SECTION_GAMES_MAX } from '../lib/homeSectionGames';
 
 interface Game {
   name: string;
@@ -18,17 +19,17 @@ interface GameSliderProps {
   useGreenButton?: boolean;
 }
 
-// Fun√ß√£o para criar slug de URL (normalizar para URL-friendly)
+// FunÁ„o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n√£o alfanum√©ricos por h√≠fen
-    .replace(/^-+|-+$/g, ''); // Remove h√≠fens do in√≠cio e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n„o alfanumÈricos por hÌfen
+    .replace(/^-+|-+$/g, ''); // Remove hÌfens do inÌcio e fim
 };
 
-// Fun√ß√£o para obter o slug do provider baseado no nome
+// FunÁ„o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   // Mapear nomes conhecidos para slugs
   const providerMap: { [key: string]: string } = {
@@ -62,6 +63,7 @@ function isMobileViewport(): boolean {
 
 export default function GameSlider({ title, viewAllLink, games, useGreenButton = false }: GameSliderProps) {
   const navigate = useNavigate();
+  const visibleGames = games.slice(0, HOME_SECTION_GAMES_MAX);
   const { config: homeConfig } = useHomeConfig();
   const surfaceBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const hoverBg = homeConfig.fundo;
@@ -125,7 +127,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
       container.removeEventListener('scroll', checkScrollability);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [games, checkScrollability]);
+  }, [visibleGames, checkScrollability]);
 
   const getScrollStep = () => {
     const el = scrollContainerRef.current;
@@ -154,7 +156,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
     // Salvar a rota atual antes de navegar
     sessionStorage.setItem('previousPath', window.location.pathname);
     
-    // Criar URL din√¢mica
+    // Criar URL din‚mica
     const providerSlug = getProviderSlug(game.provider);
     const gameSlug = createSlug(game.name);
     const gameUrl = `/${providerSlug}/${gameSlug}`;
@@ -170,6 +172,11 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
     
     navigate(gameUrl);
   };
+
+  if (visibleGames.length === 0) {
+    return null;
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
@@ -221,7 +228,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
           ref={scrollContainerRef}
           className="flex gap-2 md:gap-4 overflow-x-auto scrollbar-hide pb-2 max-md:snap-x max-md:snap-mandatory"
         >
-          {games.map((game) => (
+          {visibleGames.map((game) => (
             <div
               key={game.name}
               className="relative group flex-shrink-0 rounded-xl overflow-hidden shadow-xl max-md:snap-start md:w-[160px] md:h-[220px]"
@@ -240,7 +247,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
                     handleGameClick(game);
                   }}
                   className="font-bold text-xs px-3 py-1.5 rounded border flex items-center gap-1 hover:brightness-110 transition-all"
-                  style={{ backgroundColor: '#7B3FF2', borderColor: '#9B5FF2', color: '#000000' }}
+                  style={{ backgroundColor: 'var(--brand-primary)', borderColor: 'var(--brand-primary-light)', color: '#000000' }}
                 >
                   <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                     <path d="M8 5v14l11-7z"/>

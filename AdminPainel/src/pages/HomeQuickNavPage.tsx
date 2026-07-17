@@ -12,6 +12,8 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { Zap, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { ADMIN_IMAGE_SIZES } from '../lib/adminImageSizes';
+import ImageSizeHint from '../components/ui/ImageSizeHint';
 
 type LinkTipo = 'href' | 'game';
 
@@ -125,6 +127,7 @@ function CardFormFields({
         </div>
         <div className="md:col-span-2">
           <label className="text-gray-300 text-sm mb-1 block">URL da imagem</label>
+          <ImageSizeHint spec={ADMIN_IMAGE_SIZES.quickNav} />
           <input
             type="url"
             value={form.imagem_url}

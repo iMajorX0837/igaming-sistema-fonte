@@ -1,4 +1,4 @@
-ï»¿import Footer from './Footer';
+import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import { useNavigate } from 'react-router-dom';
 import { usePromotionBanners } from '../hooks/usePromotionBanners';
@@ -31,10 +31,10 @@ function PromotionBannerCard({
     <button
       type="button"
       onClick={() => navigate(`/help/promotions/${id}`)}
-      className="flex w-full flex-col overflow-hidden rounded-xl border text-left transition-transform duration-200 hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7B3FF2]"
+      className="flex w-full flex-col overflow-hidden rounded-xl border text-left transition-transform duration-200 hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       style={{
         aspectRatio: `${BANNER_WIDTH} / ${BANNER_HEIGHT}`,
-        borderColor: '#7B3FF2',
+        borderColor: 'var(--brand-primary)',
       }}
     >
       <div className="min-h-0 flex-1 w-full overflow-hidden bg-[#121319]">
@@ -77,17 +77,17 @@ export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps)
       <div className="flex flex-col min-h-full" style={{ backgroundColor: homeConfig.fundo }}>
         <div className="mx-auto w-full max-w-[1080px] px-6 py-8 flex-1">
         {loading ? (
-          <LoadingScreen title="Carregando promoÃ§Ãµes..." variant="page" className="min-h-[40vh] rounded-xl border border-[#7B3FF2] bg-[#181923]" />
+          <LoadingScreen title="Carregando promoções..." variant="page" className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]" />
         ) : banners.length === 0 ? (
           <div
             className="flex min-h-[40vh] items-center justify-center rounded-xl border px-6 py-16"
-            style={{ borderColor: '#7B3FF2', backgroundColor: '#181923' }}
+            style={{ borderColor: 'var(--brand-primary)', backgroundColor: '#181923' }}
           >
             <p
               className="text-center text-lg font-semibold text-slate-300"
               style={{ fontFamily: 'Montserrat, sans-serif' }}
             >
-              Sem promoÃ§Ãµes no momento
+              Sem promoções no momento
             </p>
           </div>
         ) : (

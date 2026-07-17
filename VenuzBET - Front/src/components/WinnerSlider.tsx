@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import IconifyIcon from './IconifyIcon';
 import LoadingScreen from './LoadingScreen';
 
@@ -119,7 +119,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
         return;
       }
       
-      const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+      const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
       
       // Buscar jogos de todos os provedores em paralelo
       const gamesPromises = filteredProviders.map(async (prov) => {
@@ -245,7 +245,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
           <div
             key={`${winner.game_code}-${index}`}
             onClick={() => handleWinnerClick(winner)}
-            className="flex w-[230px] shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-white/15 px-3 py-2 shadow-lg transition-all duration-200 hover:brightness-110 hover:border-violet-500/45"
+            className="flex w-[230px] shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-white/15 px-3 py-2 shadow-lg transition-all duration-200 hover:brightness-110 hover:border-brand/45"
             style={{ backgroundColor: homeConfig.fundo }}
           >
             <img

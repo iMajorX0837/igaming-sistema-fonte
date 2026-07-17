@@ -11,7 +11,7 @@ export default function AppPageScaffold({ children }: AppPageScaffoldProps) {
 
   return (
     <div
-      className="flex-1 overflow-y-auto min-h-0"
+      className="flex-1 overflow-y-auto min-h-0 [container-type:inline-size]"
       style={{ backgroundColor: homeConfig.fundo }}
     >
       {children}

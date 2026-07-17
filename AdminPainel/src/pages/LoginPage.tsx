@@ -96,7 +96,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500"
+                  className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500 input-autofill-reset"
                   placeholder="admin@example.com"
                   required
                 />
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500"
+                  className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500 input-autofill-reset"
                   placeholder="••••••••"
                   required
                 />
@@ -146,7 +146,7 @@ export default function LoginPage() {
                 maxLength={6}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="w-full px-4 py-3 text-white text-center text-2xl tracking-[0.5em] rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500 font-mono"
+                className="w-full px-4 py-3 text-white text-center text-2xl tracking-[0.5em] rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/24 placeholder-gray-500 font-mono input-autofill-reset"
                 placeholder="000000"
                 required
                 autoFocus

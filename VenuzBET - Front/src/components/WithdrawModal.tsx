@@ -1,4 +1,4 @@
-ï»¿import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -15,7 +15,7 @@ const pixOptions = [
   { id: 'email', label: 'Email', icon: 'email' },
   { id: 'cpf', label: 'CPF', icon: 'cpf' },
   { id: 'phone', label: 'Telefone', icon: 'phone' },
-  { id: 'random', label: 'Chave AleatÃ³ria', icon: 'random' },
+  { id: 'random', label: 'Chave Aleatória', icon: 'random' },
 ];
 
 export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
@@ -38,7 +38,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const prevIsOpenRef = useRef<boolean>(false);
 
-  // FunÃ§Ã£o para buscar saldo do usuÃ¡rio
+  // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
       try {
@@ -94,12 +94,12 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     }
   }, [isAuthenticated, user]);
 
-  // Buscar saldo quando o modal abrir e o usuÃ¡rio estiver autenticado
+  // Buscar saldo quando o modal abrir e o usuário estiver autenticado
   useEffect(() => {
     if (isOpen) {
       fetchSaldo();
       void fetchRollover();
-      // Resetar estados apenas quando o modal for aberto apÃ³s estar fechado
+      // Resetar estados apenas quando o modal for aberto após estar fechado
       if (!prevIsOpenRef.current) {
         setError(null);
         setSuccess(false);
@@ -195,7 +195,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     setSuccess(false);
 
     if (!isAuthenticated || !user) {
-      notify('VocÃª precisa estar autenticado para realizar um saque');
+      notify('Você precisa estar autenticado para realizar um saque');
       return;
     }
 
@@ -207,17 +207,17 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     const valorSaque = parseFloat(String(amount).trim().replace(',', '.'));
 
     if (!Number.isFinite(valorSaque) || valorSaque <= 0) {
-      notify('Por favor, insira um valor vÃ¡lido');
+      notify('Por favor, insira um valor válido');
       return;
     }
 
     if (valorSaque < minWithdraw) {
-      notify(`O valor mÃ­nimo para saque Ã© R$ ${minWithdraw},00.`);
+      notify(`O valor mínimo para saque é R$ ${minWithdraw},00.`);
       return;
     }
 
     if (valorSaque > maxWithdraw) {
-      notify(`O valor mÃ¡ximo para saque Ã© R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+      notify(`O valor máximo para saque é R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
       return;
     }
 
@@ -253,17 +253,17 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       }
 
       if (!usuarioData) {
-        throw new Error('UsuÃ¡rio nÃ£o encontrado');
+        throw new Error('Usuário não encontrado');
       }
 
       const saldoAtual = parseFloat(usuarioData.saldo) || 0;
 
       if (valorSaque < minWithdraw) {
-        throw new Error(`O valor mÃ­nimo para saque Ã© R$ ${minWithdraw},00.`);
+        throw new Error(`O valor mínimo para saque é R$ ${minWithdraw},00.`);
       }
 
       if (valorSaque > maxWithdraw) {
-        throw new Error(`O valor mÃ¡ximo para saque Ã© R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+        throw new Error(`O valor máximo para saque é R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
       }
 
       // Validar saldo novamente com o valor atual do banco
@@ -271,7 +271,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         throw new Error('Saldo insuficiente para realizar este saque');
       }
 
-      // Validar limite diÃ¡rio de saques
+      // Validar limite diário de saques
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
@@ -282,12 +282,12 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         .gte('data_hora', startOfDay.toISOString());
 
       if (countError) {
-        throw new Error(countError.message || 'Erro ao verificar limite diÃ¡rio de saques');
+        throw new Error(countError.message || 'Erro ao verificar limite diário de saques');
       }
 
       if ((saquesHoje ?? 0) >= dailyWithdrawLimit) {
         throw new Error(
-          `Limite diÃ¡rio de saques atingido. MÃ¡ximo de ${dailyWithdrawLimit} saque(s) por dia.`
+          `Limite diário de saques atingido. Máximo de ${dailyWithdrawLimit} saque(s) por dia.`
         );
       }
 
@@ -297,7 +297,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
           'Email': 'email',
           'CPF': 'cpf',
           'Telefone': 'telefone',
-          'Chave AleatÃ³ria': 'chave aleatÃ³ria'
+          'Chave Aleatória': 'chave aleatória'
         };
         return typeMap[type] || 'email';
       };
@@ -317,13 +317,13 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
       if (saqueError) {
         const msg = saqueError.message || '';
-        if (msg.includes('Limite diÃ¡rio de saques') || msg.includes('Rollover pendente')) {
+        if (msg.includes('Limite diário de saques') || msg.includes('Rollover pendente')) {
           throw new Error(msg);
         }
-        throw new Error(msg || 'Erro ao criar solicitaÃ§Ã£o de saque');
+        throw new Error(msg || 'Erro ao criar solicitação de saque');
       }
 
-      // Atualizar saldo do usuÃ¡rio usando funÃ§Ã£o RPC (bypassa RLS)
+      // Atualizar saldo do usuário usando função RPC (bypassa RLS)
       const { data: rpcResult, error: saldoError } = await supabase
         .rpc('subtrair_saldo_saque', {
           p_usuario_id: user.id,
@@ -341,10 +341,10 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         throw new Error(saldoError.message || 'Erro ao atualizar saldo');
       }
 
-      // Verificar se a funÃ§Ã£o RPC retornou sucesso
+      // Verificar se a função RPC retornou sucesso
       if (!rpcResult || !rpcResult.success) {
-        console.error('FunÃ§Ã£o RPC nÃ£o retornou sucesso:', rpcResult);
-        // Se nÃ£o retornou sucesso, tentar deletar o saque criado
+        console.error('Função RPC não retornou sucesso:', rpcResult);
+        // Se não retornou sucesso, tentar deletar o saque criado
         await supabase
           .from('saques')
           .delete()
@@ -357,15 +357,15 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
       setSuccess(true);
       
-      // Atualizar o saldo local com o valor retornado da funÃ§Ã£o RPC
+      // Atualizar o saldo local com o valor retornado da função RPC
       const saldoAtualizado = parseFloat(rpcResult.saldo_atual) || (saldoAtual - valorSaque);
       setAvailableBalance(saldoAtualizado);
       
-      // Limpar formulÃ¡rio
+      // Limpar formulário
       setAmount('100');
       setPixKey('contato.brent@gmail.com');
       
-      // Fechar modal apÃ³s 2 segundos
+      // Fechar modal após 2 segundos
       setTimeout(() => {
         onClose();
         setSuccess(false);
@@ -420,22 +420,22 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                   onChange={(e) => setAmount(e.target.value)}
                   onBlur={handleAmountBlur}
                   disabled={isSubmitting}
-                  className="w-full h-9 pl-7 pr-16 rounded-lg bg-[#181923] border-2 border-violet-600 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-600/50 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
+                  className="w-full h-9 pl-7 pr-16 rounded-lg bg-[#181923] border-2 border-brand text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
                 />
                 <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                   <button
                     type="button"
                     onClick={handleDecrement}
                     disabled={isSubmitting}
-                    className="w-6 h-6 rounded bg-violet-600 hover:bg-violet-700 flex items-center justify-center text-white transition-all font-bold text-sm disabled:opacity-50"
+                    className="w-6 h-6 rounded bg-brand hover:bg-brand-hover flex items-center justify-center text-white transition-all font-bold text-sm disabled:opacity-50"
                   >
-                    âˆ’
+                    -
                   </button>
                   <button
                     type="button"
                     onClick={handleIncrement}
                     disabled={isSubmitting}
-                    className="w-6 h-6 rounded bg-violet-600 hover:bg-violet-700 flex items-center justify-center text-white transition-all font-bold text-sm disabled:opacity-50"
+                    className="w-6 h-6 rounded bg-brand hover:bg-brand-hover flex items-center justify-center text-white transition-all font-bold text-sm disabled:opacity-50"
                   >
                     +
                   </button>
@@ -449,7 +449,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
               <span className="text-slate-300">
-                DisponÃ­vel para saque: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
+                Disponível para saque: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
               </span>
             </div>
 
@@ -473,9 +473,9 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             )}
 
             {success && (
-              <div className="p-3 rounded-lg bg-violet-600/20 border border-violet-600/50">
-                <p className="text-violet-400 text-xs font-medium">
-                  Saque solicitado com sucesso! O valor serÃ¡ processado em breve.
+              <div className="p-3 rounded-lg bg-brand/20 border border-brand/50">
+                <p className="text-brand-light text-xs font-medium">
+                  Saque solicitado com sucesso! O valor será processado em breve.
                 </p>
               </div>
             )}
@@ -492,14 +492,14 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                         setSearchTerm('');
                       }}
                       disabled={isSubmitting}
-                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-violet-600 text-white text-xs flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-violet-600/50 transition-all text-left disabled:opacity-50"
+                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all text-left disabled:opacity-50"
                     >
                       <span>{pixType}</span>
                       <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
                     </button>
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                         <polyline points="9 22 9 12 15 12 15 22" />
@@ -507,17 +507,17 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                     </div>
 
                     {isDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#181923] border-2 border-violet-600 rounded-lg shadow-xl z-[60] overflow-hidden">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#181923] border-2 border-brand rounded-lg shadow-xl z-[60] overflow-hidden">
                         <div className="p-2 border-b border-slate-700">
                           <input
                             type="text"
                             placeholder="Buscar..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-8 pl-3 pr-3 rounded bg-[#181923] border border-violet-600/30 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-violet-600"
+                            className="w-full h-8 pl-3 pr-3 rounded bg-[#181923] border border-brand/30 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-brand"
                           />
                         </div>
-                        <div className="max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-violet-600 scrollbar-track-slate-800 hover:scrollbar-thumb-violet-400">
+                        <div className="max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-brand scrollbar-track-slate-800 hover:scrollbar-thumb-brand/70">
                           {filteredOptions.map((option) => (
                             <button
                               key={option.id}
@@ -527,9 +527,9 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                                 setIsDropdownOpen(false);
                                 setSearchTerm('');
                               }}
-                              className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-violet-600/10 text-white text-xs transition-colors"
+                              className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-brand/10 text-white text-xs transition-colors"
                             >
-                              <div className="text-violet-400">
+                              <div className="text-brand-light">
                                 {getIcon(option.icon)}
                               </div>
                               <span>{option.label}</span>
@@ -549,9 +549,9 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                       value={pixKey}
                       onChange={(e) => setPixKey(e.target.value)}
                       disabled={isSubmitting}
-                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-violet-600 text-white text-xs focus:outline-none focus:ring-2 focus:ring-violet-600/50 transition-all disabled:opacity-50"
+                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50"
                     />
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                         <polyline points="22,6 12,13 2,6" />
@@ -563,16 +563,13 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             </div>
 
             <div className="text-yellow-400 text-[10px] leading-tight">
-              O PIX cadastrado deve ser prÃ³prio (CPF). NÃ£o serÃ£o pagos prÃªmios em PIX de outras titularidades.
+              O PIX cadastrado deve ser próprio (CPF). Não serão pagos prêmios em PIX de outras titularidades.
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-10 rounded-lg bg-[#7B3FF2] hover:bg-[#6528D7] disabled:bg-[#7B3FF2] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98]"
-              style={{
-                boxShadow: '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset'
-              }}
+              className="w-full h-10 rounded-lg bg-brand hover:bg-brand-hover disabled:bg-brand disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98] btn-brand-submit"
             >
               {isSubmitting ? 'Processando...' : 'Sacar'}
             </button>

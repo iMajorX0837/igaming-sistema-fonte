@@ -21,7 +21,11 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
   }, []);
 
   return (
-    <footer data-shell-footer className="relative z-50 flex-shrink-0 py-16 border-t border-white/15" style={{ backgroundColor: config.fundo }}>
+    <footer
+      data-shell-footer
+      className="relative z-50 flex-shrink-0 py-16 border-t border-white/15 w-[100cqw] max-w-none ml-[calc((100%-100cqw)/2)]"
+      style={{ backgroundColor: config.fundo }}
+    >
       <div className={containerClassName}>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-12 mb-10">
           <div className="flex flex-col gap-4">

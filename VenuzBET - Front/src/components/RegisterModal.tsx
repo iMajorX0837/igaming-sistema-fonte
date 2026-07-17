@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Eye, EyeOff, CreditCard, Mail, Smartphone, Lock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
@@ -9,14 +9,15 @@ interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchToLogin?: () => void;
-  /** Chamado após cadastro concluído com sucesso (ex.: abrir modal de depósito). */
+  /** Chamado ap?s cadastro conclu?do com sucesso (ex.: abrir modal de dep?sito). */
   onRegisterSuccess?: () => void;
 }
 
-function modalInputStyle(fundo: string) {
+function modalInputStyle(fundo: string): React.CSSProperties {
   return {
     backgroundColor: fundo,
     border: '1px solid rgba(255, 255, 255, 0.12)',
+    ['--input-autofill-bg' as string]: fundo,
   };
 }
 
@@ -83,16 +84,16 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     cpfVerifiedRef.current = cpfVerified;
   }, [cpfVerified]);
 
-  // Capturar código de indicação da URL
+  // Capturar c?digo de indica??o da URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('c');
     if (code) {
       setReferralCode(code);
-      // Salvar no localStorage para persistir mesmo após navegação
+      // Salvar no localStorage para persistir mesmo ap?s navega??o
       localStorage.setItem('referral_code', code);
     } else {
-      // Tentar recuperar do localStorage se não estiver na URL
+      // Tentar recuperar do localStorage se n?o estiver na URL
       const storedCode = localStorage.getItem('referral_code');
       if (storedCode) {
         setReferralCode(storedCode);
@@ -146,7 +147,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
           setCpfVerified(false);
           setMaskedNameLine('');
           setMaskedBirthLine('');
-          setCpfLookupError('CPF não encontrado ou inválido.');
+          setCpfLookupError('CPF n?o encontrado ou inv?lido.');
         }
       } catch {
         lastLookupCpfRef.current = '';
@@ -154,7 +155,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
         setCpfVerified(false);
         setMaskedNameLine('');
         setMaskedBirthLine('');
-        setCpfLookupError('Não foi possível validar o CPF. Tente novamente.');
+        setCpfLookupError('N?o foi poss?vel validar o CPF. Tente novamente.');
       } finally {
         setCpfLookupLoading(false);
       }
@@ -192,10 +193,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   if (!isOpen) return null;
 
   const formatCPF = (value: string) => {
-    // Remove tudo que não é dígito
+    // Remove tudo que n?o ? d?gito
     const numbers = value.replace(/\D/g, '');
     
-    // Aplica a formatação
+    // Aplica a formata??o
     if (numbers.length <= 3) {
       return numbers;
     } else if (numbers.length <= 6) {
@@ -208,10 +209,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   };
 
   const formatPhone = (value: string) => {
-    // Remove tudo que não é dígito
+    // Remove tudo que n?o ? d?gito
     const numbers = value.replace(/\D/g, '');
     
-    // Aplica a formatação
+    // Aplica a formata??o
     if (numbers.length <= 2) {
       return numbers.length > 0 ? `(${numbers}` : '';
     } else if (numbers.length <= 7) {
@@ -227,7 +228,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     const { name, value } = e.target;
     let formattedValue = value;
     
-    // Aplica formatação específica para cada campo
+    // Aplica formata??o espec?fica para cada campo
     if (name === 'cpf') {
       formattedValue = formatCPF(value);
     } else if (name === 'phone') {
@@ -243,7 +244,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setError('');
 
     if (!termsAccepted) {
-      setError('Você deve aceitar os termos e condições');
+      setError('Voc? deve aceitar os termos e condi??es');
       return;
     }
 
@@ -256,7 +257,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setLoading(true);
 
     try {
-      // Remove formatação antes de enviar (apenas números)
+      // Remove formata??o antes de enviar (apenas n?meros)
       const phoneClean = formData.phone.replace(/\D/g, '');
       
       await register(
@@ -270,7 +271,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       setFormData({ cpf: '', email: '', phone: '', password: '' });
       resetCpfVerification();
       setTermsAccepted(false);
-      // Limpar código de indicação após registro bem-sucedido
+      // Limpar c?digo de indica??o ap?s registro bem-sucedido
       localStorage.removeItem('referral_code');
       setReferralCode(null);
       onClose();
@@ -324,12 +325,12 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 Tem certeza que deseja cancelar seu registro?
               </h3>
               <p className="text-sm text-slate-300">
-                Cadastre-se agora para concorrer a bônus exclusivos e rodadas grátis imperdíveis!
+                Cadastre-se agora para concorrer a b?nus exclusivos e rodadas gr?tis imperd?veis!
               </p>
               <div className="flex flex-col gap-2 pt-4">
                 <button
                   onClick={handleCancelClose}
-                  className="w-full h-10 rounded-lg bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-violet-600/20 hover:shadow-xl hover:shadow-violet-600/30 active:scale-[0.98] flex items-center justify-center gap-2"
+                  className="w-full h-10 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   Continuar <ArrowRight className="w-4 h-4" />
                 </button>
@@ -364,7 +365,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               >
                 <p className="text-white font-medium leading-tight m-0">{maskedNameLine}</p>
                 <p className="text-xs leading-tight tabular-nums m-0 text-slate-400">
-                  <span className="font-bold text-violet-400">{formData.cpf}</span>
+                  <span className="font-bold text-brand-light">{formData.cpf}</span>
                   <span> | {maskedBirthLine}</span>
                 </p>
               </div>
@@ -381,12 +382,12 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                   onChange={handleChange}
                   maxLength={14}
                   disabled={cpfLookupLoading}
-                  className={`w-full h-10 pl-10 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all disabled:opacity-60 ${cpfLookupLoading ? 'pr-24' : 'pr-4'}`}
+                  className={`w-full h-10 pl-10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all disabled:opacity-60 input-autofill-reset ${cpfLookupLoading ? 'pr-24' : 'pr-4'}`}
                   style={modalInputStyle(homeConfig.fundo)}
                 />
                 {cpfLookupLoading && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-violet-400 pointer-events-none">
-                    Consultando…
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-brand-light pointer-events-none">
+                    Consultando?
                   </span>
                 )}
               </div>
@@ -399,7 +400,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                     type="button"
                     disabled={cpfLookupLoading}
                     onClick={() => void runCpfLookup(formData.cpf.replace(/\D/g, ''))}
-                    className="text-xs font-bold text-violet-400 hover:text-violet-300 disabled:opacity-40"
+                    className="text-xs font-bold text-brand-light hover:text-brand-light disabled:opacity-40"
                   >
                     Tentar novamente
                   </button>
@@ -417,7 +418,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 placeholder="E-mail"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all"
+                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
                 style={modalInputStyle(homeConfig.fundo)}
               />
             </div>
@@ -433,7 +434,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 value={formData.phone}
                 onChange={handleChange}
                 maxLength={15}
-                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all"
+                className="w-full h-10 pl-10 pr-4 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
                 style={modalInputStyle(homeConfig.fundo)}
               />
             </div>
@@ -448,7 +449,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 placeholder="Digite sua senha"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full h-10 pl-10 pr-10 rounded-lg text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-600/20 transition-all"
+                className="w-full h-10 pl-10 pr-10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
                 style={modalInputStyle(homeConfig.fundo)}
               />
               <button
@@ -476,23 +477,20 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 id="terms"
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="w-4 h-4 rounded bg-slate-900 accent-violet-600 cursor-pointer mt-0.5 flex-shrink-0"
+                className="w-4 h-4 rounded bg-slate-900 accent-brand cursor-pointer mt-0.5 flex-shrink-0"
               />
               <label htmlFor="terms" className="text-xs text-slate-300 leading-tight cursor-pointer">
-                Confirmo que <span className="font-bold text-violet-400">tenho mais de 18 anos</span> e aceito os{' '}
-                <a href="/help/terms" className="text-violet-400 font-bold hover:underline">Termos de Condições</a> e a{' '}
-                <a href="/help/privacy" className="text-violet-400 font-bold hover:underline">Política de Privacidade</a>.
+                Confirmo que <span className="font-bold text-brand-light">tenho mais de 18 anos</span> e aceito os{' '}
+                <a href="/help/terms" className="text-brand-light font-bold hover:underline">Termos de Condi??es</a> e a{' '}
+                <a href="/help/privacy" className="text-brand-light font-bold hover:underline">Pol?tica de Privacidade</a>.
               </label>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 rounded-lg text-white font-bold text-sm transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ 
-                backgroundColor: '#7B3FF2',
-                boxShadow: '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset'
-              }}
+              className="w-full h-10 rounded-lg text-white font-bold text-sm transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed btn-brand-submit"
+              style={{ backgroundColor: 'var(--brand-primary)' }}
             >
               {loading ? 'Criando conta...' : 'CADASTRE-SE'}
             </button>
@@ -548,7 +546,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
 
             <div className="text-center pt-1 pb-1">
               <p className="text-xs text-white font-bold mt-2">
-                Já possui uma conta?
+                J? possui uma conta?
               </p>
               <button 
                 type="button" 
@@ -556,9 +554,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                   onClose();
                   onSwitchToLogin?.();
                 }}
-                className="text-violet-400 font-bold text-xs underline mt-2 hover:opacity-90"
+                className="text-brand-light font-bold text-xs underline mt-2 hover:opacity-90"
               >
-                Faça login aqui
+                Fa?a login aqui
               </button>
             </div>
           </form>

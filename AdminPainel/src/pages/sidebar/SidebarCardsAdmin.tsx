@@ -16,6 +16,9 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
 import { LayoutTemplate, Pencil, Trash2, Plus, Power } from 'lucide-react';
+import { ADMIN_IMAGE_SIZES } from '../../lib/adminImageSizes';
+import type { AdminImageSizeSpec } from '../../lib/adminImageSizes';
+import ImageSizeHint from '../../components/ui/ImageSizeHint';
 
 type TextTheme = 'light' | 'dark';
 type CardLayout = 'single' | 'double';
@@ -868,6 +871,7 @@ function CardEditor({
                       ? 'Ícone Iconify'
                       : 'URL da imagem'
                 }
+                sizeHint={form.icon_type === 'image' ? ADMIN_IMAGE_SIZES.sidebarCardIcon : undefined}
                 value={form.icon_value}
                 onChange={(v) => setForm({ ...form, icon_value: v })}
                 className="md:col-span-2"
@@ -910,6 +914,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function Field({
   label,
+  hint,
+  sizeHint,
   value,
   onChange,
   type = 'text',
@@ -917,6 +923,8 @@ function Field({
   className = '',
 }: {
   label: string;
+  hint?: string;
+  sizeHint?: AdminImageSizeSpec;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -926,6 +934,8 @@ function Field({
   return (
     <div className={className}>
       <label className="text-gray-300 text-sm mb-1 block">{label}</label>
+      {sizeHint ? <ImageSizeHint spec={sizeHint} /> : null}
+      {hint ? <p className="text-gray-500 text-xs mb-2">{hint}</p> : null}
       <input
         type={type}
         value={value}

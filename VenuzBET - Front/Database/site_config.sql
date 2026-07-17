@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.site_config (
   -- Modais de login / cadastro
   login_modal_imagem_url TEXT NOT NULL DEFAULT 'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png',
   register_modal_imagem_url TEXT NOT NULL DEFAULT 'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png',
+  deposit_modal_imagem_url TEXT,
 
   -- Footer
   footer_fundo TEXT NOT NULL DEFAULT '#121319',
@@ -36,6 +37,10 @@ CREATE TABLE IF NOT EXISTS public.site_config (
   top_banner_botao_cor_texto TEXT NOT NULL DEFAULT '#0f172a',
   top_banner_permitir_fechar BOOLEAN NOT NULL DEFAULT true,
 
+  -- Popup de entrada
+  entry_popup_ativo BOOLEAN NOT NULL DEFAULT false,
+  entry_popup_imagem_url TEXT,
+
   -- Plataforma (depósito/saque)
   deposito_minimo NUMERIC(12,2) NOT NULL DEFAULT 20,
   deposito_maximo NUMERIC(12,2) NOT NULL DEFAULT 1000000,
@@ -58,6 +63,12 @@ ALTER TABLE public.site_config
   ADD COLUMN IF NOT EXISTS login_modal_imagem_url TEXT NOT NULL DEFAULT 'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png';
 ALTER TABLE public.site_config
   ADD COLUMN IF NOT EXISTS register_modal_imagem_url TEXT NOT NULL DEFAULT 'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png';
+ALTER TABLE public.site_config
+  ADD COLUMN IF NOT EXISTS deposit_modal_imagem_url TEXT;
+ALTER TABLE public.site_config
+  ADD COLUMN IF NOT EXISTS entry_popup_ativo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.site_config
+  ADD COLUMN IF NOT EXISTS entry_popup_imagem_url TEXT;
 
 INSERT INTO public.site_config (id)
 VALUES (1)

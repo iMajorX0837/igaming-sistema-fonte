@@ -10,9 +10,14 @@ import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
-import { ChevronLeft, ChevronRight, LayoutGrid, Pencil, Power } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Building2, Gamepad2, LayoutGrid, Pencil, Power } from 'lucide-react';
+import HomeSectionGamesModal from '../components/home/HomeSectionGamesModal';
+import HomeSectionProvidersModal from '../components/home/HomeSectionProvidersModal';
+import { HOME_SECTION_GAMES_MAX, isHomeGameSectionType } from '../lib/homeSectionGames';
+import { isEstudiosSectionType } from '../lib/homeSectionProviders';
+import { getEstudiosCardBackground, getHomeSliderSurfaceBackground } from '../lib/homeTheme';
 
-type SectionType = 'estudios' | 'recomendados' | 'jogos_pg' | 'jogos_mesa' | 'jogos_turbo';
+type SectionType = 'estudios' | 'recomendados' | 'jogos_semana' | 'jogos_pg' | 'jogos_mesa' | 'jogos_turbo';
 
 interface HomeSectionRow {
   id: string;
@@ -28,6 +33,7 @@ interface HomeSectionRow {
 const TYPE_LABELS: Record<SectionType, string> = {
   estudios: 'Estúdios (provedores)',
   recomendados: 'Recomendados (banners)',
+  jogos_semana: '+ Jogados da Semana',
   jogos_pg: 'Jogos da PG',
   jogos_mesa: 'Jogos de Mesa',
   jogos_turbo: 'Jogos Turbo',
@@ -47,6 +53,10 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
   const [configSaving, setConfigSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingSection, setEditingSection] = useState<HomeSectionRow | null>(null);
+  const [gamesModalSection, setGamesModalSection] = useState<HomeSectionRow | null>(null);
+  const [providersModalSection, setProvidersModalSection] = useState<HomeSectionRow | null>(null);
+  const [gamesCountBySection, setGamesCountBySection] = useState<Record<string, number>>({});
+  const [providersCountBySection, setProvidersCountBySection] = useState<Record<string, number>>({});
   const [editForm, setEditForm] = useState({
     titulo: '',
     ordem: 1,
@@ -97,6 +107,36 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
     }
   };
 
+  const loadGameCounts = async () => {
+    const { data, error } = await supabase.from('home_section_games').select('section_id');
+
+    if (error) {
+      return;
+    }
+
+    const counts: Record<string, number> = {};
+    for (const row of data || []) {
+      const sectionId = String(row.section_id);
+      counts[sectionId] = (counts[sectionId] || 0) + 1;
+    }
+    setGamesCountBySection(counts);
+  };
+
+  const loadProviderCounts = async () => {
+    const { data, error } = await supabase.from('home_section_providers').select('section_id');
+
+    if (error) {
+      return;
+    }
+
+    const counts: Record<string, number> = {};
+    for (const row of data || []) {
+      const sectionId = String(row.section_id);
+      counts[sectionId] = (counts[sectionId] || 0) + 1;
+    }
+    setProvidersCountBySection(counts);
+  };
+
   const loadSections = async () => {
     try {
       setLoading(true);
@@ -130,6 +170,8 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
   useEffect(() => {
     void loadHomeBackground();
     void loadSections();
+    void loadGameCounts();
+    void loadProviderCounts();
   }, []);
 
   const startEdit = (section: HomeSectionRow) => {
@@ -238,6 +280,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
             style={{ backgroundColor: homeBackground.fundo }}
           />
           <HomeSliderControlsPreview fundo={homeBackground.fundo} />
+          <EstudiosCardsPreview fundo={homeBackground.fundo} />
           <Button onClick={saveHomeBackground} loading={configSaving}>
             Salvar cor
           </Button>
@@ -269,8 +312,40 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
               {section.view_all_link && (
                 <p className="text-gray-500 text-xs">Ver tudo: {section.view_all_link}</p>
               )}
+              {isHomeGameSectionType(section.tipo) && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Jogos configurados: {gamesCountBySection[section.id] || 0}/{HOME_SECTION_GAMES_MAX}
+                </p>
+              )}
+              {isEstudiosSectionType(section.tipo) && (
+                <p className="text-gray-500 text-xs mt-1">
+                  Provedores configurados: {providersCountBySection[section.id] || 0}
+                </p>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {isEstudiosSectionType(section.tipo) && (
+                <Button
+                  variant="secondary"
+                  icon={Building2}
+                  onClick={() => setProvidersModalSection(section)}
+                  disabled={saving}
+                  className="!px-3 !py-1.5 !text-xs"
+                >
+                  Provedores
+                </Button>
+              )}
+              {isHomeGameSectionType(section.tipo) && (
+                <Button
+                  variant="secondary"
+                  icon={Gamepad2}
+                  onClick={() => setGamesModalSection(section)}
+                  disabled={saving}
+                  className="!px-3 !py-1.5 !text-xs"
+                >
+                  Jogos
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 icon={Pencil}
@@ -305,6 +380,24 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
           description="Defina a ordem das seções na home: Estúdios, Jogos Turbo, Jogos de Mesa, Jogos da PG e Recomendados. Segure o ícone à esquerda e arraste para reorganizar."
         />
       )}
+
+      <HomeSectionProvidersModal
+        open={providersModalSection !== null}
+        onClose={() => setProvidersModalSection(null)}
+        section={providersModalSection}
+        onSaved={() => {
+          void loadProviderCounts();
+        }}
+      />
+
+      <HomeSectionGamesModal
+        open={gamesModalSection !== null}
+        onClose={() => setGamesModalSection(null)}
+        section={gamesModalSection}
+        onSaved={() => {
+          void loadGameCounts();
+        }}
+      />
 
       <Modal
         open={editingId !== null && editingSection !== null}
@@ -386,7 +479,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
 }
 
 function HomeSliderControlsPreview({ fundo }: { fundo: string }) {
-  const surfaceBg = `color-mix(in srgb, ${fundo} 88%, black)`;
+  const surfaceBg = getHomeSliderSurfaceBackground(fundo);
 
   return (
     <div className="flex flex-col gap-2">
@@ -413,6 +506,28 @@ function HomeSliderControlsPreview({ fundo }: { fundo: string }) {
         >
           <ChevronRight className="w-4 h-4" />
         </span>
+      </div>
+    </div>
+  );
+}
+
+function EstudiosCardsPreview({ fundo }: { fundo: string }) {
+  const cardBg = getEstudiosCardBackground(fundo);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-gray-400 text-xs">Cards da seção Estúdios</span>
+      <div
+        className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2"
+        style={{ backgroundColor: fundo }}
+      >
+        {[1, 2, 3].map((item) => (
+          <span
+            key={item}
+            className="h-10 w-24 rounded-lg border border-white/5 shrink-0"
+            style={{ backgroundColor: cardBg }}
+          />
+        ))}
       </div>
     </div>
   );

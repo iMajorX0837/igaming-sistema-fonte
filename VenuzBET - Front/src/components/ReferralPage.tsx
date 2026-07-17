@@ -295,10 +295,10 @@ export default function ReferralPage() {
                   {recompensa > 0 ? (
                     <>
                       Indique seus amigos para a {nomeBet} e receba{' '}
-                      <span className="text-violet-400 font-bold">{formatCurrency(recompensa)}</span> em
+                      <span className="text-brand-light font-bold">{formatCurrency(recompensa)}</span> em
                       saldo real por cada um que se cadastrar com o seu link e fizer o primeiro depósito de
                       no mínimo{' '}
-                      <span className="text-violet-400 font-bold">{formatCurrency(depositoMinimo)}</span>.
+                      <span className="text-brand-light font-bold">{formatCurrency(depositoMinimo)}</span>.
                       A recompensa cai direto na sua carteira e pode ser sacada.
                     </>
                   ) : (
@@ -314,14 +314,14 @@ export default function ReferralPage() {
                     value={loading ? 'Carregando...' : referralLink}
                     readOnly
                     disabled={loading}
-                    className="flex-1 px-3 py-2 rounded-lg border border-violet-600/30 text-slate-300 font-mono text-xs focus:outline-none disabled:opacity-50"
+                    className="flex-1 px-3 py-2 rounded-lg border border-brand/30 text-slate-300 font-mono text-xs focus:outline-none disabled:opacity-50"
                     style={{ backgroundColor: cardBg }}
                   />
                   <button
                     onClick={handleCopyLink}
                     disabled={loading || !referralCode}
                     className="px-4 py-2 rounded-lg text-white font-bold text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: '#7B3FF2' }}
+                    style={{ backgroundColor: 'var(--brand-primary)' }}
                   >
                     <Copy className="w-4 h-4" />
                     {copied ? 'Link Copiado!' : 'Copiar link'}
@@ -330,7 +330,7 @@ export default function ReferralPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: cardBg }}>
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#7B3FF2' }}>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--brand-primary)' }}>
                       <span className="iconify" data-icon="fa6-solid:money-bill-trend-up" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>
@@ -340,7 +340,7 @@ export default function ReferralPage() {
                   </div>
 
                   <div className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: cardBg }}>
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#7B3FF2' }}>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--brand-primary)' }}>
                       <span className="iconify" data-icon="material-symbols:person-add-rounded" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>
@@ -350,7 +350,7 @@ export default function ReferralPage() {
                   </div>
 
                   <div className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: cardBg }}>
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#7B3FF2' }}>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--brand-primary)' }}>
                       <span className="iconify" data-icon="fluent:person-money-24-filled" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>

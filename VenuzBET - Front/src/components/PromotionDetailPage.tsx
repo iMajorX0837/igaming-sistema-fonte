@@ -22,12 +22,12 @@ export default function PromotionDetailPage() {
             <LoadingScreen
               title="Carregando promoção..."
               variant="page"
-              className="min-h-[40vh] rounded-xl border border-[#7B3FF2] bg-[#181923]"
+              className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]"
             />
           ) : error || !promotion ? (
             <div
               className="flex min-h-[40vh] flex-col items-center justify-center gap-4 rounded-xl border px-6 py-16"
-              style={{ borderColor: '#7B3FF2', backgroundColor: '#181923' }}
+              style={{ borderColor: 'var(--brand-primary)', backgroundColor: '#181923' }}
             >
               <p
                 className="text-center text-lg font-semibold text-slate-300"
@@ -39,13 +39,13 @@ export default function PromotionDetailPage() {
                 type="button"
                 onClick={() => navigate('/help/promotions')}
                 className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#7B3FF2' }}
+                style={{ backgroundColor: 'var(--brand-primary)' }}
               >
                 Ver todas as promoções
               </button>
             </div>
           ) : (
-            <article className="overflow-hidden rounded-xl border" style={{ borderColor: '#7B3FF2' }}>
+            <article className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--brand-primary)' }}>
               <div className="overflow-hidden bg-[#121319]">
                 {promotion.imagem_url ? (
                   <img

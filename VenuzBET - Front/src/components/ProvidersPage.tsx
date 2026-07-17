@@ -1,10 +1,10 @@
-Ôªøimport { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import LoadingScreen from './LoadingScreen';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
 import BackButton from './BackButton';
 import AppPageScaffold from './AppPageScaffold';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { appPageContainerClass } from '../constants/homeLayout';
 import {
@@ -42,17 +42,17 @@ interface Provider {
   apiId: number;
 }
 
-// Fun√ß√£o para criar slug de URL (normalizar para URL-friendly)
+// FunÁ„o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n√£o alfanum√©ricos por h√≠fen
-    .replace(/^-+|-+$/g, ''); // Remove h√≠fens do in√≠cio e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n„o alfanumÈricos por hÌfen
+    .replace(/^-+|-+$/g, ''); // Remove hÌfens do inÌcio e fim
 };
 
-// Fun√ß√£o para obter o slug do provider baseado no nome
+// FunÁ„o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   const providerMap: { [key: string]: string } = {
     'PG Soft': 'pgsoft',
@@ -88,13 +88,13 @@ export default function ProvidersPage() {
       const apiData: ApiResponse = await fetchProvidersCached();
       
       if (apiData.status === 1 && apiData.data) {
-        const filteredProviders = apiData.data.filter(isPlayFiverSlotsProvider);
+        const filteredProviders = apiData.data.filter(isPlayFiverEnabledProvider);
         
         // Mapear para o formato esperado
         const mappedProviders: Provider[] = filteredProviders.map(provider => ({
           id: provider.id.toString(),
           name: provider.name,
-          games: 0, // Ser√° atualizado depois
+          games: 0, // Ser· atualizado depois
           image: provider.image_url,
           apiId: provider.id,
         }));
@@ -181,7 +181,7 @@ export default function ProvidersPage() {
                 <p className="text-red-400 text-lg mb-4">{error}</p>
                 <button
                   onClick={fetchProviders}
-                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200"
+                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
                   Tentar novamente
                 </button>

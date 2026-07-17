@@ -1,4 +1,12 @@
 import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio } from './siteBrand';
+import {
+  applyBrandColorsToDocument,
+  DEFAULT_BRAND_COLORS,
+  resolveBrandColors,
+  type BrandColorsConfig,
+} from './brandColors';
+
+export type { BrandColorsConfig };
 
 export interface HeaderConfig {
   fundo: string;
@@ -22,6 +30,7 @@ export interface SidebarConfig {
 export interface AuthModalsConfig {
   login_imagem_url: string;
   register_imagem_url: string;
+  deposit_imagem_url: string;
 }
 
 export interface BrandConfig {
@@ -37,6 +46,7 @@ export interface SiteTheme {
   sidebar: SidebarConfig;
   authModals: AuthModalsConfig;
   brand: BrandConfig;
+  brandColors: BrandColorsConfig;
 }
 
 export const DEFAULT_AUTH_MODAL_IMAGE =
@@ -64,6 +74,7 @@ export const DEFAULT_SIDEBAR_CONFIG: SidebarConfig = {
 export const DEFAULT_AUTH_MODALS_CONFIG: AuthModalsConfig = {
   login_imagem_url: DEFAULT_AUTH_MODAL_IMAGE,
   register_imagem_url: DEFAULT_AUTH_MODAL_IMAGE,
+  deposit_imagem_url: '',
 };
 
 export const DEFAULT_BRAND_CONFIG: BrandConfig = {
@@ -79,9 +90,10 @@ export const DEFAULT_SITE_THEME: SiteTheme = {
   sidebar: DEFAULT_SIDEBAR_CONFIG,
   authModals: DEFAULT_AUTH_MODALS_CONFIG,
   brand: DEFAULT_BRAND_CONFIG,
+  brandColors: DEFAULT_BRAND_COLORS,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v6';
+const STORAGE_KEY = 'venuz-site-theme-v8';
 
 export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
@@ -128,6 +140,7 @@ function normalizeAuthModals(row: Record<string, unknown> | null | undefined): A
   return {
     login_imagem_url: String(row.login_imagem_url || DEFAULT_AUTH_MODALS_CONFIG.login_imagem_url),
     register_imagem_url: String(row.register_imagem_url || DEFAULT_AUTH_MODALS_CONFIG.register_imagem_url),
+    deposit_imagem_url: String(row.deposit_imagem_url ?? DEFAULT_AUTH_MODALS_CONFIG.deposit_imagem_url).trim(),
   };
 }
 
@@ -154,7 +167,18 @@ function normalizeBrand(row: Record<string, unknown> | null | undefined): BrandC
   };
 }
 
-const EMPTY_BRAND_CONFIG: BrandConfig = DEFAULT_BRAND_CONFIG;
+function normalizeBrandColors(cached: Partial<BrandColorsConfig> | undefined): BrandColorsConfig {
+  if (!cached?.primary) return DEFAULT_BRAND_COLORS;
+  return resolveBrandColors(cached.primary, cached.hover);
+}
+
+function normalizeBrandColorsFromSiteConfig(row: Record<string, unknown> | null | undefined): BrandColorsConfig {
+  if (!row) return DEFAULT_BRAND_COLORS;
+  return resolveBrandColors(
+    row.brand_cor_primaria ? String(row.brand_cor_primaria) : null,
+    row.brand_cor_hover ? String(row.brand_cor_hover) : null,
+  );
+}
 
 export function getInitialSiteTheme(): SiteTheme {
   const cached = readCache();
@@ -166,6 +190,7 @@ export function getInitialSiteTheme(): SiteTheme {
     sidebar: { ...DEFAULT_SIDEBAR_CONFIG, ...cached?.sidebar },
     authModals: { ...DEFAULT_AUTH_MODALS_CONFIG, ...cached?.authModals },
     brand: cachedBrand ?? DEFAULT_BRAND_CONFIG,
+    brandColors: normalizeBrandColors(cached?.brandColors),
   };
 }
 
@@ -182,6 +207,7 @@ export function hydrateDocumentTheme(theme: SiteTheme) {
   if (typeof document === 'undefined') return;
   document.documentElement.style.backgroundColor = theme.home.fundo;
   document.body.style.backgroundColor = theme.home.fundo;
+  applyBrandColorsToDocument(theme.brandColors);
 }
 
 export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null): SiteTheme {
@@ -202,12 +228,14 @@ export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null
     authModals: normalizeAuthModals({
       login_imagem_url: row.login_modal_imagem_url,
       register_imagem_url: row.register_modal_imagem_url,
+      deposit_imagem_url: row.deposit_modal_imagem_url,
     }),
     brand: normalizeBrand({
       nome_bet: row.nome_bet,
       site_titulo: row.site_titulo,
       site_dominio: row.site_dominio,
     }),
+    brandColors: normalizeBrandColorsFromSiteConfig(row),
   };
 }
 

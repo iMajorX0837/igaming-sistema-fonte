@@ -13,7 +13,7 @@ import {
   fetchGamesForProvider,
   fetchProviders,
   getProviderSlug,
-  isPlayFiverSlotsProvider,
+  isPlayFiverEnabledProvider,
   normalizeProviderName,
 } from '../lib/playfiversApi';
 import { getCategoryFromProvider, loadPlatformDbOverrides } from '../lib/platformCatalog';
@@ -72,9 +72,9 @@ export default function JogosPage() {
         }
 
         const providerMap = new Map(db.providers.map((p) => [p.api_provider_id, p.ativo]));
-        const slotsProviders = apiRes.data.filter(isPlayFiverSlotsProvider);
+        const enabledProviders = apiRes.data.filter(isPlayFiverEnabledProvider);
 
-        const apiProviders: ProviderGroup[] = slotsProviders.map((prov: ApiProvider) => ({
+        const apiProviders: ProviderGroup[] = enabledProviders.map((prov: ApiProvider) => ({
           id: prov.id,
           slug: getProviderSlug(prov.name),
           nome: normalizeProviderName(prov.name),

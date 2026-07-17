@@ -255,7 +255,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
               <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
                 <span className="whitespace-nowrap shrink-0">Jogos de slots</span>
                 <span
-                  className={`text-violet-400 whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+                  className={`text-brand-light whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
                     selectedProvider !== 'all' ? 'max-w-[500px] opacity-100' : 'max-w-0 opacity-0'
                   }`}
                 >
@@ -292,7 +292,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                 <p className="text-red-400 text-lg mb-4">{error}</p>
                 <button
                   onClick={() => fetchAllGames()}
-                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200"
+                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
                   Tentar novamente
                 </button>
@@ -338,7 +338,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                               <button
                                 type="button"
                                 className="font-bold text-xs px-3 py-1.5 rounded border flex items-center gap-1 hover:brightness-110 transition-all"
-                                style={{ backgroundColor: '#7B3FF2', borderColor: '#9B5FF2', color: '#000000' }}
+                                style={{ backgroundColor: 'var(--brand-primary)', borderColor: 'var(--brand-primary-light)', color: '#000000' }}
                               >
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                                   <path d="M8 5v14l11-7z"/>
@@ -366,7 +366,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                 </p>
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200 shadow-lg"
+                  className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
                 >
                   Carregar mais
                 </button>

@@ -12,6 +12,9 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { Gift, Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import { ADMIN_IMAGE_SIZES } from '../lib/adminImageSizes';
+import type { AdminImageSizeSpec } from '../lib/adminImageSizes';
+import ImageSizeHint from '../components/ui/ImageSizeHint';
 
 interface PromotionBanner {
   id: string;
@@ -314,6 +317,7 @@ export default function PromotionsPage() {
         />
         <Field
           label="URL da imagem"
+          sizeHint={ADMIN_IMAGE_SIZES.promotionBanner}
           value={form.imagem_url}
           onChange={(v) => setForm({ ...form, imagem_url: v })}
           placeholder="https://..."
@@ -500,6 +504,8 @@ export default function PromotionsPage() {
 
 function Field({
   label,
+  hint,
+  sizeHint,
   value,
   onChange,
   type = 'text',
@@ -507,6 +513,8 @@ function Field({
   className = '',
 }: {
   label: string;
+  hint?: string;
+  sizeHint?: AdminImageSizeSpec;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -516,6 +524,8 @@ function Field({
   return (
     <div className={className}>
       <label className="text-gray-300 text-sm mb-1 block">{label}</label>
+      {sizeHint ? <ImageSizeHint spec={sizeHint} /> : null}
+      {hint ? <p className="text-gray-500 text-xs mb-2">{hint}</p> : null}
       <input
         type={type}
         value={value}

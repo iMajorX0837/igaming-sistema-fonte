@@ -63,11 +63,7 @@ export default function VipLevelsPage() {
                 </p>
                 <Link
                   to="/games"
-                  className="play-game btn-shadow inline-flex items-center justify-center h-11 px-8 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm tracking-wide transition-all duration-200 active:scale-[0.98] no-underline"
-                  style={{
-                    boxShadow:
-                      '0px 4px 18.4px 0px rgba(23, 103, 238, 0.45), 0px 0px 10px 0px rgba(0, 69, 209, 0.40), 0px 1px 0px 0px rgba(255, 255, 255, 0.20) inset, 0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset, 0px 0px 12px 0px #0035A1 inset',
-                  }}
+                  className="play-game btn-shadow inline-flex items-center justify-center h-11 px-8 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm tracking-wide transition-all duration-200 active:scale-[0.98] no-underline btn-brand-submit"
                 >
                   JOGAR AGORA
                 </Link>
@@ -102,7 +98,7 @@ export default function VipLevelsPage() {
                     <p className="text-slate-400 text-sm mt-1">
                       Total depositado: <span className="text-white font-semibold">{formatBRL(profile.total_depositado)}</span>
                       {profile.cashback_pct > 0 && (
-                        <span className="ml-2">· Cashback: <span className="text-violet-400">{profile.cashback_pct}%</span></span>
+                        <span className="ml-2">· Cashback: <span className="text-brand-light">{profile.cashback_pct}%</span></span>
                       )}
                     </p>
                   </div>
@@ -116,13 +112,13 @@ export default function VipLevelsPage() {
                     </div>
                     <div className="h-2.5 rounded-full bg-slate-700/80 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-violet-600 transition-all duration-500"
+                        className="h-full rounded-full bg-brand transition-all duration-500"
                         style={{ width: `${Math.min(100, profile.progresso_pct)}%` }}
                       />
                     </div>
                   </div>
                 ) : (
-                  <p className="text-violet-400 text-sm font-semibold">Você atingiu o nível máximo — Diamante 3!</p>
+                  <p className="text-brand-light text-sm font-semibold">Você atingiu o nível máximo — Diamante 3!</p>
                 )}
               </div>
             )}
@@ -131,7 +127,7 @@ export default function VipLevelsPage() {
               <div className="title-level flex items-center justify-between gap-4 mb-5">
                 <div className="title flex items-center gap-3 min-w-0">
                   <span
-                    className="iconify i-ri:vip-crown-line shrink-0 text-violet-400"
+                    className="iconify i-ri:vip-crown-line shrink-0 text-brand-light"
                     data-icon="ri:vip-crown-line"
                     aria-hidden="true"
                     style={{ fontSize: '36px' }}
@@ -180,7 +176,7 @@ export default function VipLevelsPage() {
                     <div
                       key={level.name}
                       className={`box-level shrink-0 w-[140px] sm:w-[156px] rounded-xl border-2 p-3 flex flex-col items-center gap-3 transition-all ${
-                        isCurrent ? 'ring-2 ring-violet-500 ring-offset-2 scale-105' : ''
+                        isCurrent ? 'ring-2 ring-brand ring-offset-2 scale-105' : ''
                       } ${!isUnlocked && isAuthenticated ? 'opacity-50' : ''}`}
                       style={{
                         borderColor: level.color,
@@ -205,10 +201,10 @@ export default function VipLevelsPage() {
                         <h2 className="text-white font-bold text-sm">{level.name}</h2>
                         <p className="text-slate-400 text-[10px] mt-1">{formatBRL(level.depositoMinimo)}</p>
                         {level.cashbackPct > 0 && (
-                          <p className="text-violet-400 text-[10px]">{level.cashbackPct}% cashback</p>
+                          <p className="text-brand-light text-[10px]">{level.cashbackPct}% cashback</p>
                         )}
                         {isCurrent && (
-                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-violet-600 text-white">
+                          <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-brand text-white">
                             ATUAL
                           </span>
                         )}

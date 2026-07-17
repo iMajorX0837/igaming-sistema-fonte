@@ -124,6 +124,17 @@ body,
 }
 
 @layer components {
+  .input-autofill-reset:-webkit-autofill,
+  .input-autofill-reset:-webkit-autofill:hover,
+  .input-autofill-reset:-webkit-autofill:focus,
+  .input-autofill-reset:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--admin-text);
+    caret-color: var(--admin-text);
+    -webkit-box-shadow: 0 0 0 1000px var(--input-autofill-bg, var(--admin-panel)) inset !important;
+    box-shadow: 0 0 0 1000px var(--input-autofill-bg, var(--admin-panel)) inset !important;
+    transition: background-color 99999s ease-in-out 0s;
+  }
+
   .admin-input {
     @apply w-full px-4 py-2.5 text-admin-foreground text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/30 transition-colors;
   }

@@ -12,6 +12,7 @@ import {
   type HomeConfig,
   type SidebarConfig,
   type SiteTheme,
+  type BrandColorsConfig,
 } from '../lib/siteConfigCache';
 import { applyBrandToDocument } from '../lib/siteBrand';
 
@@ -31,7 +32,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('site_config')
         .select(
-          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo, site_dominio',
+          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, deposit_modal_imagem_url, brand_cor_primaria, brand_cor_hover, nome_bet, site_titulo, site_dominio',
         )
         .eq('id', 1)
         .maybeSingle();
@@ -58,6 +59,8 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('venuz-site-theme-v3');
       localStorage.removeItem('venuz-site-theme-v4');
       localStorage.removeItem('venuz-site-theme-v5');
+      localStorage.removeItem('venuz-site-theme-v6');
+      localStorage.removeItem('venuz-site-theme-v7');
     } catch {
       // ignore
     }
@@ -73,6 +76,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
         sidebar: theme.sidebar,
         authModals: theme.authModals,
         brand: theme.brand,
+        brandColors: theme.brandColors,
         loading,
         refresh,
       }}
@@ -124,4 +128,9 @@ export function useSiteBrand() {
   return { nomeBet: brand.nome_bet, siteTitulo: brand.site_titulo, siteDominio: brand.site_dominio, loading, refresh };
 }
 
-export type { HeaderConfig, FooterConfig, HomeConfig, SidebarConfig, AuthModalsConfig, BrandConfig };
+export function useBrandColors() {
+  const { brandColors, loading, refresh } = useSiteConfigContext();
+  return { colors: brandColors, loading, refresh };
+}
+
+export type { HeaderConfig, FooterConfig, HomeConfig, SidebarConfig, AuthModalsConfig, BrandConfig, BrandColorsConfig };

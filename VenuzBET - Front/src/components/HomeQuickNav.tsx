@@ -7,10 +7,10 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 const RGB_CARD_COUNT = 3;
 
 const innerCardClass =
-  'group relative z-10 flex h-full w-full flex-col overflow-hidden rounded-[6px] transition-all duration-200 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60';
+  'group relative z-10 flex h-full w-full flex-col overflow-hidden rounded-[6px] transition-all duration-200 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60';
 
 const plainCardClass =
-  'group flex h-[142px] w-[96px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-700/50 transition-all duration-200 hover:border-violet-500/40 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60';
+  'group flex h-[142px] w-[96px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-700/50 transition-all duration-200 hover:border-brand/40 hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60';
 
 const cardTitleStyle: CSSProperties = {
   fontFamily: 'Montserrat, sans-serif',

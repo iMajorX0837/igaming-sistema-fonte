@@ -1,6 +1,7 @@
 ﻿import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { getEstudiosCardBackground, getHomeSliderSurfaceBackground } from '../lib/homeTheme';
 
 interface Provider {
   name: string;
@@ -16,7 +17,8 @@ interface ProviderSliderProps {
 
 export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/providers', providers }: ProviderSliderProps) {
   const { config: homeConfig } = useHomeConfig();
-  const surfaceBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
+  const surfaceBg = getHomeSliderSurfaceBackground(homeConfig.fundo);
+  const cardBg = getEstudiosCardBackground(homeConfig.fundo);
   const hoverBg = homeConfig.fundo;
   const surfaceHoverHandlers = {
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
@@ -132,8 +134,8 @@ export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/pr
             <a
               key={provider.name}
               href={provider.href}
-              className="flex-shrink-0 w-[190px] h-[70px] rounded-xl hover:scale-105 transition-all duration-200 relative group"
-              style={{ backgroundColor: '#0D1237' }}
+              className="flex-shrink-0 w-[190px] h-[70px] rounded-xl border border-white/[0.06] hover:scale-105 transition-all duration-200 relative group"
+              style={{ backgroundColor: cardBg }}
             >
               <div
                 className="absolute w-[80%] h-[70%] left-[10%] top-[15%] bg-center bg-contain bg-no-repeat opacity-60 group-hover:opacity-100 transition-opacity duration-200"

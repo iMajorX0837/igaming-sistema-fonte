@@ -1,5 +1,6 @@
 export {
   useHomeConfig,
+  useBrandColors,
   type HomeConfig,
 } from '../contexts/SiteConfigContext';
 

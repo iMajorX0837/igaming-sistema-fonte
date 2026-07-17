@@ -1,11 +1,11 @@
-Ôªøimport { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import LoadingScreen from './LoadingScreen';
 import { useNavigate, useParams } from 'react-router-dom';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
 import SearchInput from './SearchInput';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
+import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { normalizeProviderSlug } from '../utils/resolveGameBySlug';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import {
@@ -112,7 +112,7 @@ export default function ProviderGamesPage() {
         const settings = await ensurePlatformGameSettingsLoaded();
 
         if (!isPlatformProviderEnabled(PROPRIETARY_PROVIDER_ID, settings)) {
-          throw new Error('Provedor n√£o encontrado');
+          throw new Error('Provedor n„o encontrado');
         }
 
         setProvider({
@@ -139,10 +139,10 @@ export default function ProviderGamesPage() {
       const providersData: ApiProvidersResponse = await fetchProvidersCached();
 
       if (providersData.status !== 1 || !providersData.data) {
-        throw new Error('Provedor n√£o encontrado');
+        throw new Error('Provedor n„o encontrado');
       }
 
-      const filteredProviders = providersData.data.filter(isPlayFiverSlotsProvider);
+      const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
 
       let foundProvider: ApiProvider | null = null;
 
@@ -157,7 +157,7 @@ export default function ProviderGamesPage() {
       }
 
       if (!foundProvider) {
-        throw new Error('Provedor n√£o encontrado');
+        throw new Error('Provedor n„o encontrado');
       }
 
       setProvider(foundProvider);
@@ -219,7 +219,7 @@ export default function ProviderGamesPage() {
             <BackButton compact onClick={handleBack} />
             <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
               <span className="whitespace-nowrap shrink-0">Jogos de</span>
-              <span className="text-violet-400 whitespace-nowrap overflow-hidden ml-1">
+              <span className="text-brand-light whitespace-nowrap overflow-hidden ml-1">
                 {provider ? provider.name : 'Carregando...'}
               </span>
             </h1>
@@ -242,7 +242,7 @@ export default function ProviderGamesPage() {
               <p className="text-red-400 text-lg mb-4">{error}</p>
               <button
                 onClick={() => fetchProviderAndGames()}
-                className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200"
+                className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
               >
                 Tentar novamente
               </button>
@@ -294,8 +294,8 @@ export default function ProviderGamesPage() {
                               type="button"
                               className="font-bold text-xs px-3 py-1.5 rounded border flex items-center gap-1 hover:brightness-110 transition-all"
                               style={{
-                                backgroundColor: '#7B3FF2',
-                                borderColor: '#9B5FF2',
+                                backgroundColor: 'var(--brand-primary)',
+                                borderColor: 'var(--brand-primary-light)',
                                 color: '#000000',
                               }}
                             >
@@ -312,7 +312,7 @@ export default function ProviderGamesPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center min-h-[360px]">
-                  <p className="text-slate-400 text-lg">N√£o possui jogos ativos.</p>
+                  <p className="text-slate-400 text-lg">N„o possui jogos ativos.</p>
                 </div>
               )}
             </div>
@@ -325,7 +325,7 @@ export default function ProviderGamesPage() {
               </p>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                className="px-6 py-3 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-bold text-sm transition-all duration-200 shadow-lg"
+                className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
               >
                 Carregar mais
               </button>

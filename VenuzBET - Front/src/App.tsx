@@ -24,6 +24,7 @@ import AppShellLayout from './components/AppShellLayout';
 import AppPageScaffold from './components/AppPageScaffold';
 import VipLevelsPage from './components/VipLevelsPage';
 import CouponModal from './components/CouponModal';
+import EntryPopupModal from './components/EntryPopupModal';
 import NotFoundPage from './components/NotFoundPage';
 import MobileBottomNav from './components/MobileBottomNav';
 import LoadingScreen from './components/LoadingScreen';
@@ -216,6 +217,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 font-sans">
       <MetaPixelTracker />
+      <EntryPopupModal />
       <CouponModal isOpen={isCouponOpen} onClose={() => setIsCouponOpen(false)} />
       <PrizeWheel />
       <MobileBottomNav visible={showMobileBottomNav} />
@@ -265,7 +267,7 @@ function AppContent() {
                   }}
                 />
               ) : (
-                <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="flex-1 overflow-y-auto min-h-0 [container-type:inline-size]">
                   <MainContent onGameSelect={handleGameSelect} />
                 </div>
               )

@@ -1,4 +1,4 @@
-ï»¿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
@@ -45,14 +45,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const [isSavingName, setIsSavingName] = useState(false);
   const itemsPerPage = 10;
 
-  // Garante que o Iconify escaneia os Ã­cones apÃ³s renderizar
+  // Garante que o Iconify escaneia os ícones após renderizar
   useEffect(() => {
     if ((window as any).Iconify) {
       (window as any).Iconify.scan();
     }
   });
 
-  // FunÃ§Ã£o para formatar CPF (XXX.XXX.XXX-XX)
+  // Função para formatar CPF (XXX.XXX.XXX-XX)
   const formatCPF = (cpf: string | null): string => {
     if (!cpf) return '';
     const cleaned = cpf.replace(/\D/g, '');
@@ -60,7 +60,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
-  // FunÃ§Ã£o para formatar telefone ((XX) XXXXX-XXXX ou (XX) X XXXX-XXXX)
+  // Função para formatar telefone ((XX) XXXXX-XXXX ou (XX) X XXXX-XXXX)
   const formatPhone = (phone: string | null): string => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
@@ -74,7 +74,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     return phone;
   };
 
-  // FunÃ§Ã£o para formatar nome (capitalizar primeira letra de cada palavra)
+  // Função para formatar nome (capitalizar primeira letra de cada palavra)
   const formatName = (name: string | null): string => {
     if (!name) return '';
     return name
@@ -87,19 +87,19 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const fullNameFromRow = (u: UserProfileData) =>
     (u.usuario_nome && u.usuario_nome.trim()) || (u.nome && u.nome.trim()) || '';
 
-  // FunÃ§Ã£o para iniciar ediÃ§Ã£o do nome
+  // Função para iniciar edição do nome
   const handleStartEditName = () => {
     setEditedName(fullNameFromRow(userData));
     setIsEditingName(true);
   };
 
-  // FunÃ§Ã£o para cancelar ediÃ§Ã£o do nome
+  // Função para cancelar edição do nome
   const handleCancelEditName = () => {
     setIsEditingName(false);
     setEditedName('');
   };
 
-  // FunÃ§Ã£o para salvar o nome
+  // Função para salvar o nome
   const handleSaveName = async () => {
     if (!isAuthenticated || !user) return;
 
@@ -144,7 +144,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     onClick={() => setActiveTab('minha-conta')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'minha-conta'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
@@ -157,46 +157,46 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     onClick={() => setActiveTab('seguranca')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'seguranca'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="material-symbols:security" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    SeguranÃ§a e login
+                    Segurança e login
                   </button>
 
                   <button
                     onClick={() => setActiveTab('historico')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'historico'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="iconamoon:history-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    HistÃ³rico de jogo
+                    Histórico de jogo
                   </button>
 
                   <button
                     onClick={() => setActiveTab('verificacao')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'verificacao'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="hugeicons:face-id" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    VerificaÃ§Ã£o KYC
+                    Verificação KYC
                   </button>
 
                   <button
                     onClick={() => setActiveTab('recesso')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'recesso'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
@@ -209,13 +209,13 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     onClick={() => setActiveTab('auto-exclusao')}
                     className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
                       activeTab === 'auto-exclusao'
-                        ? 'bg-violet-600 text-white border-2 border-violet-600'
+                        ? 'bg-brand text-white border-2 border-brand'
                         : 'text-slate-400 border-2 border-transparent'
                     }`}
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="solar:user-block-rounded-bold-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Auto-exclusÃ£o
+                    Auto-exclusão
                   </button>
                 </div>
               </div>
@@ -227,7 +227,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Dados da conta</h1>
                     </div>
 
-                    <div className="p-3 md:p-4 border-b" style={{ borderColor: '#7B3FF2' }}>
+                    <div className="p-3 md:p-4 border-b" style={{ borderColor: 'var(--brand-primary)' }}>
                       <h2 className="text-white text-base md:text-lg font-semibold mb-2">Dados pessoais</h2>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -243,7 +243,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                   type="text"
                                   value={editedName}
                                   onChange={(e) => setEditedName(e.target.value)}
-                                  className="w-full h-11 pl-10 pr-24 border border-violet-600 rounded-lg text-sm focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-all"
+                                  className="w-full h-11 pl-10 pr-24 border border-brand rounded-lg text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                                   style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                                   autoFocus
                                 />
@@ -251,10 +251,10 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                   <button
                                     onClick={handleSaveName}
                                     disabled={isSavingName}
-                                    className="p-1.5 rounded hover:bg-violet-600/20 transition-colors disabled:opacity-50"
+                                    className="p-1.5 rounded hover:bg-brand/20 transition-colors disabled:opacity-50"
                                     title="Salvar"
                                   >
-                                    <span className="iconify" data-icon="mdi:check" aria-hidden="true" style={{ fontSize: '18px', color: '#7B3FF2' }}></span>
+                                    <span className="iconify" data-icon="mdi:check" aria-hidden="true" style={{ fontSize: '18px', color: 'var(--brand-primary)' }}></span>
                                   </button>
                                   <button
                                     onClick={handleCancelEditName}
@@ -272,15 +272,15 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                   type="text"
                                   value={isLoadingUserData ? 'Carregando...' : formatName(fullNameFromRow(userData) || null)}
                                   readOnly
-                                  className="w-full h-11 pl-10 pr-10 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600"
+                                  className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                                   style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                                 />
                                 <button
                                   onClick={handleStartEditName}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-violet-600/20 transition-colors"
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-brand/20 transition-colors"
                                   title="Editar nome"
                                 >
-                                  <span className="iconify" data-icon="mdi:pencil" aria-hidden="true" style={{ fontSize: '16px', color: '#7B3FF2' }}></span>
+                                  <span className="iconify" data-icon="mdi:pencil" aria-hidden="true" style={{ fontSize: '16px', color: 'var(--brand-primary)' }}></span>
                                 </button>
                               </>
                             )}
@@ -300,7 +300,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               type="text"
                               value={isLoadingUserData ? 'Carregando...' : formatCPF(userData.cpf)}
                               readOnly
-                              className="w-full h-11 pl-10 pr-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600"
+                              className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                             />
                           </div>
@@ -308,10 +308,10 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    <div className="p-3 md:p-4 border-b" style={{ borderColor: '#7B3FF2' }}>
+                    <div className="p-3 md:p-4 border-b" style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                         <h2 className="text-white text-base md:text-lg font-semibold">Contato</h2>
-                        <button type="button" className="text-violet-400 text-sm font-semibold hover:text-violet-300 transition-colors self-start sm:self-auto">
+                        <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
                           Alterar
                         </button>
                       </div>
@@ -330,7 +330,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               type="text"
                               value={isLoadingUserData ? 'Carregando...' : formatPhone(userData.telefone)}
                               readOnly
-                              className="w-full h-11 pl-10 pr-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600"
+                              className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                             />
                           </div>
@@ -349,7 +349,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               type="text"
                               value={isLoadingUserData ? 'Carregando...' : (userData.email || '')}
                               readOnly
-                              className="w-full h-11 pl-10 pr-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600"
+                              className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                             />
                           </div>
@@ -359,8 +359,8 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                     <div className="p-3 md:p-4 pt-2">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                        <h2 className="text-white text-base md:text-lg font-semibold">EndereÃ§o</h2>
-                        <button type="button" className="text-violet-400 text-sm font-semibold hover:text-violet-300 transition-colors self-start sm:self-auto">
+                        <h2 className="text-white text-base md:text-lg font-semibold">Endereço</h2>
+                        <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
                           Alterar
                         </button>
                       </div>
@@ -371,7 +371,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           <input
                             type="text"
                             placeholder="CEP"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
@@ -381,7 +381,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           <input
                             type="text"
                             placeholder="Cidade"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
@@ -391,7 +391,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           <input
                             type="text"
                             placeholder="Estado"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
@@ -403,17 +403,17 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           <input
                             type="text"
                             placeholder="Rua"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>NÃºmero</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Número</label>
                           <input
                             type="text"
-                            placeholder="NÃºmero"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            placeholder="Número"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
@@ -423,7 +423,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           <input
                             type="text"
                             placeholder="Bairro"
-                            className="w-full h-11 px-4 border border-violet-600/40 rounded-lg text-sm focus:outline-none focus:border-violet-600 placeholder-slate-600"
+                            className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
@@ -435,7 +435,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {activeTab === 'seguranca' && (
                   <div className="space-y-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">SeguranÃ§a e login</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Segurança e login</h1>
                       {showPasswordChange && (
                         <button
                           onClick={() => {
@@ -445,7 +445,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             setShowNewPassword(false);
                             setShowConfirmPassword(false);
                           }}
-                          className="text-violet-400 text-sm font-semibold hover:text-violet-300 transition-colors self-start sm:self-auto"
+                          className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto"
                         >
                           Cancelar
                         </button>
@@ -456,14 +456,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <div className="p-3 md:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
-                            <h3 className="text-white font-semibold mb-0.5">Alterar senha de seguranÃ§a</h3>
-                            <p className="text-slate-500 text-sm">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</p>
+                            <h3 className="text-white font-semibold mb-0.5">Alterar senha de segurança</h3>
+                            <p className="text-slate-500 text-sm">••••••••••••</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => setShowPasswordChange(true)}
                             className="text-sm font-semibold hover:opacity-80 transition-colors self-start sm:self-auto flex-shrink-0"
-                            style={{ color: '#7B3FF2' }}
+                            style={{ color: 'var(--brand-primary)' }}
                           >
                             Alterar
                           </button>
@@ -471,9 +471,9 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     ) : (
                       <div className="p-3 md:p-4">
-                        <h3 className="text-white font-semibold mb-1">Alterar senha de seguranÃ§a</h3>
+                        <h3 className="text-white font-semibold mb-1">Alterar senha de segurança</h3>
                         <p className="text-slate-400 text-sm mb-4">
-                          Aqui vocÃª pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada Ã© forte e segura
+                          Aqui você pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada é forte e segura
                         </p>
 
                         <div className="space-y-3">
@@ -488,7 +488,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                 placeholder="Informe a senha atual"
                                 value={passwordData.currentPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                                className="w-full h-11 pl-10 pr-10 border border-violet-600/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-all"
+                                className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                                 style={{ backgroundColor: profileInputBg }}
                               />
                               <button
@@ -516,7 +516,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                 placeholder="Informe sua nova senha"
                                 value={passwordData.newPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                className="w-full h-11 pl-10 pr-10 border border-violet-600/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-all"
+                                className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                                 style={{ backgroundColor: profileInputBg }}
                               />
                               <button
@@ -544,7 +544,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                 placeholder="Confirme sua nova senha"
                                 value={passwordData.confirmPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                className="w-full h-11 pl-10 pr-10 border border-violet-600/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 transition-all"
+                                className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                                 style={{ backgroundColor: profileInputBg }}
                               />
                               <button
@@ -569,7 +569,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               !passwordData.newPassword ||
                               !passwordData.confirmPassword
                             }
-                            className={`w-full h-11 px-4 rounded-lg text-sm font-semibold transition-all border border-violet-600/40 ${
+                            className={`w-full h-11 px-4 rounded-lg text-sm font-semibold transition-all border border-brand/40 ${
                               !passwordData.currentPassword ||
                               !passwordData.newPassword ||
                               !passwordData.confirmPassword
@@ -584,23 +584,23 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     )}
 
-                    <div className="p-3 md:p-4 border-t" style={{ borderColor: '#7B3FF2' }}>
+                    <div className="p-3 md:p-4 border-t" style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">AutenticaÃ§Ã£o de dois fatores (2FA)</h3>
+                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">Autenticação de dois fatores (2FA)</h3>
                           <p className="text-slate-500 text-sm">Desativado</p>
                         </div>
-                        <span className="text-sm flex-shrink-0" style={{ color: '#7B3FF2' }}>Em breve</span>
+                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>Em breve</span>
                       </div>
                     </div>
 
-                    <div className="p-3 md:p-4 border-t" style={{ borderColor: '#7B3FF2' }}>
+                    <div className="p-3 md:p-4 border-t" style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <h3 className="text-white font-semibold mb-0.5">Contas Redes Sociais</h3>
                           <p className="text-slate-500 text-sm">Desativado</p>
                         </div>
-                        <span className="text-sm flex-shrink-0" style={{ color: '#7B3FF2' }}>Em breve</span>
+                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>Em breve</span>
                       </div>
                     </div>
                   </div>
@@ -609,49 +609,49 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {activeTab === 'historico' && (
                   <div className="space-y-4 md:space-y-6">
                     <div>
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">HistÃ³rico de apostas</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">Histórico de apostas</h1>
                     </div>
 
                     <div className="flex flex-wrap gap-2 mb-4 md:mb-6">
                       <button
                         onClick={() => { setSelectedPeriod('hoje'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
-                        style={{ backgroundColor: '#7B3FF2', color: '#ffffff', opacity: selectedPeriod === 'hoje' ? 1 : 0.5 }}
+                        style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'hoje' ? 1 : 0.5 }}
                       >
                         Somente hoje
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('ontem'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
-                        style={{ backgroundColor: '#7B3FF2', color: '#ffffff', opacity: selectedPeriod === 'ontem' ? 1 : 0.5 }}
+                        style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'ontem' ? 1 : 0.5 }}
                       >
                         Somente ontem
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('7dias'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
-                        style={{ backgroundColor: '#7B3FF2', color: '#ffffff', opacity: selectedPeriod === '7dias' ? 1 : 0.5 }}
+                        style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '7dias' ? 1 : 0.5 }}
                       >
-                        Ãšltimos 7 dias
+                        Últimos 7 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('30dias'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
-                        style={{ backgroundColor: '#7B3FF2', color: '#ffffff', opacity: selectedPeriod === '30dias' ? 1 : 0.5 }}
+                        style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '30dias' ? 1 : 0.5 }}
                       >
-                        Ãšltimos 30 dias
+                        Últimos 30 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('total'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
-                        style={{ backgroundColor: '#7B3FF2', color: '#ffffff', opacity: selectedPeriod === 'total' ? 1 : 0.5 }}
+                        style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'total' ? 1 : 0.5 }}
                       >
-                        PerÃ­odo total
+                        Período total
                       </button>
                     </div>
 
                     {isLoadingHistory && betHistory.length === 0 && (
-                      <LoadingScreen title="Carregando histÃ³rico..." variant="inline" className="py-8" />
+                      <LoadingScreen title="Carregando histórico..." variant="inline" className="py-8" />
                     )}
 
                     <div className="rounded-xl overflow-hidden">
@@ -664,7 +664,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Valor</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Retorno</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Status</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>c/ bÃ´nus</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>c/ bônus</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Data</th>
                             </tr>
                           </thead>
@@ -684,7 +684,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                 >
                                   <td className="px-2 py-2 md:px-4 md:py-3 align-middle">
                                     <div className={`w-5 h-5 md:w-6 md:h-6 rounded flex items-center justify-center ${
-                                      item.tipo === 'win' ? 'bg-violet-600' : 'bg-red-500'
+                                      item.tipo === 'win' ? 'bg-brand' : 'bg-red-500'
                                     }`}>
                                       {item.tipo === 'win' ? (
                                         <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -721,7 +721,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                               disabled={currentPage === 1}
                               className="w-8 h-8 rounded font-semibold text-sm flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{ backgroundColor: 'rgba(123, 63, 242, 0.2)', color: '#7B3FF2' }}
+                              style={{ backgroundColor: 'rgb(var(--brand-primary-rgb) / 0.2)', color: 'var(--brand-primary)' }}
                             >
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="15 18 9 12 15 6" />
@@ -747,9 +747,9 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                   className="w-8 h-8 rounded font-semibold text-sm flex items-center justify-center transition-all"
                                   style={{ 
                                     backgroundColor: currentPage === pageNumber 
-                                      ? 'rgba(123, 63, 242, 0.4)' 
-                                      : 'rgba(123, 63, 242, 0.2)',
-                                    color: '#7B3FF2'
+                                      ? 'rgb(var(--brand-primary-rgb) / 0.4)' 
+                                      : 'rgb(var(--brand-primary-rgb) / 0.2)',
+                                    color: 'var(--brand-primary)'
                                   }}
                                 >
                                   {pageNumber}
@@ -761,7 +761,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                               disabled={currentPage === totalPages}
                               className="w-8 h-8 rounded font-semibold text-sm flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{ backgroundColor: 'rgba(123, 63, 242, 0.2)', color: '#7B3FF2' }}
+                              style={{ backgroundColor: 'rgb(var(--brand-primary-rgb) / 0.2)', color: 'var(--brand-primary)' }}
                             >
                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="9 18 15 12 9 6" />
@@ -779,7 +779,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                 {(activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
                   <div className="p-6 md:p-8 text-center">
-                    <p className="text-slate-400 text-base md:text-lg">Em construÃ§Ã£o</p>
+                    <p className="text-slate-400 text-base md:text-lg">Em construção</p>
                   </div>
                 )}
               </div>

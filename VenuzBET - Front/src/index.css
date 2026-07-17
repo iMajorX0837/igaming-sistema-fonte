@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand-primary: #7B3FF2;
+    --brand-primary-hover: #6528D7;
+    --brand-primary-light: #9B5FF2;
+    --brand-primary-rgb: 123 63 242;
+    --brand-primary-hover-rgb: 101 40 215;
+    --brand-primary-light-rgb: 155 95 242;
+  }
+
   * {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -19,6 +28,47 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .scrollbar-thumb-brand {
+    scrollbar-color: rgb(var(--brand-primary-rgb)) rgb(30 41 59);
+  }
+
+  .scrollbar-thumb-brand::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--brand-primary-rgb));
+  }
+
+  .btn-play-brand {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary-light);
+    color: #000000;
+  }
+
+  .btn-brand-submit {
+    box-shadow:
+      0px 4px 18.4px 0px color-mix(in srgb, var(--brand-primary) 45%, transparent),
+      0px 0px 10px 0px color-mix(in srgb, var(--brand-primary) 40%, transparent),
+      0px 1px 0px 0px rgba(255, 255, 255, 0.2) inset,
+      0px -3px 0px 0px rgba(0, 0, 0, 0.15) inset,
+      0px 0px 12px 0px color-mix(in srgb, var(--brand-primary) 55%, black) inset;
+  }
+
+  .glow-brand {
+    box-shadow:
+      0 0 14px rgb(var(--brand-primary-rgb) / 0.48),
+      0 0 28px rgb(var(--brand-primary-rgb) / 0.48),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  }
+
+  .input-autofill-reset:-webkit-autofill,
+  .input-autofill-reset:-webkit-autofill:hover,
+  .input-autofill-reset:-webkit-autofill:focus,
+  .input-autofill-reset:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    -webkit-box-shadow: 0 0 0 1000px var(--input-autofill-bg, #121319) inset !important;
+    box-shadow: 0 0 0 1000px var(--input-autofill-bg, #121319) inset !important;
+    transition: background-color 99999s ease-in-out 0s;
   }
 
   .game-iframe-wrapper,

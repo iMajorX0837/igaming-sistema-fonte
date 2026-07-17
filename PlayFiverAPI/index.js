@@ -302,23 +302,26 @@ async function resolveGameCodeFromSlug(jogoSlug, providerSlug, jogoNome) {
   const providersData = await providersResponse.json();
   if (providersData.status !== 1 || !Array.isArray(providersData.data)) return null;
 
-  const slotsProviders = providersData.data.filter(
-    (prov) => prov.status === 1 && prov.wallet?.name === 'Carteira PlayFiver (Slots)'
+  const enabledProviders = providersData.data.filter(
+    (prov) =>
+      prov.status === 1 &&
+      (prov.wallet?.name === 'Carteira PlayFiver (Slots)' ||
+        prov.wallet?.name === 'Carteira Oficial (Live)')
   );
 
   let foundProvider = null;
   if (providerSlug) {
     const providerId = parseInt(providerSlug, 10);
     if (!Number.isNaN(providerId)) {
-      foundProvider = slotsProviders.find((prov) => prov.id === providerId) || null;
+      foundProvider = enabledProviders.find((prov) => prov.id === providerId) || null;
     }
     if (!foundProvider) {
       foundProvider =
-        slotsProviders.find((prov) => getProviderSlug(prov.name) === providerSlug) || null;
+        enabledProviders.find((prov) => getProviderSlug(prov.name) === providerSlug) || null;
     }
   }
 
-  const providersToSearch = foundProvider ? [foundProvider] : slotsProviders;
+  const providersToSearch = foundProvider ? [foundProvider] : enabledProviders;
   const normalizedName = jogoNome ? createSlug(jogoNome) : '';
 
   for (const prov of providersToSearch) {

@@ -2,13 +2,14 @@ import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import PagePanel from '../components/ui/PagePanel';
-import { Home, Image, Zap, Star, LayoutGrid } from 'lucide-react';
+import { Home, Image, Zap, Star, LayoutGrid, PictureInPicture2 } from 'lucide-react';
 import BannersPage from './BannersPage';
 import HomeQuickNavPage from './HomeQuickNavPage';
 import RecommendedBannersPage from './RecommendedBannersPage';
 import HomeSectionsPage from './HomeSectionsPage';
+import EntryPopupPage from './EntryPopupPage';
 
-type HomeTab = 'carrossel' | 'atalhos' | 'recomendados' | 'secoes';
+type HomeTab = 'carrossel' | 'atalhos' | 'recomendados' | 'secoes' | 'popup';
 
 const TABS: { key: HomeTab; label: string; icon: typeof Image; description: string }[] = [
   {
@@ -33,7 +34,13 @@ const TABS: { key: HomeTab; label: string; icon: typeof Image; description: stri
     key: 'secoes',
     label: 'Seções & Cor',
     icon: LayoutGrid,
-    description: 'Ordem das seções e cor de fundo da página inicial.',
+    description: 'Ordem das seções, cor de fundo, jogos (até 11) e provedores da seção Estúdios.',
+  },
+  {
+    key: 'popup',
+    label: 'Popup',
+    icon: PictureInPicture2,
+    description: 'Imagem exibida em popup ao entrar no site (uma vez por sessão).',
   },
 ];
 
@@ -66,7 +73,7 @@ export default function HomeCmsPage() {
       <PageHeader
         icon={Home}
         title="Página Inicial"
-        description="Gerencie todo o conteúdo visual da home: carrossel, atalhos, recomendados e estrutura das seções."
+        description="Gerencie todo o conteúdo visual da home: carrossel, atalhos, recomendados, popup e estrutura das seções."
       />
 
       <PagePanel padding={false} className="overflow-hidden">
@@ -99,6 +106,7 @@ export default function HomeCmsPage() {
           {activeTab === 'atalhos' && <HomeQuickNavPage embedded />}
           {activeTab === 'recomendados' && <RecommendedBannersPage embedded />}
           {activeTab === 'secoes' && <HomeSectionsPage embedded />}
+          {activeTab === 'popup' && <EntryPopupPage embedded />}
         </div>
       </PagePanel>
     </div>
