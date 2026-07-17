@@ -167,6 +167,91 @@ async function fetchPlayFiversFreeBonusList(token, secret) {
   );
 }
 
+/** Busca nome do jogo na PlayFivers — só para persistência; não bloquear webhook. */
+async function resolvePlayFiversGameName(providerCode, gameCode) {
+  const fallback = `Jogo ${gameCode}`;
+  if (!providerCode || !gameCode) return fallback;
+
+  const providersResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/providers`, {
+    headers: PLAYFIVERS_FETCH_HEADERS,
+  });
+  if (!providersResponse.ok) return fallback;
+
+  const providersData = await providersResponse.json();
+  if (providersData.status !== 1 || !providersData.data) return fallback;
+
+  const foundProvider = providersData.data.find(
+    (p) =>
+      p.code === providerCode ||
+      p.name === providerCode ||
+      p.name.toLowerCase().includes(String(providerCode).toLowerCase())
+  );
+  if (!foundProvider) return fallback;
+
+  const gamesResponse = await fetch(
+    `${PLAYFIVERS_UPSTREAM}/api/v2/games?provider=${foundProvider.id}`,
+    { headers: PLAYFIVERS_FETCH_HEADERS }
+  );
+  if (!gamesResponse.ok) return fallback;
+
+  const gamesData = await gamesResponse.json();
+  if (gamesData.status !== 1 || !gamesData.data) return fallback;
+
+  const gameCodeStr = String(gameCode).trim();
+  const gameCodeNum = parseInt(gameCode, 10);
+  const foundGame = gamesData.data.find((g) => {
+    if (String(g.game_code) === gameCodeStr || String(g.code) === gameCodeStr) return true;
+    if (g.game_code === gameCodeNum || g.code === gameCodeNum) return true;
+    if (String(g.id) === gameCodeStr || g.id === gameCodeNum) return true;
+    return false;
+  });
+
+  return foundGame?.name || fallback;
+}
+
+/** Persiste aposta no Supabase após responder à PlayFivers (evita timeout no game_callback). */
+async function persistGameTransaction({
+  usuarioId,
+  txnId,
+  bet,
+  win,
+  providerCode,
+  gameCode,
+  createdAt,
+}) {
+  let nomeJogo = `Jogo ${gameCode}`;
+  try {
+    nomeJogo = await resolvePlayFiversGameName(providerCode, gameCode);
+  } catch (error) {
+    console.warn('⚠️  Erro ao buscar nome do jogo (background):', error);
+  }
+
+  const transactionData = {
+    usuario_id: usuarioId,
+    txn_id: txnId,
+    tipo: win > 0 ? 'Ganhou' : 'Perdeu',
+    jogo: nomeJogo,
+    valor: bet,
+    retorno: win > 0 ? win : 0,
+    status: 'Finalizado',
+    com_bonus: 'Não',
+    data: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
+  };
+
+  const { data: savedTransaction, error: insertError } = await supabase
+    .from('transacoes_jogos')
+    .insert(transactionData)
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('❌ Erro ao salvar transação (background):', insertError);
+    return;
+  }
+
+  console.log('💾 Transação salva no banco:', savedTransaction?.id);
+}
+
 function createSlug(text) {
   return String(text)
     .toLowerCase()
@@ -617,7 +702,7 @@ app.post('/webhook/transaction', async (req, res) => {
       .from('transacoes_jogos')
       .select('id')
       .eq('txn_id', txnId)
-      .single();
+      .maybeSingle();
 
     if (existingTransaction) {
       console.log(`⚠️  Transação já processada: ${txnId}`);
@@ -724,137 +809,39 @@ app.post('/webhook/transaction', async (req, res) => {
       });
     }
 
-    // Buscar nome do jogo da API Play Fiver
-    let nomeJogo = `Jogo ${gameCode}`; // Nome padrão caso não encontre
-    try {
-      if (providerCode && gameCode) {
-        console.log(`🔍 Buscando nome do jogo: provider=${providerCode}, game_code=${gameCode}`);
-        
-        // Buscar todos os providers
-        const providersResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/providers`, {
-          headers: PLAYFIVERS_FETCH_HEADERS,
-        });
-        
-        if (providersResponse.ok) {
-          const providersData = await providersResponse.json();
-          if (providersData.status === 1 && providersData.data) {
-            // Encontrar o provider pelo código ou nome
-            const foundProvider = providersData.data.find(
-              p => p.code === providerCode || p.name === providerCode || p.name.toLowerCase().includes(providerCode.toLowerCase())
-            );
-            
-            if (foundProvider) {
-              console.log(`✅ Provider encontrado: ${foundProvider.name} (ID: ${foundProvider.id})`);
-              
-              // Buscar jogos do provider
-              const gamesResponse = await fetch(
-                `${PLAYFIVERS_UPSTREAM}/api/v2/games?provider=${foundProvider.id}`,
-                { headers: PLAYFIVERS_FETCH_HEADERS }
-              );
-              
-              if (gamesResponse.ok) {
-                const gamesData = await gamesResponse.json();
-                if (gamesData.status === 1 && gamesData.data) {
-                  console.log(`📋 Total de jogos encontrados: ${gamesData.data.length}`);
-                  
-                  // Tentar encontrar o jogo pelo game_code (campo usado na API)
-                  // O game_code pode vir como número ou string do webhook
-                  const gameCodeStr = String(gameCode).trim();
-                  const gameCodeNum = parseInt(gameCode, 10);
-                  
-                  // Tentar múltiplas formas de comparação
-                  let foundGame = gamesData.data.find(
-                    g => {
-                      // Comparar como string
-                      if (String(g.game_code) === gameCodeStr || String(g.code) === gameCodeStr) return true;
-                      // Comparar como número
-                      if (g.game_code === gameCodeNum || g.code === gameCodeNum) return true;
-                      // Comparar ID
-                      if (String(g.id) === gameCodeStr || g.id === gameCodeNum) return true;
-                      return false;
-                    }
-                  );
-                  
-                  if (foundGame) {
-                    nomeJogo = foundGame.name || nomeJogo;
-                    console.log(`✅ Nome do jogo encontrado: ${nomeJogo} (código: ${gameCode})`);
-                  } else {
-                    // Log para debug
-                    console.warn(`⚠️  Jogo não encontrado com código: ${gameCode} (tipo: ${typeof gameCode})`);
-                    const sampleCodes = gamesData.data.slice(0, 5).map(g => ({
-                      game_code: g.game_code,
-                      code: g.code,
-                      name: g.name
-                    }));
-                    console.log(`📋 Exemplos de códigos disponíveis:`, JSON.stringify(sampleCodes, null, 2));
-                  }
-                }
-              } else {
-                console.warn(`⚠️  Erro ao buscar jogos: ${gamesResponse.status}`);
-              }
-            } else {
-              console.warn(`⚠️  Provider não encontrado: ${providerCode}`);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️  Erro ao buscar nome do jogo:', error);
-      // Continua com o nome padrão
-    }
-
-    // Determinar tipo: Ganhou ou Perdeu
-    const tipo = win > 0 ? 'Ganhou' : 'Perdeu';
-    
-    // Salvar transação na tabela transacoes_jogos (formato simplificado)
-    const transactionData = {
-      usuario_id: usuario.id,
-      txn_id: txnId, // Para evitar duplicatas
-      tipo: tipo,
-      jogo: nomeJogo,
-      valor: bet,
-      retorno: win > 0 ? win : 0,
-      status: 'Finalizado',
-      com_bonus: 'Não',
-      data: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString()
-    };
-
-    const { data: savedTransaction, error: insertError } = await supabase
-      .from('transacoes_jogos')
-      .insert(transactionData)
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('❌ Erro ao salvar transação:', insertError);
-      // Não retornar erro aqui, pois o saldo já foi atualizado
-      // Apenas logar o erro
-    } else {
-      console.log('💾 Transação salva no banco:', savedTransaction?.id);
-    }
-
     console.log('✅ Transação processada:', {
       txn_id: txnId,
       usuario: user_code,
       tipo: type,
-      bet: bet,
-      win: win,
+      bet,
+      win,
       saldo_anterior: userBeforeBalance,
-      saldo_novo: userAfterBalance
+      saldo_novo: userAfterBalance,
     });
 
-    // Retornar sucesso no formato esperado pela Play Fiver
+    // PlayFivers exige resposta rápida no game_callback — responder antes de I/O lento
     res.status(200).json({
       msg: '',
-      balance: userAfterBalance
+      balance: userAfterBalance,
+    });
+
+    void persistGameTransaction({
+      usuarioId: usuario.id,
+      txnId,
+      bet,
+      win,
+      providerCode,
+      gameCode,
+      createdAt,
+    }).catch((error) => {
+      console.error('❌ Erro ao persistir transação (background):', error);
     });
 
   } catch (error) {
     console.error('❌ Erro ao processar webhook:', error);
     res.status(500).json({
-      success: false,
-      error: 'Erro interno do servidor',
-      message: error.message
+      msg: 'Erro interno do servidor',
+      balance: 0
     });
   }
 });
