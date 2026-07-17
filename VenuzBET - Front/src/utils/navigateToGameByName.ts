@@ -1,6 +1,7 @@
 import type { NavigateFunction } from 'react-router-dom';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
 import {
+  AVIATOR_GAME_IMAGE,
   findProprietaryGameByName,
   PROPRIETARY_PROVIDER,
   PROPRIETARY_PROVIDER_ID,
@@ -46,7 +47,7 @@ const gameMapping: { [key: string]: { provider: string; image: string } } = {
   Mines: { provider: 'Spribe', image: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/mines.svg' },
   'Fortune Dragon': { provider: 'Pgsoft', image: 'https://imagensfivers.com/Games/Pgsoft/1695365.webp' },
   'Fortune Tiger': { provider: 'Pgsoft', image: 'https://imagensfivers.com/Games/Pgsoft/126.webp' },
-  Aviator: { provider: 'Spribe', image: 'https://imagensfivers.com/Games/Spribe/Aviator.webp' },
+  Aviator: { provider: 'Spribe', image: AVIATOR_GAME_IMAGE },
 };
 
 interface ApiGame {

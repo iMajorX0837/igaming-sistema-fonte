@@ -1,12 +1,15 @@
 /** Jogos hospedados na VenuzBET (fora da PlayFivers). */
+import { SPRIBE_PROVIDER_LOGO } from './providerLogos';
+
 export const PROPRIETARY_PROVIDER_ID = 900001;
+export const AVIATOR_GAME_IMAGE = '/assets/games/aviator.gif';
 
 export const PROPRIETARY_PROVIDER = {
   id: PROPRIETARY_PROVIDER_ID,
-  name: 'Propria',
-  slug: 'propria',
-  image_url: '',
-  integracao: 'Carteira VenuzBET (Própria)',
+  name: 'Spribe',
+  slug: 'spribe',
+  image_url: SPRIBE_PROVIDER_LOGO,
+  integracao: 'Carteira VenuzBET (Spribe)',
   category: 'crash' as const,
 };
 
@@ -21,7 +24,7 @@ export const PROPRIETARY_GAMES: ProprietaryGame[] = [
   {
     game_code: 'aviator',
     nome: 'Aviator',
-    image_url: 'https://imagensfivers.com/Games/Spribe/Aviator.webp',
+    image_url: AVIATOR_GAME_IMAGE,
     api_status: true,
   },
 ];

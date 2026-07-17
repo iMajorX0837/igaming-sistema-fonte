@@ -23,10 +23,18 @@ const PROVIDER_SLUG_ALIASES: Record<string, string> = {
   'pragmatic-play': 'pragmatic',
   'pg-soft': 'pgsoft',
   'pragmatic-live': 'pragmaticlive',
+  propria: 'spribe',
+  'própria': 'spribe',
 };
 
 export const normalizeProviderSlug = (slug: string): string =>
   PROVIDER_SLUG_ALIASES[slug] || slug;
+
+const normalizeProviderName = (providerName: string): string => {
+  const trimmed = providerName.trim();
+  if (trimmed === 'Propria' || trimmed === 'Própria') return 'Spribe';
+  return trimmed;
+};
 
 const getProviderSlug = (providerName: string): string => {
   const providerMap: Record<string, string> = {
@@ -41,21 +49,24 @@ const getProviderSlug = (providerName: string): string => {
     Playson: 'playson',
     Habanero: 'habanero',
     Spribe: 'spribe',
-    Propria: 'propria',
-    Própria: 'propria',
+    Propria: 'spribe',
+    Própria: 'spribe',
     Evoplay: 'evoplay',
     BGaming: 'bgaming',
     Ezugi: 'ezugi',
     'C Games': 'cgames',
   };
 
-  const trimmed = providerName.trim();
+  const normalizedName = normalizeProviderName(providerName);
+  const trimmed = normalizedName.trim();
   if (providerMap[trimmed]) return providerMap[trimmed];
+  if (providerMap[providerName.trim()]) return providerMap[providerName.trim()];
 
   const lower = trimmed.toLowerCase();
   if (lower.includes('pragmatic') && lower.includes('live')) return 'pragmaticlive';
   if (lower.includes('pragmatic')) return 'pragmatic';
   if (lower.includes('pg soft') || lower.includes('pgsoft')) return 'pgsoft';
+  if (lower.includes('propria') || lower.includes('própria')) return 'spribe';
 
   return createSlug(trimmed);
 };
@@ -132,7 +143,7 @@ export async function resolveGameBySlug(
     if (foundGame) {
       return {
         name: foundGame.name,
-        provider: foundGame.provider.name,
+        provider: normalizeProviderName(foundGame.provider.name),
         image: foundGame.image_url,
         game_code: foundGame.game_code,
         provider_slug: getProviderSlug(foundGame.provider.name),
@@ -210,7 +221,7 @@ export async function resolveFreeBonusGameBySlug(
         if (xVariant) {
           return {
             name: xVariant.name,
-            provider: xVariant.provider.name,
+            provider: normalizeProviderName(xVariant.provider.name),
             image: xVariant.image_url,
             game_code: xVariant.game_code,
             provider_slug: getProviderSlug(xVariant.provider.name),
@@ -221,7 +232,7 @@ export async function resolveFreeBonusGameBySlug(
 
       return {
         name: foundGame.name,
-        provider: foundGame.provider.name,
+        provider: normalizeProviderName(foundGame.provider.name),
         image: foundGame.image_url,
         game_code: foundGame.game_code,
         provider_slug: getProviderSlug(foundGame.provider.name),
@@ -254,7 +265,7 @@ export async function resolveGameByGameCode(gameCode: string): Promise<ResolvedG
     if (foundGame) {
       return {
         name: foundGame.name,
-        provider: foundGame.provider.name,
+        provider: normalizeProviderName(foundGame.provider.name),
         image: foundGame.image_url,
         game_code: foundGame.game_code,
         provider_slug: getProviderSlug(foundGame.provider.name),

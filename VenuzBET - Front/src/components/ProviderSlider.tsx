@@ -83,13 +83,9 @@ export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/pr
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="text-3xl">
-          </div>
-          <h4 className="text-white font-bold text-xl tracking-tight">{title}</h4>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <h4 className="text-white font-bold text-xl tracking-tight">{title}</h4>
+        <div className="flex items-center gap-2 flex-shrink-0">
           <a
             href={viewAllLink}
             className="px-4 h-9 rounded-lg text-sm font-semibold flex items-center transition-all duration-200 text-slate-300 hover:text-slate-100"
@@ -130,7 +126,7 @@ export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/pr
       <div className="relative overflow-hidden rounded-xl">
         <div
           ref={scrollContainerRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide pb-2"
+          className="flex gap-4 overflow-x-auto scrollbar-hide"
         >
           {providers.map((provider) => (
             <a

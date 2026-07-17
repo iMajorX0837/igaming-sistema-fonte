@@ -23,14 +23,7 @@ interface SiteConfigContextValue extends SiteTheme {
 const SiteConfigContext = createContext<SiteConfigContextValue | null>(null);
 
 export function SiteConfigProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<SiteTheme>(() => {
-    const initial = getInitialSiteTheme();
-    hydrateDocumentTheme(initial);
-    if (initial.brand.nome_bet || initial.brand.site_titulo) {
-      applyBrandToDocument(initial.brand);
-    }
-    return initial;
-  });
+  const [theme, setTheme] = useState<SiteTheme>(() => getInitialSiteTheme());
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -38,7 +31,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('site_config')
         .select(
-          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo',
+          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo, site_dominio',
         )
         .eq('id', 1)
         .maybeSingle();
@@ -64,6 +57,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('venuz-site-theme-v2');
       localStorage.removeItem('venuz-site-theme-v3');
       localStorage.removeItem('venuz-site-theme-v4');
+      localStorage.removeItem('venuz-site-theme-v5');
     } catch {
       // ignore
     }
@@ -127,7 +121,7 @@ export function useAuthModalsConfig() {
 
 export function useSiteBrand() {
   const { brand, loading, refresh } = useSiteConfigContext();
-  return { nomeBet: brand.nome_bet, siteTitulo: brand.site_titulo, loading, refresh };
+  return { nomeBet: brand.nome_bet, siteTitulo: brand.site_titulo, siteDominio: brand.site_dominio, loading, refresh };
 }
 
 export type { HeaderConfig, FooterConfig, HomeConfig, SidebarConfig, AuthModalsConfig, BrandConfig };

@@ -2,6 +2,7 @@ import {
   fetchWithRateLimitRetry,
   playFiversRequestQueue,
 } from './playfiversRequestQueue';
+import { resolveProviderImageUrl } from './providerLogos';
 
 
 
@@ -111,63 +112,74 @@ export function createSlug(text: string): string {
 
 
 
+export function normalizeProviderName(providerName: string): string {
+  const trimmed = providerName.trim();
+  if (trimmed === 'Propria' || trimmed === 'Própria') return 'Spribe';
+  return trimmed;
+}
+
+function normalizeProvidersResponse(data: ApiProvidersResponse): ApiProvidersResponse {
+  if (!data.data?.length) return data;
+  return {
+    ...data,
+    data: data.data.map((provider) => {
+      const name = normalizeProviderName(provider.name);
+      return {
+        ...provider,
+        name,
+        image_url: resolveProviderImageUrl(name, provider.image_url),
+      };
+    }),
+  };
+}
+
+function normalizeGamesResponse(data: ApiGamesResponse): ApiGamesResponse {
+  if (!data.data?.length) return data;
+  return {
+    ...data,
+    data: data.data.map((game) => ({
+      ...game,
+      provider: {
+        ...game.provider,
+        name: normalizeProviderName(game.provider.name),
+      },
+    })),
+  };
+}
+
 export function getProviderSlug(providerName: string): string {
-
   const providerMap: Record<string, string> = {
-
     'PG Soft': 'pgsoft',
-
     Pgsoft: 'pgsoft',
-
     'Pragmatic Play': 'pragmatic',
-
     Pragmatic: 'pragmatic',
-
     'Pragmatic Live': 'pragmaticlive',
-
     NetEnt: 'netent',
-
     'Evolution Gaming': 'evolution',
-
     'Red Tiger': 'redtiger',
-
     Playson: 'playson',
-
     Habanero: 'habanero',
-
     Spribe: 'spribe',
-
+    Propria: 'spribe',
+    Própria: 'spribe',
     Evoplay: 'evoplay',
-
     BGaming: 'bgaming',
-
     Ezugi: 'ezugi',
-
     'C Games': 'cgames',
-    Propria: 'propria',
-    Própria: 'propria',
   };
 
-
-
-  const trimmed = providerName.trim();
-
+  const normalizedName = normalizeProviderName(providerName);
+  const trimmed = normalizedName.trim();
   if (providerMap[trimmed]) return providerMap[trimmed];
-
-
+  if (providerMap[providerName.trim()]) return providerMap[providerName.trim()];
 
   const lower = trimmed.toLowerCase();
-
   if (lower.includes('pragmatic') && lower.includes('live')) return 'pragmaticlive';
-
   if (lower.includes('pragmatic')) return 'pragmatic';
-
   if (lower.includes('pg soft') || lower.includes('pgsoft')) return 'pgsoft';
-
-
+  if (lower.includes('propria') || lower.includes('própria')) return 'spribe';
 
   return createSlug(trimmed);
-
 }
 
 
@@ -204,7 +216,7 @@ async function fetchProvidersFromNetwork(): Promise<ApiProvidersResponse> {
 
 
 
-  return res.json() as Promise<ApiProvidersResponse>;
+  return normalizeProvidersResponse(await res.json() as ApiProvidersResponse);
 
 }
 
@@ -242,7 +254,7 @@ async function fetchGamesFromNetwork(providerId: number): Promise<ApiGamesRespon
 
 
 
-  return res.json() as Promise<ApiGamesResponse>;
+  return normalizeGamesResponse(await res.json() as ApiGamesResponse);
 
 }
 

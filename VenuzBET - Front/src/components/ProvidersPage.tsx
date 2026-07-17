@@ -7,6 +7,16 @@ import AppPageScaffold from './AppPageScaffold';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { appPageContainerClass } from '../constants/homeLayout';
+import {
+  PROPRIETARY_GAMES,
+  PROPRIETARY_PROVIDER,
+  PROPRIETARY_PROVIDER_ID,
+} from '../lib/proprietaryCatalog';
+import {
+  ensurePlatformGameSettingsLoaded,
+  isPlatformGameEnabled,
+  isPlatformProviderEnabled,
+} from '../lib/platformGames';
 
 interface ApiProvider {
   id: number;
@@ -116,7 +126,26 @@ export default function ProvidersPage() {
           ...provider,
           games: counts[provider.apiId] || 0,
         }));
-        
+
+        const settings = await ensurePlatformGameSettingsLoaded();
+        const proprietaryEnabled = isPlatformProviderEnabled(PROPRIETARY_PROVIDER_ID, settings);
+        const proprietaryGamesCount = PROPRIETARY_GAMES.filter((game) =>
+          isPlatformGameEnabled(PROPRIETARY_PROVIDER_ID, game.game_code, settings)
+        ).length;
+        const hasApiSpribe = providersWithCounts.some(
+          (provider) => getProviderSlug(provider.name) === PROPRIETARY_PROVIDER.slug
+        );
+
+        if (proprietaryEnabled && !hasApiSpribe) {
+          providersWithCounts.unshift({
+            id: PROPRIETARY_PROVIDER_ID.toString(),
+            name: PROPRIETARY_PROVIDER.name,
+            games: proprietaryGamesCount,
+            image: PROPRIETARY_PROVIDER.image_url,
+            apiId: PROPRIETARY_PROVIDER_ID,
+          });
+        }
+
         setProviders(providersWithCounts);
       } else {
         setProviders([]);

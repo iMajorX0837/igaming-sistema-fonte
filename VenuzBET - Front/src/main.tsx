@@ -4,27 +4,31 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { SiteConfigProvider } from './contexts/SiteConfigContext.tsx';
-import { getInitialSiteTheme, hydrateDocumentTheme } from './lib/siteConfigCache';
+import { getInitialSiteTheme, hydrateDocumentTheme, buildSiteThemeFromSiteConfig, persistSiteTheme } from './lib/siteConfigCache';
 import { applyBrandToDocument } from './lib/siteBrand';
 import { supabase } from './lib/supabase';
 import './index.css';
 
-hydrateDocumentTheme(getInitialSiteTheme());
+const initialTheme = getInitialSiteTheme();
+hydrateDocumentTheme(initialTheme);
+applyBrandToDocument(initialTheme.brand);
 
 void (async () => {
   try {
     const { data, error } = await supabase
       .from('site_config')
-      .select('nome_bet, site_titulo')
+      .select(
+        'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo, site_dominio',
+      )
       .eq('id', 1)
       .maybeSingle();
 
     if (error || !data) return;
 
-    applyBrandToDocument({
-      nome_bet: String(data.nome_bet ?? ''),
-      site_titulo: String(data.site_titulo ?? ''),
-    });
+    const theme = buildSiteThemeFromSiteConfig(data as Record<string, unknown>);
+    persistSiteTheme(theme);
+    hydrateDocumentTheme(theme);
+    applyBrandToDocument(theme.brand);
   } catch {
     // ignore — SiteConfigProvider refaz o fetch completo
   }

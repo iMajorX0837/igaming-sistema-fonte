@@ -8,6 +8,16 @@ import SearchInput from './SearchInput';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
 import { normalizeProviderSlug } from '../utils/resolveGameBySlug';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import {
+  PROPRIETARY_GAMES,
+  PROPRIETARY_PROVIDER,
+  PROPRIETARY_PROVIDER_ID,
+} from '../lib/proprietaryCatalog';
+import {
+  ensurePlatformGameSettingsLoaded,
+  isPlatformGameEnabled,
+  isPlatformProviderEnabled,
+} from '../lib/platformGames';
 
 interface ApiGame {
   name: string;
@@ -98,6 +108,34 @@ export default function ProviderGamesPage() {
     setError(null);
 
     try {
+      if (normalizedProviderSlug === PROPRIETARY_PROVIDER.slug) {
+        const settings = await ensurePlatformGameSettingsLoaded();
+
+        if (!isPlatformProviderEnabled(PROPRIETARY_PROVIDER_ID, settings)) {
+          throw new Error('Provedor não encontrado');
+        }
+
+        setProvider({
+          id: PROPRIETARY_PROVIDER_ID,
+          name: PROPRIETARY_PROVIDER.name,
+          image_url: PROPRIETARY_PROVIDER.image_url,
+          wallet: { name: 'VenuzBET' },
+          status: 1,
+        });
+
+        setGames(
+          PROPRIETARY_GAMES.filter((game) =>
+            isPlatformGameEnabled(PROPRIETARY_PROVIDER_ID, game.game_code, settings)
+          ).map((game) => ({
+            name: game.nome,
+            provider: PROPRIETARY_PROVIDER.name,
+            image: game.image_url,
+            game_code: game.game_code,
+          }))
+        );
+        return;
+      }
+
       const providersData: ApiProvidersResponse = await fetchProvidersCached();
 
       if (providersData.status !== 1 || !providersData.data) {

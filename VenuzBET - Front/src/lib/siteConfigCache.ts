@@ -1,4 +1,4 @@
-import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, normalizeNomeBet, normalizeSiteTitulo } from './siteBrand';
+import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio } from './siteBrand';
 
 export interface HeaderConfig {
   fundo: string;
@@ -27,6 +27,7 @@ export interface AuthModalsConfig {
 export interface BrandConfig {
   nome_bet: string;
   site_titulo: string;
+  site_dominio: string;
 }
 
 export interface SiteTheme {
@@ -68,6 +69,7 @@ export const DEFAULT_AUTH_MODALS_CONFIG: AuthModalsConfig = {
 export const DEFAULT_BRAND_CONFIG: BrandConfig = {
   nome_bet: DEFAULT_NOME_BET,
   site_titulo: DEFAULT_SITE_TITULO,
+  site_dominio: DEFAULT_SITE_DOMINIO,
 };
 
 export const DEFAULT_SITE_THEME: SiteTheme = {
@@ -79,7 +81,7 @@ export const DEFAULT_SITE_THEME: SiteTheme = {
   brand: DEFAULT_BRAND_CONFIG,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v5';
+const STORAGE_KEY = 'venuz-site-theme-v6';
 
 export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
@@ -133,10 +135,12 @@ function normalizeBrandFromCache(brand: Partial<BrandConfig> | undefined): Brand
   if (!brand) return null;
   const nomeBet = String(brand.nome_bet ?? '').trim();
   const siteTitulo = String(brand.site_titulo ?? '').trim();
-  if (!nomeBet && !siteTitulo) return null;
+  const siteDominio = String(brand.site_dominio ?? '').trim();
+  if (!nomeBet && !siteTitulo && !siteDominio) return null;
   return {
     nome_bet: normalizeNomeBet(nomeBet),
     site_titulo: normalizeSiteTitulo(siteTitulo, nomeBet),
+    site_dominio: normalizeSiteDominio(siteDominio),
   };
 }
 
@@ -146,13 +150,11 @@ function normalizeBrand(row: Record<string, unknown> | null | undefined): BrandC
   return {
     nome_bet: nomeBet,
     site_titulo: normalizeSiteTitulo(row.site_titulo, nomeBet),
+    site_dominio: normalizeSiteDominio(row.site_dominio),
   };
 }
 
-const EMPTY_BRAND_CONFIG: BrandConfig = {
-  nome_bet: '',
-  site_titulo: '',
-};
+const EMPTY_BRAND_CONFIG: BrandConfig = DEFAULT_BRAND_CONFIG;
 
 export function getInitialSiteTheme(): SiteTheme {
   const cached = readCache();
@@ -163,15 +165,14 @@ export function getInitialSiteTheme(): SiteTheme {
     home: { ...DEFAULT_HOME_CONFIG, ...cached?.home },
     sidebar: { ...DEFAULT_SIDEBAR_CONFIG, ...cached?.sidebar },
     authModals: { ...DEFAULT_AUTH_MODALS_CONFIG, ...cached?.authModals },
-    brand: cachedBrand ?? EMPTY_BRAND_CONFIG,
+    brand: cachedBrand ?? DEFAULT_BRAND_CONFIG,
   };
 }
 
 export function persistSiteTheme(theme: SiteTheme) {
   if (typeof window === 'undefined') return;
   try {
-    const { brand: _brand, ...themeWithoutBrand } = theme;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(themeWithoutBrand));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
   } catch {
     // ignore quota / private mode
   }
@@ -202,7 +203,11 @@ export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null
       login_imagem_url: row.login_modal_imagem_url,
       register_imagem_url: row.register_modal_imagem_url,
     }),
-    brand: normalizeBrand({ nome_bet: row.nome_bet, site_titulo: row.site_titulo }),
+    brand: normalizeBrand({
+      nome_bet: row.nome_bet,
+      site_titulo: row.site_titulo,
+      site_dominio: row.site_dominio,
+    }),
   };
 }
 

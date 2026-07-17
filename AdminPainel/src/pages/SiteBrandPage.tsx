@@ -5,19 +5,29 @@ import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
 import Button from '../components/ui/Button';
-import { BadgeCheck, Globe, Image as ImageIcon, Type } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Globe, Image as ImageIcon, Link2, Type } from 'lucide-react';
 
 interface SiteBrandForm {
   logo_url: string;
   nome_bet: string;
   site_titulo: string;
+  site_dominio: string;
 }
 
 const defaultForm: SiteBrandForm = {
   logo_url: '/assets/logo.png',
   nome_bet: 'RoyalBet',
   site_titulo: 'RoyalBet | Apostas Online com Saques Rápidos',
+  site_dominio: 'royall.bet',
 };
+
+function normalizeSiteDominioInput(value: string): string {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+}
+
+function isValidSiteDominio(value: string): boolean {
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(value);
+}
 
 export default function SiteBrandPage() {
   const { showToast } = useToast();
@@ -31,7 +41,7 @@ export default function SiteBrandPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('site_config')
-        .select('header_logo_url, nome_bet, site_titulo, header_fundo')
+        .select('header_logo_url, nome_bet, site_titulo, site_dominio, header_fundo')
         .eq('id', 1)
         .maybeSingle();
 
@@ -46,6 +56,9 @@ export default function SiteBrandPage() {
           nome_bet: String(data.nome_bet || defaultForm.nome_bet).trim() || defaultForm.nome_bet,
           site_titulo:
             String(data.site_titulo || defaultForm.site_titulo).trim() || defaultForm.site_titulo,
+          site_dominio:
+            normalizeSiteDominioInput(String(data.site_dominio || defaultForm.site_dominio)) ||
+            defaultForm.site_dominio,
         });
         setHeaderFundo(String(data.header_fundo || '#121319'));
       }
@@ -76,6 +89,16 @@ export default function SiteBrandPage() {
       return;
     }
 
+    const siteDominio = normalizeSiteDominioInput(form.site_dominio);
+    if (!siteDominio) {
+      showToast('Informe o domínio do site.', 'error');
+      return;
+    }
+    if (!isValidSiteDominio(siteDominio)) {
+      showToast('Informe um domínio válido (ex.: royall.bet).', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase.from('site_config').upsert({
@@ -83,6 +106,7 @@ export default function SiteBrandPage() {
         header_logo_url: form.logo_url.trim(),
         nome_bet: nomeBet,
         site_titulo: siteTitulo,
+        site_dominio: siteDominio,
         updated_at: new Date().toISOString(),
       });
 
@@ -104,6 +128,7 @@ export default function SiteBrandPage() {
   }
 
   const originaisLabel = `${form.nome_bet.trim() || 'RoyalBet'} Originais`;
+  const dominioPreview = normalizeSiteDominioInput(form.site_dominio) || 'royall.bet';
 
   return (
     <div className="max-w-4xl">
@@ -143,6 +168,42 @@ export default function SiteBrandPage() {
                 placeholder="RoyalBet | Apostas Online com Saques Rápidos"
                 maxLength={120}
               />
+            </div>
+          </PagePanel>
+
+          <PagePanel>
+            <div className="flex items-center gap-2 mb-4">
+              <Link2 className="w-4 h-4 text-admin-muted" />
+              <h3 className="text-white font-semibold">Domínio do site</h3>
+            </div>
+
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-200 text-sm font-medium">Não altere sem orientação</p>
+                <p className="text-amber-100/80 text-xs mt-1 leading-relaxed">
+                  Este domínio é usado nos links de indicação do site. Mudanças incorretas quebram
+                  convites, campanhas e rastreamento de afiliados.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Field
+                label="Domínio principal"
+                hint="Informe apenas o domínio, sem https://. Ex.: royall.bet"
+                value={form.site_dominio}
+                onChange={(v) => setForm({ ...form, site_dominio: v })}
+                placeholder="royall.bet"
+                maxLength={120}
+              />
+
+              <div className="rounded-lg border border-admin-border bg-admin-panel px-4 py-3">
+                <p className="text-gray-500 text-xs mb-1">Exemplo de link de indicação</p>
+                <p className="text-admin-accent text-sm font-mono break-all">
+                  https://{dominioPreview}?c=CODIGO_DO_USUARIO
+                </p>
+              </div>
             </div>
           </PagePanel>
 
@@ -223,6 +284,9 @@ export default function SiteBrandPage() {
               <div>
                 <p className="text-gray-500 text-[11px] uppercase tracking-wide mb-2">Onde o nome aparece</p>
                 <ul className="space-y-2 text-sm text-gray-400">
+                  <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
+                    Link de indicação: <span className="text-white">https://{dominioPreview}?c=...</span>
+                  </li>
                   <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
                     Páginas legais: <span className="text-white">{form.nome_bet || '—'}</span>
                   </li>

@@ -1,4 +1,5 @@
 import { PLAYFIVERS_API_V2 } from '../config/playfivers';
+import { resolveProviderImageUrl } from '../lib/providerLogos';
 import { playFiversRequestQueue } from './playfiversRequestQueue';
 import {
   ensurePlatformGameSettingsLoaded,
@@ -8,7 +9,7 @@ import {
 
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
-const PROVIDERS_STORAGE_KEY = 'venuz-playfivers-providers-v1';
+const PROVIDERS_STORAGE_KEY = 'venuz-playfivers-providers-v2';
 const GAMES_STORAGE_KEY = 'venuz-playfivers-games-v1';
 
 /** Provedores mudam pouco — TTL maior. */
@@ -58,6 +59,41 @@ export const PLAYFIVERS_SLOTS_WALLET = 'Carteira PlayFiver (Slots)';
 
 export function isPlayFiverSlotsProvider(prov: ApiProvider): boolean {
   return prov.status === 1 && prov.wallet.name === PLAYFIVERS_SLOTS_WALLET;
+}
+
+function normalizeProviderName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed === 'Propria' || trimmed === 'Própria') return 'Spribe';
+  return trimmed;
+}
+
+function normalizeProvidersResponse(data: ApiProvidersResponse): ApiProvidersResponse {
+  if (!data.data?.length) return data;
+  return {
+    ...data,
+    data: data.data.map((provider) => {
+      const name = normalizeProviderName(provider.name);
+      return {
+        ...provider,
+        name,
+        image_url: resolveProviderImageUrl(name, provider.image_url),
+      };
+    }),
+  };
+}
+
+function normalizeGamesResponse(data: ApiGamesResponse): ApiGamesResponse {
+  if (!data.data?.length) return data;
+  return {
+    ...data,
+    data: data.data.map((game) => ({
+      ...game,
+      provider: {
+        ...game.provider,
+        name: normalizeProviderName(game.provider.name),
+      },
+    })),
+  };
 }
 
 function isFresh(savedAt: number, ttlMs: number): boolean {
@@ -136,7 +172,7 @@ async function fetchProvidersFromNetwork(): Promise<ApiProvidersResponse> {
 
     if (!res.ok) throw new Error(`providers ${res.status}`);
 
-    const data = (await res.json()) as ApiProvidersResponse;
+    const data = normalizeProvidersResponse((await res.json()) as ApiProvidersResponse);
     providersCache = data;
     writeProvidersToStorage(data);
     return data;
@@ -224,7 +260,7 @@ async function fetchGamesFromNetwork(providerId: number): Promise<ApiGamesRespon
 
     if (!res.ok) throw new Error(`games ${res.status}`);
 
-    const data = (await res.json()) as ApiGamesResponse;
+    const data = normalizeGamesResponse((await res.json()) as ApiGamesResponse);
     gamesCache.set(providerId, data);
     writeGamesToStorage(providerId, data);
     return data;

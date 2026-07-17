@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { AVIATOR_GAME_IMAGE } from '../lib/proprietaryCatalog';
 
 export type HomeQuickNavLinkTipo = 'href' | 'game';
 
@@ -78,7 +79,7 @@ export const DEFAULT_HOME_QUICK_NAV: HomeQuickNavItem[] = [
   {
     id: 'default-7',
     titulo: 'Aviator',
-    imagem_url: 'https://imagensfivers.com/Games/Spribe/Aviator.webp',
+    imagem_url: AVIATOR_GAME_IMAGE,
     link_tipo: 'game',
     href: null,
     game_name: 'Aviator',

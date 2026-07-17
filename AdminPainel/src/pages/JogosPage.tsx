@@ -14,6 +14,7 @@ import {
   fetchProviders,
   getProviderSlug,
   isPlayFiverSlotsProvider,
+  normalizeProviderName,
 } from '../lib/playfiversApi';
 import { getCategoryFromProvider, loadPlatformDbOverrides } from '../lib/platformCatalog';
 import {
@@ -76,7 +77,7 @@ export default function JogosPage() {
         const apiProviders: ProviderGroup[] = slotsProviders.map((prov: ApiProvider) => ({
           id: prov.id,
           slug: getProviderSlug(prov.name),
-          nome: prov.name,
+          nome: normalizeProviderName(prov.name),
           image_url: prov.image_url,
           api_status: prov.status,
           integracao: prov.wallet.name,
@@ -577,7 +578,7 @@ function ProviderCard({
               <h3 className="text-white font-semibold">{provider.nome}</h3>
               {provider.id === PROPRIETARY_PROVIDER_ID && (
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-admin-panel-3 text-admin-accent">
-                  Própria
+                  VenuzBET
                 </span>
               )}
               <span

@@ -1,11 +1,13 @@
 export const DEFAULT_NOME_BET = 'RoyalBet';
 export const DEFAULT_SITE_TITULO = `${DEFAULT_NOME_BET} | Apostas Online com Saques Rápidos`;
+export const DEFAULT_SITE_DOMINIO = 'royall.bet';
 
 export const PROPRIETARY_PROVIDER_SLUGS = new Set(['venuzbet', 'venuz']);
 
 export interface SiteBrandDocument {
   nome_bet: string;
   site_titulo: string;
+  site_dominio?: string;
 }
 
 export function normalizeNomeBet(value: unknown): string {
@@ -18,6 +20,17 @@ export function normalizeSiteTitulo(value: unknown, nomeBet: string = DEFAULT_NO
   if (trimmed) return trimmed;
   const brand = normalizeNomeBet(nomeBet);
   return `${brand} | Apostas Online com Saques Rápidos`;
+}
+
+export function normalizeSiteDominio(value: unknown): string {
+  let trimmed = String(value ?? '').trim().toLowerCase();
+  trimmed = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  return trimmed || DEFAULT_SITE_DOMINIO;
+}
+
+export function buildReferralLink(dominio: string, referralCode?: string | null): string {
+  const base = `https://${normalizeSiteDominio(dominio)}`;
+  return referralCode ? `${base}?c=${referralCode}` : `${base}?c=`;
 }
 
 export function getOriginaisLabel(nomeBet: string = DEFAULT_NOME_BET): string {

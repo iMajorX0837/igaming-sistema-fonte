@@ -9,7 +9,13 @@ import PagePanel from '../components/ui/PagePanel';
 import Pagination from '../components/jogos/Pagination';
 import { Trophy, Hash, TrendingUp } from 'lucide-react';
 
-const APOSTAS_LIST_CACHE = 'admin:apostas:list:';
+const APOSTAS_LIST_CACHE = 'admin:apostas:list:v3:';
+
+interface ApostaUsuario {
+  nome: string;
+  email?: string;
+  cargo?: string;
+}
 
 interface Aposta {
   id: string;
@@ -21,9 +27,36 @@ interface Aposta {
   jogo?: string;
   retorno?: number;
   com_bonus?: string;
-  usuarios?: {
-    nome: string;
-    cargo?: string;
+  usuarios?: ApostaUsuario;
+}
+
+type UsuarioJoinRow = {
+  nome?: string | null;
+  usuario_nome?: string | null;
+  usuario?: string | null;
+  email?: string | null;
+  cargo?: string | null;
+};
+
+function getUsuarioDisplayName(usuario?: UsuarioJoinRow | null): string {
+  return (
+    (usuario?.usuario_nome && usuario.usuario_nome.trim()) ||
+    (usuario?.nome && usuario.nome.trim()) ||
+    (usuario?.usuario && usuario.usuario.trim()) ||
+    '-'
+  );
+}
+
+function normalizeUsuarioJoin(
+  usuarios: UsuarioJoinRow | UsuarioJoinRow[] | null | undefined
+): ApostaUsuario | undefined {
+  const usuario = Array.isArray(usuarios) ? usuarios[0] : usuarios;
+  if (!usuario) return undefined;
+
+  return {
+    nome: getUsuarioDisplayName(usuario),
+    email: usuario.email?.trim() || undefined,
+    cargo: usuario.cargo ?? undefined,
   };
 }
 
@@ -89,7 +122,7 @@ export default function ApostasPage() {
           jogo,
           retorno,
           com_bonus,
-          usuarios!inner(nome, cargo)
+          usuarios!inner(nome, usuario_nome, usuario, email, cargo)
         `)
         .order('data', { ascending: false })
         .range(from, to);
@@ -110,39 +143,27 @@ export default function ApostasPage() {
 
         // Buscar nomes e cargos dos usuários separadamente
         const userIds = [...new Set((apostasData || []).map(a => a.usuario_id).filter(Boolean))];
-        const usuariosMap = new Map<string, { nome: string; cargo?: string }>();
+        const usuariosMap = new Map<string, ApostaUsuario>();
 
         if (userIds.length > 0) {
           const { data: usuariosData } = await supabase
             .from('usuarios')
-            .select('id, nome, cargo')
+            .select('id, nome, usuario_nome, usuario, email, cargo')
             .in('id', userIds);
 
           (usuariosData || []).forEach(usuario => {
-            usuariosMap.set(usuario.id, { 
-              nome: usuario.nome || '-',
-              cargo: usuario.cargo 
+            usuariosMap.set(usuario.id, {
+              nome: getUsuarioDisplayName(usuario),
+              email: usuario.email?.trim() || undefined,
+              cargo: usuario.cargo ?? undefined,
             });
           });
         }
 
-        // Combinar dados
-        const apostasComNome = (apostasData || []).map(aposta => {
-          const usuario = usuariosMap.get(aposta.usuario_id);
-          return {
-            ...aposta,
-            usuarios: { 
-              id: aposta.usuario_id,
-              nome: usuario?.nome || '-',
-              cpf: '',
-              email: '',
-              telefone: '',
-              created_at: '',
-              saldo: 0,
-              cargo: usuario?.cargo 
-            } as any
-          };
-        });
+        const apostasComNome = (apostasData || []).map(aposta => ({
+          ...aposta,
+          usuarios: usuariosMap.get(aposta.usuario_id),
+        }));
 
         const lista = apostasComNome as Aposta[];
         setApostas(lista);
@@ -154,21 +175,9 @@ export default function ApostasPage() {
         return;
       }
 
-      // Transformar dados do Supabase para o formato esperado
       const apostasFormatados = (data || []).map((item: any) => ({
         ...item,
-        usuarios: Array.isArray(item.usuarios) && item.usuarios.length > 0 
-          ? {
-              id: item.usuario_id,
-              nome: item.usuarios[0].nome || '-',
-              cpf: '',
-              email: '',
-              telefone: '',
-              created_at: '',
-              saldo: 0,
-              cargo: item.usuarios[0].cargo
-            } as any
-          : undefined
+        usuarios: normalizeUsuarioJoin(item.usuarios),
       })) as Aposta[];
       
       setApostas(apostasFormatados);
@@ -304,16 +313,21 @@ export default function ApostasPage() {
                     {apostas.map((aposta) => (
                       <tr key={aposta.id}>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">
-                              {aposta.usuarios?.nome || '-'}
-                            </span>
-                            <span 
-                              className="px-2 py-1 rounded-md text-xs font-medium"
-                              style={{ backgroundColor: 'rgba(0, 98, 255, 0.2)', color: '#0062FF' }}
-                            >
-                              {aposta.usuarios?.cargo === 'admin' ? 'Administrador' : 'Usuário'}
-                            </span>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-medium">
+                                {aposta.usuarios?.nome || '-'}
+                              </span>
+                              <span
+                                className="px-2 py-1 rounded-md text-xs font-medium"
+                                style={{ backgroundColor: 'rgba(0, 98, 255, 0.2)', color: '#0062FF' }}
+                              >
+                                {aposta.usuarios?.cargo === 'admin' ? 'Administrador' : 'Usuário'}
+                              </span>
+                            </div>
+                            {aposta.usuarios?.email && (
+                              <span className="text-gray-500 text-xs">{aposta.usuarios.email}</span>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-gray-400 text-sm">{aposta.id || '-'}</td>

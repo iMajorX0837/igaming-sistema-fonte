@@ -8,6 +8,7 @@ import { appPageContainerClass } from '../constants/homeLayout';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
+import { buildReferralLink } from '../lib/siteBrand';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -16,7 +17,7 @@ export default function ReferralPage() {
   const { user, isAuthenticated } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const { config: plataformaConfig } = usePlataformaConfig();
-  const { nomeBet } = useSiteBrand();
+  const { nomeBet, siteDominio } = useSiteBrand();
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ export default function ReferralPage() {
   const [recompensa, setRecompensa] = useState(plataformaConfig.indicacao_recompensa);
   const [depositoMinimo, setDepositoMinimo] = useState(plataformaConfig.indicacao_deposito_minimo);
 
-  const referralLink = referralCode ? `https://royall.bet?c=${referralCode}` : 'https://royall.bet?c=';
+  const referralLink = buildReferralLink(siteDominio, referralCode);
   const cardBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
 
   useEffect(() => {

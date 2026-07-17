@@ -13,6 +13,14 @@ import { homePageContainerClass } from '../constants/homeLayout';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverSlotsProvider } from '../api/playfiversCache';
 import { useHomeSections, type HomeSection } from '../hooks/useHomeSections';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import {
+  PROPRIETARY_PROVIDER,
+  PROPRIETARY_PROVIDER_ID,
+} from '../lib/proprietaryCatalog';
+import {
+  ensurePlatformGameSettingsLoaded,
+  isPlatformProviderEnabled,
+} from '../lib/platformGames';
 
 interface MainContentProps {
   onGameSelect: (game: GameInfo) => void;
@@ -222,7 +230,23 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
           image: provider.image_url || '',
           href: `/provider/${getProviderSlug(provider.name)}`,
         }));
-        
+
+        const settings = await ensurePlatformGameSettingsLoaded();
+        const hasApiSpribe = mappedProviders.some(
+          (provider) => getProviderSlug(provider.name) === PROPRIETARY_PROVIDER.slug
+        );
+
+        if (
+          isPlatformProviderEnabled(PROPRIETARY_PROVIDER_ID, settings) &&
+          !hasApiSpribe
+        ) {
+          mappedProviders.unshift({
+            name: PROPRIETARY_PROVIDER.name,
+            image: PROPRIETARY_PROVIDER.image_url,
+            href: `/provider/${PROPRIETARY_PROVIDER.slug}`,
+          });
+        }
+
         setProviders(mappedProviders);
       }
     } catch (err) {
@@ -297,9 +321,9 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ backgroundColor: homeConfig.fundo }}>
-      <div className={`flex flex-1 flex-col ${homePageContainerClass}`}>
-        <div className="flex-1 py-4 sm:py-6">
+    <div style={{ backgroundColor: homeConfig.fundo }}>
+      <div className={homePageContainerClass}>
+        <div className="py-4 sm:py-6">
           <Banner />
 
           <div className="mt-2">
@@ -314,11 +338,16 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
             <WinnerSlider onGameSelect={onGameSelect} />
           </div>
 
-          {homeSections.map((section) => (
-            <div key={section.id} className="mt-2">
-              {renderHomeSection(section)}
-            </div>
-          ))}
+          {homeSections.map((section) => {
+            const content = renderHomeSection(section);
+            if (!content) return null;
+
+            return (
+              <div key={section.id} className="mt-2">
+                {content}
+              </div>
+            );
+          })}
         </div>
 
         <Footer containerClassName="w-full" />
