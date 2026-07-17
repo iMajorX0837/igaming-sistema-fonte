@@ -155,10 +155,24 @@ function secondsUntilCrash(crashAtMs: number, clockOffset: number) {
   return Math.max(0, Math.floor((crashAtMs - now) / 1000));
 }
 
-type CrashTier = 'low' | 'mid' | 'high' | 'mega';
+/** Cores oficiais das velas do Aviator (Spribe). */
+const AVIATOR_VELA_COLORS = {
+  low: '#34B4FF', // < 2x
+  mid: '#913EF8', // 2x – 9.99x
+  high: '#C017B4', // ≥ 10x
+} as const;
+
+type CrashTier = keyof typeof AVIATOR_VELA_COLORS;
+
+function hexWithAlpha(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 function crashTier(x: number): CrashTier {
-  if (x >= 50) return 'mega';
   if (x >= 10) return 'high';
   if (x >= 2) return 'mid';
   return 'low';
@@ -167,43 +181,26 @@ function crashTier(x: number): CrashTier {
 function crashTierLabel(tier: CrashTier) {
   switch (tier) {
     case 'low':
-      return 'Baixa';
+      return 'Azul';
     case 'mid':
-      return 'Média';
+      return 'Roxo';
     case 'high':
-      return 'Alta';
-    case 'mega':
-      return 'Muito alta';
+      return 'Rosa';
   }
 }
 
 function crashTierStyles(tier: CrashTier) {
-  switch (tier) {
-    case 'low':
-      return {
-        text: 'text-emerald-400',
-        bar: 'bg-emerald-500',
-        chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
-      };
-    case 'mid':
-      return {
-        text: 'text-gray-200',
-        bar: 'bg-gray-400',
-        chip: 'bg-white/5 text-gray-300 border-white/10',
-      };
-    case 'high':
-      return {
-        text: 'text-amber-400',
-        bar: 'bg-amber-500',
-        chip: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
-      };
-    case 'mega':
-      return {
-        text: 'text-rose-400',
-        bar: 'bg-rose-500',
-        chip: 'bg-rose-500/15 text-rose-300 border-rose-500/25',
-      };
-  }
+  const hex = AVIATOR_VELA_COLORS[tier];
+  return {
+    hex,
+    textStyle: { color: hex } as const,
+    barStyle: { backgroundColor: hex } as const,
+    chipStyle: {
+      color: hex,
+      backgroundColor: hexWithAlpha(hex, 0.14),
+      borderColor: hexWithAlpha(hex, 0.35),
+    } as const,
+  };
 }
 
 function crashBarWidth(x: number) {
@@ -220,8 +217,9 @@ function summarizeUpcoming(rounds: AviatorScheduleEntry[]) {
   const values = rounds.map((r) => Number(r.crash_x));
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
   const low = values.filter((v) => v < 2).length;
+  const mid = values.filter((v) => v >= 2 && v < 10).length;
   const high = values.filter((v) => v >= 10).length;
-  return { avg, low, high, total: rounds.length };
+  return { avg, low, mid, high, total: rounds.length };
 }
 
 export default function AviatorRtpPage() {
@@ -920,7 +918,7 @@ function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; cloc
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-wide text-gray-500">Rodada #{item.round_id}</p>
-          <p className={`font-mono text-3xl font-semibold tabular-nums ${styles.text}`}>
+          <p className="font-mono text-3xl font-semibold tabular-nums" style={styles.textStyle}>
             {formatCrashX(Number(item.crash_x))}
           </p>
         </div>
@@ -930,7 +928,10 @@ function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; cloc
       </div>
 
       <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div className={`h-full rounded-full ${styles.bar}`} style={{ width: `${crashBarWidth(Number(item.crash_x))}%` }} />
+        <div
+          className="h-full rounded-full"
+          style={{ ...styles.barStyle, width: `${crashBarWidth(Number(item.crash_x))}%` }}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -959,21 +960,31 @@ function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; cloc
 function UpcomingSummary({
   stats,
 }: {
-  stats: { avg: number; low: number; high: number; total: number };
+  stats: { avg: number; low: number; mid: number; high: number; total: number };
 }) {
   return (
-    <div className="grid grid-cols-3 gap-px bg-admin-border/50 border-b border-admin-border/80 text-[10px]">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-admin-border/50 border-b border-admin-border/80 text-[10px]">
       <div className="bg-black/20 px-3 py-2">
         <p className="text-gray-500">Média</p>
         <p className="text-gray-200 font-mono font-medium tabular-nums">{formatCrashX(stats.avg)}</p>
       </div>
       <div className="bg-black/20 px-3 py-2">
-        <p className="text-gray-500">Baixas (&lt;2x)</p>
-        <p className="text-emerald-400 font-medium tabular-nums">{stats.low}</p>
+        <p style={{ color: AVIATOR_VELA_COLORS.low }}>&lt;2x · Azul</p>
+        <p className="font-medium tabular-nums" style={{ color: AVIATOR_VELA_COLORS.low }}>
+          {stats.low}
+        </p>
       </div>
       <div className="bg-black/20 px-3 py-2">
-        <p className="text-gray-500">Altas (≥10x)</p>
-        <p className="text-amber-400 font-medium tabular-nums">{stats.high}</p>
+        <p style={{ color: AVIATOR_VELA_COLORS.mid }}>2–10x · Roxo</p>
+        <p className="font-medium tabular-nums" style={{ color: AVIATOR_VELA_COLORS.mid }}>
+          {stats.mid}
+        </p>
+      </div>
+      <div className="bg-black/20 px-3 py-2">
+        <p style={{ color: AVIATOR_VELA_COLORS.high }}>≥10x · Rosa</p>
+        <p className="font-medium tabular-nums" style={{ color: AVIATOR_VELA_COLORS.high }}>
+          {stats.high}
+        </p>
       </div>
     </div>
   );
@@ -1000,12 +1011,17 @@ function UpcomingRow({
       <td className="py-2.5 px-1">
         <div className="flex items-center gap-2 min-w-[88px]">
           <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div className={`h-full rounded-full ${styles.bar}`} style={{ width: `${crashBarWidth(x)}%` }} />
+            <div
+              className="h-full rounded-full"
+              style={{ ...styles.barStyle, width: `${crashBarWidth(x)}%` }}
+            />
           </div>
-          <span className="text-[10px] text-gray-500 w-10 shrink-0">{crashTierLabel(tier)}</span>
+          <span className="text-[10px] w-10 shrink-0" style={{ color: styles.hex }}>
+            {crashTierLabel(tier)}
+          </span>
         </div>
       </td>
-      <td className={`py-2.5 px-1 text-right font-mono font-semibold tabular-nums ${styles.text}`}>
+      <td className="py-2.5 px-1 text-right font-mono font-semibold tabular-nums" style={styles.textStyle}>
         {formatCrashX(x)}
       </td>
       <td className="py-2.5 px-1 text-right text-gray-500 tabular-nums hidden sm:table-cell">
@@ -1028,7 +1044,8 @@ function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number })
       <td className="py-2.5 px-1">
         <div className="flex items-center gap-2">
           <span
-            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums ${styles.chip}`}
+            className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums"
+            style={styles.chipStyle}
           >
             {formatCrashX(x)}
           </span>
