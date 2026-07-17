@@ -25,6 +25,7 @@ import JogosPage from './pages/JogosPage';
 import UsuarioDetalhesPage from './pages/UsuarioDetalhesPage';
 import LogsPage from './pages/LogsPage';
 import WebhooksPage from './pages/WebhooksPage';
+import TrackingPage from './pages/TrackingPage';
 import SegurancaPage from './pages/SegurancaPage';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -114,6 +115,7 @@ function App() {
         <Route path="administracao" element={<AdministracaoPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
+        <Route path="tracking" element={<TrackingPage />} />
         <Route path="seguranca" element={<SegurancaPage />} />
         <Route path="configuracoes" element={<ConfiguracoesPage />} />
       </Route>

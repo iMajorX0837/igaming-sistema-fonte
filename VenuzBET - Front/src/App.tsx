@@ -30,6 +30,7 @@ import LoadingScreen from './components/LoadingScreen';
 import PrizeWheel from './components/PrizeWheel';
 import { resolveGameBySlug } from './utils/resolveGameBySlug';
 import { captureTrackingParams } from './lib/trackingParams';
+import MetaPixelTracker from './components/MetaPixelTracker';
 
 export interface GameInfo {
   name: string;
@@ -214,6 +215,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 font-sans">
+      <MetaPixelTracker />
       <CouponModal isOpen={isCouponOpen} onClose={() => setIsCouponOpen(false)} />
       <PrizeWheel />
       <MobileBottomNav visible={showMobileBottomNav} />
