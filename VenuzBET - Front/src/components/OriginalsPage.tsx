@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Gamepad2, Grid3x3 } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
@@ -7,21 +7,23 @@ import SearchInput from './SearchInput';
 import FilterDropdown from './FilterDropdown';
 import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useSiteBrand } from '../hooks/useSiteBrand';
+import { getOriginaisLabel } from '../lib/siteBrand';
 
 interface OriginalsPageProps {
   onBack: () => void;
   onGameSelect: (game: GameInfo) => void;
 }
 
-const originalGames = [
-  { name: 'Crash', provider: 'RoyalBet', image: 'https://i.ibb.co/8n08ZyVs/Chat-GPT-Image-3-de-nov-de-2025-20-44-01.png', category: 'crash' },
-  { name: 'Double', provider: 'RoyalBet', image: 'https://i.ibb.co/fzksfGFj/Chat-GPT-Image-3-de-nov-de-2025-20-44-08.png', category: 'slots' },
-  { name: 'Mines', provider: 'RoyalBet', image: 'https://i.ibb.co/8gGgt9GJ/Chat-GPT-Image-3-de-nov-de-2025-20-44-14.png', category: 'crash' },
+const originalGameDefs = [
+  { name: 'Crash', image: 'https://i.ibb.co/8n08ZyVs/Chat-GPT-Image-3-de-nov-de-2025-20-44-01.png', category: 'crash' },
+  { name: 'Double', image: 'https://i.ibb.co/fzksfGFj/Chat-GPT-Image-3-de-nov-de-2025-20-44-08.png', category: 'slots' },
+  { name: 'Mines', image: 'https://i.ibb.co/8gGgt9GJ/Chat-GPT-Image-3-de-nov-de-2025-20-44-14.png', category: 'crash' },
 ];
 
-const providers = [
-  { id: 'all', name: 'Todos', count: 3 },
-  { id: 'venuzbet', name: 'RoyalBet', count: 3 },
+const baseProviders = [
+  { id: 'all', count: 3 },
+  { id: 'venuzbet', count: 3 },
   { id: 'pgsoft', name: 'PG Soft', count: 0 },
   { id: 'pragmatic', name: 'Pragmatic Play', count: 0 },
   { id: 'pragmaticlive', name: 'Pragmatic Live', count: 0 },
@@ -45,11 +47,27 @@ const categories = [
 
 export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: OriginalsPageProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { nomeBet } = useSiteBrand();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 18;
+
+  const originalGames = useMemo(
+    () => originalGameDefs.map((game) => ({ ...game, provider: nomeBet })),
+    [nomeBet],
+  );
+
+  const providers = useMemo(
+    () =>
+      baseProviders.map((provider) => {
+        if (provider.id === 'all') return { ...provider, name: 'Todos' };
+        if (provider.id === 'venuzbet') return { ...provider, name: nomeBet };
+        return { id: provider.id, name: provider.name!, count: provider.count };
+      }),
+    [nomeBet],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -102,7 +120,7 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
               }}
             />
             <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
-              <span className="whitespace-nowrap shrink-0">Jogos Originais</span>
+              <span className="whitespace-nowrap shrink-0">{getOriginaisLabel(nomeBet)}</span>
               <span
                 className={`text-violet-400 whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
                   selectedProvider !== 'all' ? 'max-w-[500px] opacity-100' : 'max-w-0 opacity-0'

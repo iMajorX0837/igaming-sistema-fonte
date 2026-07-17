@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import Notification from './Notification';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import {
 import { dispatchVipProfileUpdated, formatBRL, type DepositVipResult } from '../lib/vip';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import SiteLogo from './SiteLogo';
 import {
   formatCupomBonus,
   getCupomErrorMessage,
@@ -364,11 +365,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
           className="w-full shrink-0 px-4 py-3 flex justify-center"
           style={{ backgroundColor: homeConfig.fundo }}
         >
-          <img
-            src="https://cdn.royalbetsolutions.com/royalbetsolutions-com-images/images/1781264933868.png"
-            alt="RoyalBet"
-            className="h-12 w-auto max-w-full object-contain"
-          />
+          <SiteLogo className="h-12 w-auto max-w-full object-contain" />
         </div>
 
         <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-4 pb-5">

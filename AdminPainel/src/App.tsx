@@ -8,14 +8,12 @@ import UsuariosPage from './pages/UsuariosPage';
 import DepositosPage from './pages/DepositosPage';
 import ApostasPage from './pages/ApostasPage';
 import VipNiveisPage from './pages/VipNiveisPage';
-import BannersPage from './pages/BannersPage';
 import SidebarCardsPage from './pages/SidebarCardsPage';
 import TodosJogosPage from './pages/TodosJogosPage';
-import HomeSectionsPage from './pages/HomeSectionsPage';
+import HomeCmsPage from './pages/HomeCmsPage';
+import SiteBrandPage from './pages/SiteBrandPage';
 import TopBannerPage from './pages/TopBannerPage';
 import PromotionsPage from './pages/PromotionsPage';
-import RecommendedBannersPage from './pages/RecommendedBannersPage';
-import HomeQuickNavPage from './pages/HomeQuickNavPage';
 import AdministracaoPage from './pages/AdministracaoPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
 import CuponsPage from './pages/CuponsPage';
@@ -79,6 +77,10 @@ function LoginRoute() {
   return <LoginPage />;
 }
 
+function RedirectToHomeTab({ tab }: { tab: string }) {
+  return <Navigate to={`/home-cms?tab=${tab}`} replace />;
+}
+
 function App() {
   return (
     <Routes>
@@ -104,14 +106,16 @@ function App() {
         <Route path="aviator-rtp" element={<AviatorRtpPage />} />
         <Route path="jogos" element={<JogosPage />} />
         <Route path="provedores" element={<Navigate to="/jogos" replace />} />
-        <Route path="banners" element={<BannersPage />} />
+        <Route path="home-cms" element={<HomeCmsPage />} />
+        <Route path="identidade-site" element={<SiteBrandPage />} />
+        <Route path="banners" element={<RedirectToHomeTab tab="carrossel" />} />
+        <Route path="atalhos-home" element={<RedirectToHomeTab tab="atalhos" />} />
+        <Route path="recomendados" element={<RedirectToHomeTab tab="recomendados" />} />
+        <Route path="home-secoes" element={<RedirectToHomeTab tab="secoes" />} />
         <Route path="sidebar-cards" element={<SidebarCardsPage />} />
         <Route path="todos-jogos" element={<TodosJogosPage />} />
-        <Route path="home-secoes" element={<HomeSectionsPage />} />
         <Route path="top-banner" element={<TopBannerPage />} />
         <Route path="promocoes" element={<PromotionsPage />} />
-        <Route path="recomendados" element={<RecommendedBannersPage />} />
-        <Route path="atalhos-home" element={<HomeQuickNavPage />} />
         <Route path="administracao" element={<AdministracaoPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
@@ -125,9 +129,3 @@ function App() {
 }
 
 export default App;
-
-
-
-
-
-

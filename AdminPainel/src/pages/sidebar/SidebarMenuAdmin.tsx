@@ -4,12 +4,18 @@ import { useToast } from '../../contexts/ToastContext';
 import SortableOrderList from '../../components/SortableOrderList';
 import { applySequentialOrder } from '../../lib/reorderUtils';
 import { persistTableOrder } from '../../lib/persistTableOrder';
+import {
+  buildLabelsFromPortuguese,
+  emptyLabels,
+  translateFromPortuguese,
+  type Labels,
+} from '../../lib/autoTranslateLabels';
 import LoadingState from '../../components/ui/LoadingState';
 import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import StatusBadge from '../../components/ui/StatusBadge';
-import { FolderTree, Link2, Pencil, Trash2, Plus } from 'lucide-react';
+import { FolderTree, Link2, Pencil, Trash2, Plus, ChevronDown, ChevronRight, Power } from 'lucide-react';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
@@ -17,17 +23,6 @@ type SidebarLanguage = 'pt' | 'en' | 'es';
 type CategoryTipo = 'menu' | 'language';
 type LinkTipo = 'href' | 'game' | 'external' | 'event';
 type IconType = 'emoji' | 'image' | 'iconify' | 'none';
-
-interface LabelSet {
-  line1: string;
-  line2: string;
-}
-
-interface Labels {
-  pt: LabelSet;
-  en: LabelSet;
-  es: LabelSet;
-}
 
 interface CategoryRow {
   id: string;
@@ -57,12 +52,6 @@ interface MenuItemRow {
 
 const CMS_CATEGORY = 'sidebar_category';
 const CMS_MENU_ITEM = 'sidebar_menu_item';
-
-const emptyLabels = (): Labels => ({
-  pt: { line1: '', line2: '' },
-  en: { line1: '', line2: '' },
-  es: { line1: '', line2: '' },
-});
 
 const emptyCategoryForm = {
   nome_admin: '',
@@ -247,64 +236,60 @@ function SelectField({
   );
 }
 
-function LabelsEditor({
-  labels,
+function PortugueseLabelField({
+  label,
+  hint,
+  value,
   onChange,
 }: {
-  labels: Labels;
-  onChange: (labels: Labels) => void;
-}) {
-  const update = (lang: SidebarLanguage, value: string) => {
-    onChange({
-      ...labels,
-      [lang]: { ...labels[lang], line1: value },
-    });
-  };
-
-  return (
-    <div className="space-y-3">
-      {(['pt', 'en', 'es'] as const).map((lang) => (
-        <Field
-          key={lang}
-          label={lang.toUpperCase()}
-          value={labels[lang].line1}
-          onChange={(value) => update(lang, value)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ActiveToggle({
-  active,
-  disabled,
-  label,
-  onToggle,
-}: {
-  active: boolean;
-  disabled?: boolean;
   label: string;
-  onToggle: () => void;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
 }) {
+  const [preview, setPreview] = useState<{ en: string; es: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setPreview(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    setPreviewLoading(true);
+    const timer = window.setTimeout(() => {
+      void translateFromPortuguese(trimmed)
+        .then((result) => setPreview(result))
+        .finally(() => setPreviewLoading(false));
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [value]);
+
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={disabled}
-      aria-label={active ? `Desativar ${label}` : `Ativar ${label}`}
-      title={active ? 'Clique para desativar' : 'Clique para ativar'}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        active
-          ? 'border-admin-success/40 bg-admin-success/25'
-          : 'border-admin-border bg-admin-panel-3'
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          active ? 'translate-x-6' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
+    <div>
+      <Field label={label} value={value} onChange={onChange} placeholder="Ex: Todos os Jogos" />
+      {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
+      {value.trim() ? (
+        <div className="mt-3 rounded-lg border border-admin-border bg-admin-panel/50 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+            Tradução automática {previewLoading ? '· gerando...' : ''}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="rounded-md bg-admin-panel-2 px-2.5 py-2 text-gray-300">
+              <span className="text-gray-500">EN · </span>
+              {preview?.en || '—'}
+            </div>
+            <div className="rounded-md bg-admin-panel-2 px-2.5 py-2 text-gray-300">
+              <span className="text-gray-500">ES · </span>
+              {preview?.es || '—'}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -334,10 +319,24 @@ function FilterChip({
   );
 }
 
+function getLinkTipoLabel(linkTipo: LinkTipo) {
+  if (linkTipo === 'href') return 'Rota interna';
+  if (linkTipo === 'game') return 'Jogo';
+  if (linkTipo === 'external') return 'Link externo';
+  return 'Evento';
+}
+
 function getMenuItemLinkLabel(item: MenuItemRow) {
   if (item.link_tipo === 'href') return item.href || '—';
   if (item.link_tipo === 'game') return item.game_name || '—';
   return item.action_value || '—';
+}
+
+function toggleExpanded(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
 }
 
 export default function SidebarMenuAdmin() {
@@ -356,6 +355,9 @@ export default function SidebarMenuAdmin() {
   const [menuItemForm, setMenuItemForm] = useState(emptyMenuItemForm);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [deletingCategory, setDeletingCategory] = useState<CategoryRow | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const menuCategoryOptions = useMemo(
     () => categories.filter((category) => category.category_tipo === 'menu'),
@@ -414,8 +416,10 @@ export default function SidebarMenuAdmin() {
       }
 
       const rows = (data || []) as Record<string, unknown>[];
-      setCategories(rows.filter((row) => row.secao === CMS_CATEGORY).map(rowToCategory));
+      const loadedCategories = rows.filter((row) => row.secao === CMS_CATEGORY).map(rowToCategory);
+      setCategories(loadedCategories);
       setMenuItems(rows.filter((row) => row.secao === CMS_MENU_ITEM).map(rowToMenuItem));
+      setExpandedCategories(new Set(loadedCategories.map((category) => category.id)));
     } catch {
       showToast('Erro ao carregar menu da sidebar.', 'error');
     } finally {
@@ -459,9 +463,11 @@ export default function SidebarMenuAdmin() {
 
     setSaving(true);
     try {
+      const labels = await buildLabelsFromPortuguese(categoryForm.labels.pt.line1);
       const payload = buildCategoryPayload({
         ...categoryForm,
         slug: slugify(categoryForm.slug),
+        labels,
       });
 
       const response = editingCategoryId
@@ -477,7 +483,12 @@ export default function SidebarMenuAdmin() {
         return;
       }
 
-      showToast(editingCategoryId ? 'Categoria atualizada!' : 'Categoria criada!', 'success');
+      showToast(
+        editingCategoryId
+          ? 'Seção atualizada! Inglês e espanhol gerados automaticamente.'
+          : 'Seção criada! Inglês e espanhol gerados automaticamente.',
+        'success',
+      );
       setEditingCategoryId(null);
       setCreatingCategory(false);
       setCategoryForm(emptyCategoryForm);
@@ -487,13 +498,15 @@ export default function SidebarMenuAdmin() {
     }
   };
 
-  const removeCategory = async (category: CategoryRow) => {
+  const removeCategory = async () => {
+    if (!deletingCategory) return;
+    const category = deletingCategory;
     const linkedItems = menuItems.filter((item) => item.categoria_slug === category.slug);
     if (linkedItems.length > 0) {
-      showToast('Remova ou mova os botões desta categoria antes de excluí-la.', 'error');
+      showToast('Remova ou mova os botões desta seção antes de excluí-la.', 'error');
+      setDeletingCategory(null);
       return;
     }
-    if (!window.confirm(`Excluir categoria "${category.nome_admin}"?`)) return;
 
     setSaving(true);
     try {
@@ -503,24 +516,26 @@ export default function SidebarMenuAdmin() {
         .eq('id', category.id)
         .eq('secao', CMS_CATEGORY);
       if (error) {
-        showToast('Erro ao excluir categoria.', 'error');
+        showToast('Erro ao excluir seção.', 'error');
         return;
       }
-      showToast('Categoria excluída.', 'success');
+      showToast('Seção excluída.', 'success');
+      setDeletingCategory(null);
       await loadMenu();
     } finally {
       setSaving(false);
     }
   };
 
-  const startCreateItem = () => {
+  const startCreateItem = (categorySlug?: string) => {
     setEditingItemId(null);
     setCreatingItem(true);
     const nextOrder = menuItems.length > 0 ? Math.max(...menuItems.map((item) => item.ordem)) + 1 : 1;
     setMenuItemForm({
       ...emptyMenuItemForm,
       ordem: nextOrder,
-      categoria_slug: activeMenuCategories[0]?.slug || menuCategoryOptions[0]?.slug || '',
+      categoria_slug:
+        categorySlug || activeMenuCategories[0]?.slug || menuCategoryOptions[0]?.slug || '',
     });
   };
 
@@ -574,7 +589,11 @@ export default function SidebarMenuAdmin() {
 
     setSaving(true);
     try {
-      const payload = buildMenuItemPayload(menuItemForm);
+      const labels = await buildLabelsFromPortuguese(menuItemForm.labels.pt.line1);
+      const payload = buildMenuItemPayload({
+        ...menuItemForm,
+        labels,
+      });
       const response = editingItemId
         ? await supabase
             .from('cms_items')
@@ -588,7 +607,12 @@ export default function SidebarMenuAdmin() {
         return;
       }
 
-      showToast(editingItemId ? 'Botão atualizado!' : 'Botão criado!', 'success');
+      showToast(
+        editingItemId
+          ? 'Botão atualizado! Inglês e espanhol gerados automaticamente.'
+          : 'Botão criado! Inglês e espanhol gerados automaticamente.',
+        'success',
+      );
       setEditingItemId(null);
       setCreatingItem(false);
       setMenuItemForm(emptyMenuItemForm);
@@ -598,16 +622,21 @@ export default function SidebarMenuAdmin() {
     }
   };
 
-  const removeMenuItem = async (id: string) => {
-    if (!window.confirm('Excluir este botão do menu?')) return;
+  const removeMenuItem = async () => {
+    if (!deletingItemId) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('cms_items').delete().eq('id', id).eq('secao', CMS_MENU_ITEM);
+      const { error } = await supabase
+        .from('cms_items')
+        .delete()
+        .eq('id', deletingItemId)
+        .eq('secao', CMS_MENU_ITEM);
       if (error) {
         showToast('Erro ao excluir botão.', 'error');
         return;
       }
       showToast('Botão excluído.', 'success');
+      setDeletingItemId(null);
       await loadMenu();
     } finally {
       setSaving(false);
@@ -728,13 +757,13 @@ export default function SidebarMenuAdmin() {
           placeholder="cassino"
         />
         <SelectField
-          label="Tipo"
+          label="Tipo de seção"
           value={categoryForm.category_tipo}
           onChange={(value) =>
             setCategoryForm({ ...categoryForm, category_tipo: value as CategoryTipo })
           }
           options={[
-            { value: 'menu', label: 'Menu com botões' },
+            { value: 'menu', label: 'Menu com botões (Cassino, Extras...)' },
             { value: 'language', label: 'Seletor de idioma' },
           ]}
         />
@@ -745,13 +774,17 @@ export default function SidebarMenuAdmin() {
           onChange={(value) => setCategoryForm({ ...categoryForm, ordem: Number(value) })}
         />
       </div>
-      <div>
-        <p className="mb-2 text-sm font-medium text-gray-200">Título da seção por idioma</p>
-        <LabelsEditor
-          labels={categoryForm.labels}
-          onChange={(labels) => setCategoryForm({ ...categoryForm, labels })}
-        />
-      </div>
+      <PortugueseLabelField
+        label="Título da seção (português)"
+        hint="Inglês e espanhol são traduzidos automaticamente ao salvar."
+        value={categoryForm.labels.pt.line1}
+        onChange={(value) =>
+          setCategoryForm({
+            ...categoryForm,
+            labels: { ...categoryForm.labels, pt: { ...categoryForm.labels.pt, line1: value } },
+          })
+        }
+      />
       <label className="flex items-center gap-2 text-sm text-gray-300">
         <input
           type="checkbox"
@@ -858,13 +891,17 @@ export default function SidebarMenuAdmin() {
           />
         ) : null}
       </div>
-      <div>
-        <p className="mb-2 text-sm font-medium text-gray-200">Texto do botão por idioma</p>
-        <LabelsEditor
-          labels={menuItemForm.labels}
-          onChange={(labels) => setMenuItemForm({ ...menuItemForm, labels })}
-        />
-      </div>
+      <PortugueseLabelField
+        label="Texto do botão (português)"
+        hint="Inglês e espanhol são traduzidos automaticamente ao salvar."
+        value={menuItemForm.labels.pt.line1}
+        onChange={(value) =>
+          setMenuItemForm({
+            ...menuItemForm,
+            labels: { ...menuItemForm.labels, pt: { ...menuItemForm.labels.pt, line1: value } },
+          })
+        }
+      />
       <label className="flex items-center gap-2 text-sm text-gray-300">
         <input
           type="checkbox"
@@ -885,23 +922,39 @@ export default function SidebarMenuAdmin() {
   );
 
   if (loading) {
-    return <LoadingState message="Carregando menu da sidebar..." />;
+    return <LoadingState inline message="Carregando menu da sidebar..." />;
   }
 
+  const itemToDelete = menuItems.find((item) => item.id === deletingItemId);
+  const modalBusy =
+    saving ||
+    creatingCategory ||
+    editingCategoryId !== null ||
+    creatingItem ||
+    editingItemId !== null ||
+    deletingCategory !== null ||
+    deletingItemId !== null;
+
+  const visibleCategories = filteredCategories;
+
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-admin-border bg-admin-panel p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm text-gray-300">
-              {statusCounts.categories} categorias · {statusCounts.items} botões ·{' '}
+    <div className="space-y-4">
+      <div className="rounded-xl border border-admin-border bg-admin-panel-2/40 p-4 md:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <h3 className="text-white font-semibold mb-1">Estrutura do menu lateral</h3>
+            <p className="text-gray-400 text-sm">
+              Organize por seções. Cada seção do tipo menu agrupa botões; seções de idioma exibem
+              apenas o seletor de idioma. Arraste as seções para reordenar e, dentro de cada uma,
+              arraste os botões.
+            </p>
+            <p className="text-gray-500 text-xs mt-2">
+              {statusCounts.categories} seções · {statusCounts.items} botões ·{' '}
               {statusCounts.inactive} inativos
             </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Use o interruptor para ativar ou desativar sem abrir o editor.
-            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <FilterChip
               active={statusFilter === 'all'}
               label="Todos"
@@ -923,318 +976,352 @@ export default function SidebarMenuAdmin() {
               count={statusCounts.inactive}
               onClick={() => setStatusFilter('inactive')}
             />
+            <Button
+              icon={Plus}
+              onClick={startCreateCategory}
+              disabled={modalBusy}
+              className="!px-3 !py-2 !text-sm"
+            >
+              Nova seção
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-white">
-              <FolderTree className="h-5 w-5" />
-              Categorias do menu
-            </h2>
-            <p className="text-sm text-gray-400">
-              Seções como Cassino, Extras ou seletor de idioma.
-            </p>
-          </div>
-          <Button
-            icon={Plus}
-            onClick={startCreateCategory}
-            disabled={saving || creatingCategory || editingCategoryId !== null}
-            className="!px-3 !py-2 !text-sm"
-          >
-            Nova categoria
-          </Button>
-        </div>
+      {visibleCategories.length === 0 ? (
+        <EmptyState
+          icon={FolderTree}
+          title={statusFilter === 'all' ? 'Nenhuma seção cadastrada.' : 'Nenhuma seção neste filtro.'}
+          description="Crie a primeira seção do menu lateral, como Cassino ou Extras."
+        />
+      ) : (
+        <SortableOrderList
+          items={visibleCategories}
+          onReorder={handleCategoriesReorder}
+          disabled={modalBusy || statusFilter !== 'all'}
+          className="space-y-4"
+          renderItem={(category) => {
+            const isExpanded = expandedCategories.has(category.id);
+            const isLanguage = category.category_tipo === 'language';
+            const categoryItems = filteredMenuItems.filter(
+              (item) => item.categoria_slug === category.slug,
+            );
 
-        {filteredCategories.length === 0 ? (
-          <EmptyState
-            icon={FolderTree}
-            title={
-              statusFilter === 'all'
-                ? 'Nenhuma categoria cadastrada.'
-                : 'Nenhuma categoria neste filtro.'
-            }
-          />
-        ) : (
-          <SortableOrderList
-            items={filteredCategories}
-            onReorder={handleCategoriesReorder}
-            disabled={
-              saving ||
-              creatingCategory ||
-              editingCategoryId !== null ||
-              statusFilter !== 'all'
-            }
-            className="space-y-3"
-            renderItem={(category) => (
+            return (
               <div
-                className={`rounded-lg border border-admin-border bg-admin-panel p-4 transition-opacity ${
-                  category.ativo ? '' : 'opacity-60'
+                className={`rounded-xl border border-admin-border bg-admin-panel-2/50 overflow-hidden ${
+                  category.ativo ? '' : 'opacity-70'
                 }`}
               >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-white">{category.nome_admin}</h3>
-                      <StatusBadge variant={category.ativo ? 'success' : 'neutral'}>
-                        {category.ativo ? 'Ativa' : 'Inativa'}
-                      </StatusBadge>
-                      <span className="rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
-                        {category.slug}
-                      </span>
-                      <span className="rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
-                        {category.category_tipo === 'language' ? 'Idioma' : 'Menu'}
-                      </span>
-                      <span className="text-xs text-gray-500">Ordem {category.ordem}</span>
-                    </div>
-                    <p className="text-sm text-gray-400">{category.labels.pt.line1 || '—'}</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {menuItems.filter((item) => item.categoria_slug === category.slug).length} botões
-                      vinculados
-                    </p>
-                  </div>
+                <div className="p-4 md:p-5 border-b border-admin-border/70">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedCategories((current) => toggleExpanded(current, category.id))
+                        }
+                        className="mt-0.5 p-1 rounded-md text-gray-400 hover:text-white hover:bg-admin-panel transition-colors shrink-0"
+                        aria-label={isExpanded ? 'Recolher seção' : 'Expandir seção'}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
 
-                  <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                    <div className="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-panel-2 px-3 py-2">
-                      <span className="text-xs text-gray-400">Ativa</span>
-                      <ActiveToggle
-                        active={category.ativo}
-                        disabled={saving || togglingIds.has(category.id)}
-                        label={category.nome_admin}
-                        onToggle={() => void toggleCategoryAtivo(category)}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h3 className="text-white font-semibold">{category.nome_admin}</h3>
+                          <StatusBadge variant={category.ativo ? 'success' : 'neutral'}>
+                            {category.ativo ? 'Ativa' : 'Inativa'}
+                          </StatusBadge>
+                          <StatusBadge variant={isLanguage ? 'info' : 'neutral'}>
+                            {isLanguage ? 'Idioma' : 'Menu'}
+                          </StatusBadge>
+                          <span className="text-xs text-gray-500">#{category.ordem}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">{category.labels.pt.line1 || '—'}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Slug: <span className="font-mono text-gray-400">{category.slug}</span>
+                          {!isLanguage && (
+                            <>
+                              {' '}
+                              · {categoryItems.length} botão{categoryItems.length === 1 ? '' : 'es'}
+                            </>
+                          )}
+                        </p>
+                      </div>
                     </div>
-                    <Button
-                      variant="secondary"
-                      icon={Pencil}
-                      onClick={() => startEditCategory(category)}
-                      disabled={saving}
-                      className="!px-3 !py-1.5 !text-xs"
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="danger"
-                      icon={Trash2}
-                      onClick={() => void removeCategory(category)}
-                      disabled={saving}
-                      className="!px-3 !py-1.5 !text-xs"
-                    >
-                      Excluir
-                    </Button>
+
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
+                      <Button
+                        variant="ghost"
+                        icon={Power}
+                        onClick={() => void toggleCategoryAtivo(category)}
+                        disabled={saving || togglingIds.has(category.id)}
+                        className="!px-3 !py-1.5 !text-xs"
+                      >
+                        {category.ativo ? 'Desativar' : 'Ativar'}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        icon={Pencil}
+                        onClick={() => startEditCategory(category)}
+                        disabled={saving}
+                        className="!px-3 !py-1.5 !text-xs"
+                      >
+                        Editar seção
+                      </Button>
+                      <Button
+                        variant="danger"
+                        icon={Trash2}
+                        onClick={() => setDeletingCategory(category)}
+                        disabled={saving}
+                        className="!px-3 !py-1.5 !text-xs"
+                      >
+                        Excluir
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          />
-        )}
-      </div>
 
-      <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-white">
-              <Link2 className="h-5 w-5" />
-              Botões do menu
-            </h2>
-            <p className="text-sm text-gray-400">
-              Rotas, links externos, jogos e eventos exibidos na sidebar.
-            </p>
-          </div>
-          <Button
-            icon={Plus}
-            onClick={startCreateItem}
-            disabled={
-              saving ||
-              creatingItem ||
-              editingItemId !== null ||
-              menuCategoryOptions.length === 0
-            }
-            className="!px-3 !py-2 !text-sm"
-          >
-            Novo botão
-          </Button>
-        </div>
-
-        {menuCategoryOptions.length === 0 ? (
-          <p className="text-sm text-gray-400">Crie uma categoria do tipo menu antes de adicionar botões.</p>
-        ) : filteredMenuItems.length === 0 ? (
-          <EmptyState
-            icon={Link2}
-            title={
-              statusFilter === 'all' ? 'Nenhum botão cadastrado.' : 'Nenhum botão neste filtro.'
-            }
-          />
-        ) : (
-          <div className="space-y-6">
-            {menuCategoryOptions.map((category) => {
-              const categoryItems = filteredMenuItems.filter(
-                (item) => item.categoria_slug === category.slug,
-              );
-              if (categoryItems.length === 0) return null;
-
-              return (
-                <div key={category.id} className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2 border-b border-admin-border pb-2">
-                    <h3 className="text-sm font-semibold text-white">{category.nome_admin}</h3>
-                    <span className="text-xs text-gray-500">{category.slug}</span>
-                    {!category.ativo ? (
-                      <StatusBadge variant="warning">Categoria inativa</StatusBadge>
-                    ) : null}
-                    <span className="text-xs text-gray-500">
-                      {categoryItems.length} botão{categoryItems.length === 1 ? '' : 'es'}
-                    </span>
-                  </div>
-
-                  <SortableOrderList
-                    items={categoryItems}
-                    onReorder={async (reordered) => {
-                      const itemsByCategory = new Map<string, MenuItemRow[]>();
-                      for (const menuCategory of menuCategoryOptions) {
-                        if (menuCategory.slug === category.slug) {
-                          itemsByCategory.set(menuCategory.slug, applySequentialOrder(reordered));
-                          continue;
-                        }
-                        itemsByCategory.set(
-                          menuCategory.slug,
-                          menuItems.filter((row) => row.categoria_slug === menuCategory.slug),
-                        );
-                      }
-
-                      const orphanItems = menuItems.filter(
-                        (row) =>
-                          !menuCategoryOptions.some(
-                            (menuCategory) => menuCategory.slug === row.categoria_slug,
-                          ),
-                      );
-
-                      const merged = [
-                        ...menuCategoryOptions.flatMap(
-                          (menuCategory) => itemsByCategory.get(menuCategory.slug) || [],
-                        ),
-                        ...orphanItems,
-                      ];
-
-                      await handleItemsReorder(merged);
-                    }}
-                    disabled={
-                      saving ||
-                      creatingItem ||
-                      editingItemId !== null ||
-                      statusFilter !== 'all'
-                    }
-                    className="space-y-3"
-                    renderItem={(item) => (
-                      <div
-                        className={`rounded-lg border border-admin-border bg-admin-panel p-4 transition-opacity ${
-                          item.ativo ? '' : 'opacity-60'
-                        }`}
-                      >
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              {item.icon_type === 'iconify' && item.icon_value ? (
-                                <span
-                                  className="iconify text-gray-300"
-                                  data-icon={item.icon_value}
-                                  style={{ fontSize: '18px' }}
-                                />
-                              ) : null}
-                              <h3 className="font-semibold text-white">{item.nome_admin}</h3>
-                              <StatusBadge variant={item.ativo ? 'success' : 'neutral'}>
-                                {item.ativo ? 'Ativo' : 'Inativo'}
-                              </StatusBadge>
-                              {item.destaque ? (
-                                <StatusBadge variant="info">Negrito</StatusBadge>
-                              ) : null}
-                              <span className="rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
-                                {item.link_tipo}
-                              </span>
-                              <span className="text-xs text-gray-500">Ordem {item.ordem}</span>
-                            </div>
-                            <p className="text-sm text-gray-300">{item.labels.pt.line1 || '—'}</p>
-                            <p className="mt-1 truncate text-xs text-gray-500">
-                              {getMenuItemLinkLabel(item)}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                            <div className="flex items-center gap-2 rounded-lg border border-admin-border bg-admin-panel-2 px-3 py-2">
-                              <span className="text-xs text-gray-400">Ativo</span>
-                              <ActiveToggle
-                                active={item.ativo}
-                                disabled={saving || togglingIds.has(item.id)}
-                                label={item.nome_admin}
-                                onToggle={() => void toggleMenuItemAtivo(item)}
-                              />
-                            </div>
-                            <Button
-                              variant="secondary"
-                              icon={Pencil}
-                              onClick={() => startEditItem(item)}
-                              disabled={saving}
-                              className="!px-3 !py-1.5 !text-xs"
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="danger"
-                              icon={Trash2}
-                              onClick={() => void removeMenuItem(item.id)}
-                              disabled={saving}
-                              className="!px-3 !py-1.5 !text-xs"
-                            >
-                              Excluir
-                            </Button>
-                          </div>
+                {isExpanded && (
+                  <div className="p-4 md:p-5 pt-0 md:pt-0 bg-admin-panel/20">
+                    {isLanguage ? (
+                      <p className="text-sm text-gray-400 rounded-lg border border-dashed border-admin-border px-4 py-3">
+                        Seção de idioma — exibe o seletor PT / EN / ES na sidebar. Não possui botões
+                        vinculados.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-4">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                            Botões desta seção
+                          </p>
+                          <Button
+                            variant="secondary"
+                            icon={Plus}
+                            onClick={() => startCreateItem(category.slug)}
+                            disabled={modalBusy}
+                            className="!px-3 !py-1.5 !text-xs"
+                          >
+                            Adicionar botão
+                          </Button>
                         </div>
+
+                        {categoryItems.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-admin-border px-4 py-6 text-center">
+                            <p className="text-sm text-gray-400">Nenhum botão nesta seção.</p>
+                            <Button
+                              variant="ghost"
+                              icon={Plus}
+                              onClick={() => startCreateItem(category.slug)}
+                              disabled={modalBusy}
+                              className="!mt-3 !px-3 !py-1.5 !text-xs"
+                            >
+                              Criar primeiro botão
+                            </Button>
+                          </div>
+                        ) : (
+                          <SortableOrderList
+                            items={categoryItems}
+                            onReorder={async (reordered) => {
+                              const itemsByCategory = new Map<string, MenuItemRow[]>();
+                              for (const menuCategory of menuCategoryOptions) {
+                                if (menuCategory.slug === category.slug) {
+                                  itemsByCategory.set(menuCategory.slug, applySequentialOrder(reordered));
+                                  continue;
+                                }
+                                itemsByCategory.set(
+                                  menuCategory.slug,
+                                  menuItems.filter((row) => row.categoria_slug === menuCategory.slug),
+                                );
+                              }
+
+                              const orphanItems = menuItems.filter(
+                                (row) =>
+                                  !menuCategoryOptions.some(
+                                    (menuCategory) => menuCategory.slug === row.categoria_slug,
+                                  ),
+                              );
+
+                              const merged = [
+                                ...menuCategoryOptions.flatMap(
+                                  (menuCategory) => itemsByCategory.get(menuCategory.slug) || [],
+                                ),
+                                ...orphanItems,
+                              ];
+
+                              await handleItemsReorder(merged);
+                            }}
+                            disabled={modalBusy || statusFilter !== 'all'}
+                            className="space-y-2"
+                            renderItem={(item) => (
+                              <div
+                                className={`rounded-lg border border-admin-border bg-admin-panel px-3 py-3 ${
+                                  item.ativo ? '' : 'opacity-65'
+                                }`}
+                              >
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    {item.icon_type === 'iconify' && item.icon_value ? (
+                                      <span
+                                        className="iconify text-gray-300 mt-0.5 shrink-0"
+                                        data-icon={item.icon_value}
+                                        style={{ fontSize: '18px' }}
+                                      />
+                                    ) : (
+                                      <Link2 className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
+                                    )}
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                        <span className="text-sm font-medium text-white">
+                                          {item.labels.pt.line1 || item.nome_admin}
+                                        </span>
+                                        {item.destaque ? (
+                                          <StatusBadge variant="info">Negrito</StatusBadge>
+                                        ) : null}
+                                        <StatusBadge variant={item.ativo ? 'success' : 'neutral'}>
+                                          {item.ativo ? 'Ativo' : 'Inativo'}
+                                        </StatusBadge>
+                                      </div>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {item.nome_admin} · {getLinkTipoLabel(item.link_tipo)} ·{' '}
+                                        {getMenuItemLinkLabel(item)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2 shrink-0">
+                                    <Button
+                                      variant="ghost"
+                                      icon={Power}
+                                      onClick={() => void toggleMenuItemAtivo(item)}
+                                      disabled={saving || togglingIds.has(item.id)}
+                                      className="!px-2.5 !py-1.5 !text-xs"
+                                    >
+                                      {item.ativo ? 'Off' : 'On'}
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      icon={Pencil}
+                                      onClick={() => startEditItem(item)}
+                                      disabled={saving}
+                                      className="!px-2.5 !py-1.5 !text-xs"
+                                    >
+                                      Editar
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      icon={Trash2}
+                                      onClick={() => setDeletingItemId(item.id)}
+                                      disabled={saving}
+                                      className="!px-2.5 !py-1.5 !text-xs"
+                                    >
+                                      Excluir
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          />
+                        )}
                       </div>
                     )}
-                  />
-                </div>
-              );
-            })}
-
-            {filteredMenuItems.some(
-              (item) => !menuCategoryOptions.some((category) => category.slug === item.categoria_slug),
-            ) ? (
-              <div className="space-y-3">
-                <div className="border-b border-admin-border pb-2">
-                  <h3 className="text-sm font-semibold text-white">Sem categoria</h3>
-                </div>
-                {filteredMenuItems
-                  .filter(
-                    (item) =>
-                      !menuCategoryOptions.some((category) => category.slug === item.categoria_slug),
-                  )
-                  .map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-lg border border-admin-border bg-admin-panel p-4 opacity-80"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-white">{item.nome_admin}</p>
-                          <p className="text-xs text-gray-500">Categoria: {item.categoria_slug}</p>
-                        </div>
-                        <Button
-                          variant="secondary"
-                          icon={Pencil}
-                          onClick={() => startEditItem(item)}
-                          className="!px-3 !py-1.5 !text-xs"
-                        >
-                          Editar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                  </div>
+                )}
               </div>
-            ) : null}
+            );
+          }}
+        />
+      )}
+
+      {filteredMenuItems.some(
+        (item) => !menuCategoryOptions.some((category) => category.slug === item.categoria_slug),
+      ) ? (
+        <div className="rounded-xl border border-admin-warning/30 bg-admin-warning/5 p-4 md:p-5">
+          <h3 className="text-white font-semibold mb-1">Botões sem seção válida</h3>
+          <p className="text-gray-400 text-sm mb-4">
+            Estes botões apontam para uma seção que não existe ou foi removida. Edite para corrigir.
+          </p>
+          <div className="space-y-2">
+            {filteredMenuItems
+              .filter(
+                (item) =>
+                  !menuCategoryOptions.some((category) => category.slug === item.categoria_slug),
+              )
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-admin-border bg-admin-panel px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-white">{item.nome_admin}</p>
+                    <p className="text-xs text-gray-500">Seção: {item.categoria_slug}</p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    icon={Pencil}
+                    onClick={() => startEditItem(item)}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Corrigir
+                  </Button>
+                </div>
+              ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
+
+      <Modal
+        open={deletingCategory !== null}
+        onClose={() => setDeletingCategory(null)}
+        title="Excluir seção"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingCategory(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void removeCategory()} loading={saving}>
+              Excluir seção
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir a seção{' '}
+          <span className="text-white font-medium">{deletingCategory?.nome_admin}</span>?
+        </p>
+      </Modal>
+
+      <Modal
+        open={deletingItemId !== null}
+        onClose={() => setDeletingItemId(null)}
+        title="Excluir botão"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingItemId(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={() => void removeMenuItem()} loading={saving}>
+              Excluir botão
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir o botão{' '}
+          <span className="text-white font-medium">{itemToDelete?.nome_admin || 'selecionado'}</span>?
+        </p>
+      </Modal>
 
       <Modal
         open={creatingCategory}
@@ -1242,8 +1329,8 @@ export default function SidebarMenuAdmin() {
           setCreatingCategory(false);
           setCategoryForm(emptyCategoryForm);
         }}
-        title="Nova categoria"
-        description="Crie uma seção do menu lateral."
+        title="Nova seção"
+        description="Crie uma seção do menu lateral, como Cassino, Extras ou Idioma."
         icon={FolderTree}
         size="lg"
         footer={
@@ -1258,7 +1345,7 @@ export default function SidebarMenuAdmin() {
               Cancelar
             </Button>
             <Button onClick={saveCategory} loading={saving}>
-              Criar categoria
+              Criar seção
             </Button>
           </>
         }
@@ -1272,7 +1359,7 @@ export default function SidebarMenuAdmin() {
           setEditingCategoryId(null);
           setCategoryForm(emptyCategoryForm);
         }}
-        title={categoryForm.nome_admin ? `Editar: ${categoryForm.nome_admin}` : 'Editar categoria'}
+        title={categoryForm.nome_admin ? `Editar seção: ${categoryForm.nome_admin}` : 'Editar seção'}
         description="Atualize título, tipo e status da seção."
         icon={Pencil}
         size="lg"
@@ -1302,8 +1389,8 @@ export default function SidebarMenuAdmin() {
           setCreatingItem(false);
           setMenuItemForm(emptyMenuItemForm);
         }}
-        title="Novo botão do menu"
-        description="Configure rota, ícone e textos do botão."
+        title="Novo botão"
+        description="Configure rota, ícone e textos do botão da sidebar."
         icon={Link2}
         size="xl"
         footer={
@@ -1332,7 +1419,7 @@ export default function SidebarMenuAdmin() {
           setEditingItemId(null);
           setMenuItemForm(emptyMenuItemForm);
         }}
-        title={menuItemForm.nome_admin ? `Editar: ${menuItemForm.nome_admin}` : 'Editar botão'}
+        title={menuItemForm.nome_admin ? `Editar botão: ${menuItemForm.nome_admin}` : 'Editar botão'}
         description="Atualize link, ícone, textos e status do botão."
         icon={Pencil}
         size="xl"

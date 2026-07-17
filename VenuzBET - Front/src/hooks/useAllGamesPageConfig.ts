@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useSiteBrand } from './useSiteBrand';
+import { getOriginaisLabel, mapProprietaryProviderLabel } from '../lib/siteBrand';
 
 export interface AllGamesPageConfig {
   titulo: string;
@@ -30,7 +32,7 @@ export const DEFAULT_ALL_GAMES_PAGE_CONFIG: AllGamesPageConfig = {
 
 export const DEFAULT_ALL_GAMES_PROVIDERS: AllGamesProviderFilter[] = [
   { id: 'default-all', slug: 'all', nome: 'Todos', api_provider_id: null, ordem: 1, ativo: true },
-  { id: 'default-venuzbet', slug: 'venuzbet', nome: 'RoyalBet Originais', api_provider_id: null, ordem: 2, ativo: true },
+  { id: 'default-venuzbet', slug: 'venuzbet', nome: getOriginaisLabel(), api_provider_id: null, ordem: 2, ativo: true },
   { id: 'default-pgsoft', slug: 'pgsoft', nome: 'PG Soft', api_provider_id: 1, ordem: 3, ativo: true },
   { id: 'default-pragmatic', slug: 'pragmatic', nome: 'Pragmatic Play', api_provider_id: null, ordem: 4, ativo: true },
   { id: 'default-pragmaticlive', slug: 'pragmaticlive', nome: 'Pragmatic Live', api_provider_id: null, ordem: 5, ativo: true },
@@ -75,7 +77,18 @@ function normalizeCategory(row: Record<string, unknown>): AllGamesCategoryFilter
   };
 }
 
+function mapProvidersWithBrand(
+  rows: AllGamesProviderFilter[],
+  nomeBet: string,
+): AllGamesProviderFilter[] {
+  return rows.map((provider) => ({
+    ...provider,
+    nome: mapProprietaryProviderLabel(provider.slug, provider.nome, nomeBet),
+  }));
+}
+
 export function useAllGamesPageConfig() {
+  const { nomeBet } = useSiteBrand();
   const [pageConfig, setPageConfig] = useState<AllGamesPageConfig>(DEFAULT_ALL_GAMES_PAGE_CONFIG);
   const [providers, setProviders] = useState<AllGamesProviderFilter[]>(DEFAULT_ALL_GAMES_PROVIDERS);
   const [categories, setCategories] = useState<AllGamesCategoryFilter[]>(DEFAULT_ALL_GAMES_CATEGORIES);
@@ -101,11 +114,16 @@ export function useAllGamesPageConfig() {
 
       if (providersRes.error) {
         console.error('Erro ao buscar providers todos jogos:', providersRes.error);
-        setProviders(DEFAULT_ALL_GAMES_PROVIDERS);
+        setProviders(mapProvidersWithBrand(DEFAULT_ALL_GAMES_PROVIDERS, nomeBet));
       } else if (!providersRes.data?.length) {
-        setProviders(DEFAULT_ALL_GAMES_PROVIDERS);
+        setProviders(mapProvidersWithBrand(DEFAULT_ALL_GAMES_PROVIDERS, nomeBet));
       } else {
-        setProviders(providersRes.data.map((row) => normalizeProvider(row as Record<string, unknown>)));
+        setProviders(
+          mapProvidersWithBrand(
+            providersRes.data.map((row) => normalizeProvider(row as Record<string, unknown>)),
+            nomeBet,
+          ),
+        );
       }
 
       if (categoriesRes.error) {
@@ -119,12 +137,12 @@ export function useAllGamesPageConfig() {
     } catch (err) {
       console.error('Erro ao buscar config todos jogos:', err);
       setPageConfig(DEFAULT_ALL_GAMES_PAGE_CONFIG);
-      setProviders(DEFAULT_ALL_GAMES_PROVIDERS);
+      setProviders(mapProvidersWithBrand(DEFAULT_ALL_GAMES_PROVIDERS, nomeBet));
       setCategories(DEFAULT_ALL_GAMES_CATEGORIES);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [nomeBet]);
 
   useEffect(() => {
     void fetchConfig();

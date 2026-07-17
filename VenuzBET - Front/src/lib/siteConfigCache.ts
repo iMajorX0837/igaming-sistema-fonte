@@ -1,3 +1,5 @@
+import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, normalizeNomeBet, normalizeSiteTitulo } from './siteBrand';
+
 export interface HeaderConfig {
   fundo: string;
   logo_url: string;
@@ -22,12 +24,18 @@ export interface AuthModalsConfig {
   register_imagem_url: string;
 }
 
+export interface BrandConfig {
+  nome_bet: string;
+  site_titulo: string;
+}
+
 export interface SiteTheme {
   header: HeaderConfig;
   footer: FooterConfig;
   home: HomeConfig;
   sidebar: SidebarConfig;
   authModals: AuthModalsConfig;
+  brand: BrandConfig;
 }
 
 export const DEFAULT_AUTH_MODAL_IMAGE =
@@ -57,15 +65,23 @@ export const DEFAULT_AUTH_MODALS_CONFIG: AuthModalsConfig = {
   register_imagem_url: DEFAULT_AUTH_MODAL_IMAGE,
 };
 
+export const DEFAULT_BRAND_CONFIG: BrandConfig = {
+  nome_bet: DEFAULT_NOME_BET,
+  site_titulo: DEFAULT_SITE_TITULO,
+};
+
 export const DEFAULT_SITE_THEME: SiteTheme = {
   header: DEFAULT_HEADER_CONFIG,
   footer: DEFAULT_FOOTER_CONFIG,
   home: DEFAULT_HOME_CONFIG,
   sidebar: DEFAULT_SIDEBAR_CONFIG,
   authModals: DEFAULT_AUTH_MODALS_CONFIG,
+  brand: DEFAULT_BRAND_CONFIG,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v2';
+const STORAGE_KEY = 'venuz-site-theme-v5';
+
+export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
 function readCache(): Partial<SiteTheme> | null {
   if (typeof window === 'undefined') return null;
@@ -113,21 +129,49 @@ function normalizeAuthModals(row: Record<string, unknown> | null | undefined): A
   };
 }
 
+function normalizeBrandFromCache(brand: Partial<BrandConfig> | undefined): BrandConfig | null {
+  if (!brand) return null;
+  const nomeBet = String(brand.nome_bet ?? '').trim();
+  const siteTitulo = String(brand.site_titulo ?? '').trim();
+  if (!nomeBet && !siteTitulo) return null;
+  return {
+    nome_bet: normalizeNomeBet(nomeBet),
+    site_titulo: normalizeSiteTitulo(siteTitulo, nomeBet),
+  };
+}
+
+function normalizeBrand(row: Record<string, unknown> | null | undefined): BrandConfig {
+  if (!row) return DEFAULT_BRAND_CONFIG;
+  const nomeBet = normalizeNomeBet(row.nome_bet);
+  return {
+    nome_bet: nomeBet,
+    site_titulo: normalizeSiteTitulo(row.site_titulo, nomeBet),
+  };
+}
+
+const EMPTY_BRAND_CONFIG: BrandConfig = {
+  nome_bet: '',
+  site_titulo: '',
+};
+
 export function getInitialSiteTheme(): SiteTheme {
   const cached = readCache();
+  const cachedBrand = normalizeBrandFromCache(cached?.brand);
   return {
     header: { ...DEFAULT_HEADER_CONFIG, ...cached?.header },
     footer: { ...DEFAULT_FOOTER_CONFIG, ...cached?.footer },
     home: { ...DEFAULT_HOME_CONFIG, ...cached?.home },
     sidebar: { ...DEFAULT_SIDEBAR_CONFIG, ...cached?.sidebar },
     authModals: { ...DEFAULT_AUTH_MODALS_CONFIG, ...cached?.authModals },
+    brand: cachedBrand ?? EMPTY_BRAND_CONFIG,
   };
 }
 
 export function persistSiteTheme(theme: SiteTheme) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
+    const { brand: _brand, ...themeWithoutBrand } = theme;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(themeWithoutBrand));
   } catch {
     // ignore quota / private mode
   }
@@ -158,6 +202,7 @@ export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null
       login_imagem_url: row.login_modal_imagem_url,
       register_imagem_url: row.register_modal_imagem_url,
     }),
+    brand: normalizeBrand({ nome_bet: row.nome_bet, site_titulo: row.site_titulo }),
   };
 }
 
@@ -167,4 +212,5 @@ export {
   normalizeHome,
   normalizeSidebar,
   normalizeAuthModals,
+  normalizeBrand,
 };

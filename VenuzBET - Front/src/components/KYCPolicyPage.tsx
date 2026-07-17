@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface KYCPolicyPageProps {
   onBack: () => void;
 }
 
 export default function KYCPolicyPage({ onBack }: KYCPolicyPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -34,7 +36,7 @@ export default function KYCPolicyPage({ onBack }: KYCPolicyPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">VISÃO GERAL KYC</h2>
                 <div className="space-y-4">
                   <p>
-                    A Política KYC (Know Your Customer) do Royal Bet estabelece os procedimentos e requisitos para verificação de identidade e conformidade de nossos
+                    A Política KYC (Know Your Customer) do {nomeBet} estabelece os procedimentos e requisitos para verificação de identidade e conformidade de nossos
                     usuários. Esta política está em conformidade com regulamentações brasileiras e internacionais de combate à fraude e lavagem de dinheiro.
                   </p>
                 </div>

@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface ResponsibleGamingPageProps {
   onBack: () => void;
 }
 
 export default function ResponsibleGamingPage({ onBack }: ResponsibleGamingPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -34,7 +36,7 @@ export default function ResponsibleGamingPage({ onBack }: ResponsibleGamingPageP
                 <h2 className="text-white text-xl font-bold mb-4">COMPROMISSO COM JOGO RESPONSÁVEL</h2>
                 <div className="space-y-4">
                   <p>
-                    O Royal Bet está profundamente comprometido com a promoção de jogo responsável e seguro. Reconhecemos que o jogo pode ser prejudicial se não for
+                    O {nomeBet} está profundamente comprometido com a promoção de jogo responsável e seguro. Reconhecemos que o jogo pode ser prejudicial se não for
                     praticado de forma responsável e estamos dedicados a fornecer ferramentas e recursos para ajudar nossos clientes a jogar de forma segura.
                   </p>
                 </div>
@@ -214,7 +216,7 @@ export default function ResponsibleGamingPage({ onBack }: ResponsibleGamingPageP
                 <h2 className="text-white text-xl font-bold mb-4">CONFORMIDADE</h2>
                 <div className="space-y-4">
                   <p>
-                    O Royal Bet está em conformidade com todas as regulamentações de jogo responsável estabelecidas pelas autoridades regulatórias brasileiras e é
+                    O {nomeBet} está em conformidade com todas as regulamentações de jogo responsável estabelecidas pelas autoridades regulatórias brasileiras e é
                     membro de associações de jogo responsável.
                   </p>
                 </div>

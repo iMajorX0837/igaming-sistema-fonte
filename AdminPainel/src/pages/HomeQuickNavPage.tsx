@@ -10,7 +10,8 @@ import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-import { Zap } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import { Zap, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 
 type LinkTipo = 'href' | 'game';
 
@@ -61,14 +62,124 @@ function CardPreview({ titulo, imagemUrl }: { titulo: string; imagemUrl: string 
         <img src={imagemUrl} alt={titulo} className="h-full w-full object-cover" />
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-center">
-        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#FFFFFF80' }}>Jogue Agora</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: '#FFFFFF80' }}>
+          Jogue Agora
+        </span>
         <span className="line-clamp-2 text-[14px] font-bold leading-tight text-white">{titulo || 'Nome do jogo'}</span>
       </div>
     </div>
   );
 }
 
-export default function HomeQuickNavPage() {
+function CardFormFields({
+  form,
+  setForm,
+  idPrefix,
+}: {
+  form: typeof emptyForm;
+  setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>;
+  idPrefix: string;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Nome interno (admin)</label>
+          <input
+            type="text"
+            value={form.nome_admin}
+            onChange={(e) => setForm({ ...form, nome_admin: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="Ex: Fortune Tiger"
+          />
+        </div>
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Título no card</label>
+          <input
+            type="text"
+            value={form.titulo}
+            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="Nome exibido na home"
+          />
+        </div>
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
+          <input
+            type="number"
+            value={form.ordem}
+            onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Tipo de link</label>
+          <select
+            value={form.link_tipo}
+            onChange={(e) => setForm({ ...form, link_tipo: e.target.value as LinkTipo })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+          >
+            <option value="href">Página (URL interna)</option>
+            <option value="game">Jogo (busca por nome)</option>
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-gray-300 text-sm mb-1 block">URL da imagem</label>
+          <input
+            type="url"
+            value={form.imagem_url}
+            onChange={(e) => setForm({ ...form, imagem_url: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="https://..."
+          />
+        </div>
+        {form.link_tipo === 'href' ? (
+          <div className="md:col-span-2">
+            <label className="text-gray-300 text-sm mb-1 block">Link de destino</label>
+            <input
+              type="text"
+              value={form.href}
+              onChange={(e) => setForm({ ...form, href: e.target.value })}
+              className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+              placeholder="/games ou /pragmatic/spaceman"
+            />
+          </div>
+        ) : (
+          <div className="md:col-span-2">
+            <label className="text-gray-300 text-sm mb-1 block">Nome do jogo</label>
+            <input
+              type="text"
+              value={form.game_name}
+              onChange={(e) => setForm({ ...form, game_name: e.target.value })}
+              className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+              placeholder="Ex: Aviator, Mines, Fortune Tiger"
+            />
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id={`${idPrefix}-ativo`}
+            checked={form.ativo}
+            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
+            className="rounded"
+          />
+          <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">
+            Ativo
+          </label>
+        </div>
+      </div>
+      {form.imagem_url && (
+        <div className="mt-4">
+          <p className="text-gray-400 text-xs mb-2">Pré-visualização (96×142)</p>
+          <CardPreview titulo={form.titulo} imagemUrl={form.imagem_url} />
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function HomeQuickNavPage({ embedded = false }: { embedded?: boolean }) {
   const { showToast } = useToast();
   const [items, setItems] = useState<HomeQuickNavRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +188,7 @@ export default function HomeQuickNavPage() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(emptyForm);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadItems = async () => {
@@ -162,8 +274,8 @@ export default function HomeQuickNavPage() {
     return true;
   };
 
-  const saveEdit = async (id: string) => {
-    if (!validateForm(editForm)) return;
+  const saveEdit = async () => {
+    if (!editingId || !validateForm(editForm)) return;
 
     setSaving(true);
     try {
@@ -173,7 +285,7 @@ export default function HomeQuickNavPage() {
           ...buildPayload(editForm),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id)
+        .eq('id', editingId)
         .eq('secao', CMS_SECAO);
 
       if (updateError) {
@@ -213,12 +325,12 @@ export default function HomeQuickNavPage() {
     }
   };
 
-  const deleteItem = async (id: string) => {
-    if (!window.confirm('Deseja excluir este card?')) return;
+  const deleteItem = async () => {
+    if (!deletingId) return;
 
     setSaving(true);
     try {
-      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', id).eq('secao', CMS_SECAO);
+      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', deletingId).eq('secao', CMS_SECAO);
 
       if (deleteError) {
         showToast('Erro ao excluir card.', 'error');
@@ -226,7 +338,8 @@ export default function HomeQuickNavPage() {
       }
 
       showToast('Card excluído!', 'success');
-      if (editingId === id) cancelEdit();
+      if (editingId === deletingId) cancelEdit();
+      setDeletingId(null);
       await loadItems();
     } catch {
       showToast('Erro ao excluir card.', 'error');
@@ -270,114 +383,31 @@ export default function HomeQuickNavPage() {
     }
   };
 
-  const renderFormFields = (
-    form: typeof emptyForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>,
-    idPrefix: string
-  ) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Nome interno (admin)</label>
-        <input
-          type="text"
-          value={form.nome_admin}
-          onChange={(e) => setForm({ ...form, nome_admin: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Ex: Fortune Tiger"
+  const itemToDelete = items.find((i) => i.id === deletingId);
+  const modalBusy = editingId !== null || isCreating || saving || deletingId !== null;
+
+  const content = (
+    <>
+      {!embedded && (
+        <PageHeader
+          icon={Zap}
+          title="Atalhos da Home"
+          description="Configure os cards de atalhos da home (96×142). Segure o ícone à esquerda e arraste para reorganizar a ordem."
+          actions={
+            <Button icon={Plus} onClick={startCreate} disabled={modalBusy}>
+              Novo card
+            </Button>
+          }
         />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Título no card</label>
-        <input
-          type="text"
-          value={form.titulo}
-          onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Nome exibido na home"
-        />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
-        <input
-          type="number"
-          value={form.ordem}
-          onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-        />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Tipo de link</label>
-        <select
-          value={form.link_tipo}
-          onChange={(e) => setForm({ ...form, link_tipo: e.target.value as LinkTipo })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-        >
-          <option value="href">Página (URL interna)</option>
-          <option value="game">Jogo (busca por nome)</option>
-        </select>
-      </div>
-      <div className="md:col-span-2">
-        <label className="text-gray-300 text-sm mb-1 block">URL da imagem</label>
-        <input
-          type="url"
-          value={form.imagem_url}
-          onChange={(e) => setForm({ ...form, imagem_url: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="https://..."
-        />
-      </div>
-      {form.link_tipo === 'href' ? (
-        <div className="md:col-span-2">
-          <label className="text-gray-300 text-sm mb-1 block">Link de destino</label>
-          <input
-            type="text"
-            value={form.href}
-            onChange={(e) => setForm({ ...form, href: e.target.value })}
-            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-            placeholder="/games ou /pragmatic/spaceman"
-          />
-        </div>
-      ) : (
-        <div className="md:col-span-2">
-          <label className="text-gray-300 text-sm mb-1 block">Nome do jogo</label>
-          <input
-            type="text"
-            value={form.game_name}
-            onChange={(e) => setForm({ ...form, game_name: e.target.value })}
-            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-            placeholder="Ex: Aviator, Mines, Fortune Tiger"
-          />
+      )}
+
+      {embedded && (
+        <div className="flex justify-end mb-4">
+          <Button icon={Plus} onClick={startCreate} disabled={modalBusy}>
+            Novo card
+          </Button>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id={`${idPrefix}-ativo`}
-          checked={form.ativo}
-          onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-          className="rounded"
-        />
-        <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">Ativo</label>
-      </div>
-    </div>
-  );
-
-  return (
-    <div>
-      <PageHeader
-        icon={Zap}
-        title="Atalhos da Home"
-        description="Configure os cards de atalhos da home (96×142). Segure o ícone à esquerda e arraste para reorganizar a ordem."
-        actions={
-          <button
-            onClick={startCreate}
-            disabled={isCreating || saving}
-            className="px-4 py-2 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
-          >
-            Novo card
-          </button>
-        }
-      />
 
       <Modal
         open={isCreating}
@@ -397,111 +427,139 @@ export default function HomeQuickNavPage() {
           </>
         }
       >
-        {renderFormFields(createForm, setCreateForm, 'create')}
-        {createForm.imagem_url && (
-          <div className="mt-4">
-            <p className="text-gray-400 text-xs mb-2">Pré-visualização (96×142)</p>
-            <CardPreview titulo={createForm.titulo} imagemUrl={createForm.imagem_url} />
-          </div>
-        )}
+        <CardFormFields form={createForm} setForm={setCreateForm} idPrefix="create" />
+      </Modal>
+
+      <Modal
+        open={editingId !== null}
+        onClose={cancelEdit}
+        title={editForm.nome_admin ? `Editar: ${editForm.nome_admin}` : 'Editar card de atalho'}
+        description="Atualize as informações do card de atalho."
+        icon={Pencil}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} loading={saving}>
+              Salvar alterações
+            </Button>
+          </>
+        }
+      >
+        <CardFormFields form={editForm} setForm={setEditForm} idPrefix="edit" />
+      </Modal>
+
+      <Modal
+        open={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        title="Excluir card"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingId(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={deleteItem} loading={saving}>
+              Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir o card{' '}
+          <span className="text-white font-medium">{itemToDelete?.nome_admin || 'selecionado'}</span>?
+        </p>
       </Modal>
 
       {loading ? (
-        <LoadingState message="Carregando cards..." />
+        <LoadingState message="Carregando cards..." inline={embedded} />
       ) : error ? (
-        <PagePanel>
+        embedded ? (
           <p className="text-admin-danger">{error}</p>
-        </PagePanel>
+        ) : (
+          <PagePanel>
+            <p className="text-admin-danger">{error}</p>
+          </PagePanel>
+        )
       ) : items.length === 0 ? (
-        <PagePanel>
+        embedded ? (
           <EmptyState icon={Zap} title="Nenhum card cadastrado." description="Clique em Novo card para começar." />
-        </PagePanel>
+        ) : (
+          <PagePanel>
+            <EmptyState icon={Zap} title="Nenhum card cadastrado." description="Clique em Novo card para começar." />
+          </PagePanel>
+        )
       ) : (
         <SortableOrderList
           items={items}
           onReorder={handleItemsReorder}
-          disabled={editingId !== null || isCreating || saving}
-          className="space-y-4"
+          disabled={modalBusy}
+          className="space-y-3"
           renderItem={(item) => (
-            <PagePanel className="p-4 md:p-6">
+            <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
               <div className="flex flex-col lg:flex-row gap-4">
                 <CardPreview titulo={item.titulo} imagemUrl={item.imagem_url} />
 
                 <div className="flex-1 min-w-0">
-                  {editingId === item.id ? (
-                    <div className="space-y-3">
-                      {renderFormFields(editForm, setEditForm, `edit-${item.id}`)}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => saveEdit(item.id)}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-admin-info hover:bg-admin-info/90 text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="text-white font-semibold">{item.nome_admin}</h3>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            item.ativo ? 'bg-green-900/50 text-admin-success' : 'bg-gray-700 text-gray-400'
-                          }`}
-                        >
-                          {item.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <span className="text-gray-500 text-xs">Ordem: {item.ordem}</span>
-                      </div>
-                      <p className="text-gray-300 text-sm mb-1">
-                        <span className="text-gray-500">Título:</span> {item.titulo}
-                      </p>
-                      <p className="text-gray-400 text-xs mb-1 break-all">
-                        <span className="text-gray-500">Imagem:</span> {item.imagem_url}
-                      </p>
-                      <p className="text-gray-400 text-xs mb-3">
-                        <span className="text-gray-500">Destino:</span>{' '}
-                        {item.link_tipo === 'href' ? item.href : `Jogo: ${item.game_name}`}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => startEdit(item)}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-admin-info hover:bg-admin-info/90 text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => toggleAtivo(item)}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          {item.ativo ? 'Desativar' : 'Ativar'}
-                        </button>
-                        <button
-                          onClick={() => deleteItem(item.id)}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="text-white font-semibold">{item.nome_admin}</h3>
+                    <StatusBadge variant={item.ativo ? 'success' : 'neutral'}>
+                      {item.ativo ? 'Ativo' : 'Inativo'}
+                    </StatusBadge>
+                    <span className="text-gray-500 text-xs">Ordem: {item.ordem}</span>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-1">
+                    <span className="text-gray-500">Título:</span> {item.titulo}
+                  </p>
+                  <p className="text-gray-400 text-xs mb-1 break-all">
+                    <span className="text-gray-500">Imagem:</span> {item.imagem_url}
+                  </p>
+                  <p className="text-gray-400 text-xs">
+                    <span className="text-gray-500">Destino:</span>{' '}
+                    {item.link_tipo === 'href' ? item.href : `Jogo: ${item.game_name}`}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch shrink-0">
+                  <Button
+                    variant="secondary"
+                    icon={Pencil}
+                    onClick={() => startEdit(item)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    icon={Power}
+                    onClick={() => toggleAtivo(item)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    {item.ativo ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    icon={Trash2}
+                    onClick={() => setDeletingId(item.id)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Excluir
+                  </Button>
                 </div>
               </div>
-            </PagePanel>
+            </div>
           )}
         />
       )}
-    </div>
+    </>
   );
+
+  return embedded ? content : <div>{content}</div>;
 }

@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface AMLPolicyPageProps {
   onBack: () => void;
 }
 
 export default function AMLPolicyPage({ onBack }: AMLPolicyPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -34,7 +36,7 @@ export default function AMLPolicyPage({ onBack }: AMLPolicyPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">VISÃO GERAL AML</h2>
                 <div className="space-y-4">
                   <p>
-                    O Royal Bet está comprometido em cumprir todas as leis e regulamentações de Prevenção à Lavagem de Dinheiro (Anti-Money Laundering - AML) e de
+                    O {nomeBet} está comprometido em cumprir todas as leis e regulamentações de Prevenção à Lavagem de Dinheiro (Anti-Money Laundering - AML) e de
                     Combate ao Financiamento do Terrorismo (CFT) aplicáveis.
                   </p>
                   <p>
@@ -48,7 +50,7 @@ export default function AMLPolicyPage({ onBack }: AMLPolicyPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">CONFORMIDADE REGULATÓRIA</h2>
                 <div className="space-y-4">
                   <p>
-                    O Royal Bet está em conformidade com:
+                    O {nomeBet} está em conformidade com:
                   </p>
                   <p className="pl-4">
                     • Lei nº 9.613/1998 (Lei de Lavagem de Dinheiro do Brasil)

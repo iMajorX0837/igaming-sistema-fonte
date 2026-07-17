@@ -7,7 +7,10 @@ import { persistTableOrder } from '../lib/persistTableOrder';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
-import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import Button from '../components/ui/Button';
+import StatusBadge from '../components/ui/StatusBadge';
+import { ChevronLeft, ChevronRight, LayoutGrid, Pencil, Power } from 'lucide-react';
 
 type SectionType = 'estudios' | 'recomendados' | 'jogos_pg' | 'jogos_mesa' | 'jogos_turbo';
 
@@ -34,7 +37,7 @@ const defaultHomeBackground = {
   fundo: '#121319',
 };
 
-export default function HomeSectionsPage() {
+export default function HomeSectionsPage({ embedded = false }: { embedded?: boolean }) {
   const { showToast } = useToast();
   const [sections, setSections] = useState<HomeSectionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,7 @@ export default function HomeSectionsPage() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configSaving, setConfigSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<HomeSectionRow | null>(null);
   const [editForm, setEditForm] = useState({
     titulo: '',
     ordem: 1,
@@ -130,6 +134,7 @@ export default function HomeSectionsPage() {
 
   const startEdit = (section: HomeSectionRow) => {
     setEditingId(section.id);
+    setEditingSection(section);
     setEditForm({
       titulo: section.titulo,
       ordem: section.ordem,
@@ -139,7 +144,13 @@ export default function HomeSectionsPage() {
     });
   };
 
-  const saveEdit = async (id: string) => {
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingSection(null);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
     if (!editForm.titulo.trim()) {
       showToast('Informe o título da seção.', 'error');
       return;
@@ -157,7 +168,7 @@ export default function HomeSectionsPage() {
           use_green_button: editForm.use_green_button,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', editingId);
 
       if (error) {
         showToast('Erro ao salvar seção.', 'error');
@@ -165,7 +176,7 @@ export default function HomeSectionsPage() {
       }
 
       showToast('Seção atualizada! A ordem na home foi reorganizada.', 'success');
-      setEditingId(null);
+      cancelEdit();
       await loadSections();
     } finally {
       setSaving(false);
@@ -204,130 +215,174 @@ export default function HomeSectionsPage() {
     }
   };
 
-  if (loading) {
+  if (loading && !embedded) {
     return <LoadingState message="Carregando seções..." />;
   }
 
-  return (
-    <div>
-      <PageHeader
-        icon={LayoutGrid}
-        title="Seções da Home"
-        description="Defina a ordem das seções na home: Estúdios, Jogos Turbo, Jogos de Mesa, Jogos da PG e Recomendados. Segure o ícone à esquerda e arraste para reorganizar."
-      />
+  const backgroundPanel = (
+    <div className={`rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5 ${embedded ? 'mb-5' : 'mb-6'}`}>
+      <h2 className="text-white text-base font-semibold mb-1">Cor de fundo da Home</h2>
+      <p className="text-gray-400 text-sm mb-5">Personalize a cor de fundo da página inicial do site.</p>
 
-      <PagePanel className="mb-6">
-        <h2 className="text-white text-lg font-semibold mb-1">Cor de fundo da Home</h2>
-        <p className="text-gray-400 text-sm mb-5">
-          Personalize a cor de fundo da página inicial do site.
-        </p>
-
-        {configLoading ? (
-          <LoadingState inline message="Carregando cores..." />
-        ) : (
-          <div className="flex items-end gap-4 flex-wrap">
-            <ColorField
-              label="Fundo da home"
-              value={homeBackground.fundo}
-              onChange={(v) => setHomeBackground({ fundo: v })}
-            />
-            <div
-              className="w-40 h-16 rounded-lg border border-white/10 shrink-0"
-              style={{ backgroundColor: homeBackground.fundo }}
-            />
-            <HomeSliderControlsPreview fundo={homeBackground.fundo} />
-            <button
-              onClick={saveHomeBackground}
-              disabled={configSaving}
-              className="px-4 py-2 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
-            >
-              {configSaving ? 'Salvando...' : 'Salvar cor da home'}
-            </button>
-          </div>
-        )}
-      </PagePanel>
-
-      <SortableOrderList
-        items={sections}
-        onReorder={handleSectionsReorder}
-        disabled={editingId !== null || saving}
-        renderItem={(section) => (
-          <PagePanel className="p-4 md:p-5">
-            {editingId === section.id ? (
-              <div className="space-y-3">
-                <h3 className="text-white font-semibold">Editar: {TYPE_LABELS[section.tipo]}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Field label="Título exibido" value={editForm.titulo} onChange={(v) => setEditForm({ ...editForm, titulo: v })} />
-                  <Field label="Ordem (1 = primeiro)" type="number" value={String(editForm.ordem)} onChange={(v) => setEditForm({ ...editForm, ordem: Number(v) })} />
-                  {(section.tipo === 'estudios' || section.tipo.startsWith('jogos_')) && (
-                    <Field
-                      label="Link Ver Tudo"
-                      value={editForm.view_all_link}
-                      onChange={(v) => setEditForm({ ...editForm, view_all_link: v })}
-                      className="md:col-span-2"
-                      placeholder="/providers"
-                    />
-                  )}
-                  {section.tipo.startsWith('jogos_') && (
-                    <label className="flex items-center gap-2 text-gray-300 text-sm md:col-span-2">
-                      <input
-                        type="checkbox"
-                        checked={editForm.use_green_button}
-                        onChange={(e) => setEditForm({ ...editForm, use_green_button: e.target.checked })}
-                        className="rounded"
-                      />
-                      Botão JOGAR verde
-                    </label>
-                  )}
-                  <label className="flex items-center gap-2 text-gray-300 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={editForm.ativo}
-                      onChange={(e) => setEditForm({ ...editForm, ativo: e.target.checked })}
-                      className="rounded"
-                    />
-                    Ativo na home
-                  </label>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => saveEdit(section.id)} disabled={saving} className="px-3 py-1.5 rounded bg-admin-info hover:bg-admin-info/90 text-white text-xs font-medium disabled:opacity-50">
-                    Salvar
-                  </button>
-                  <button onClick={() => setEditingId(null)} disabled={saving} className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium">
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span className="text-admin-accent text-xs font-bold">#{section.ordem}</span>
-                    <h3 className="text-white font-semibold">{section.titulo}</h3>
-                    <span className="text-gray-500 text-xs">({TYPE_LABELS[section.tipo]})</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${section.ativo ? 'bg-green-900/50 text-admin-success' : 'bg-gray-700 text-gray-400'}`}>
-                      {section.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                  {section.view_all_link && (
-                    <p className="text-gray-500 text-xs">Ver tudo: {section.view_all_link}</p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => startEdit(section)} disabled={saving} className="px-3 py-1.5 rounded bg-admin-info hover:bg-admin-info/90 text-white text-xs font-medium disabled:opacity-50">
-                    Editar ordem
-                  </button>
-                  <button onClick={() => toggleAtivo(section)} disabled={saving} className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium disabled:opacity-50">
-                    {section.ativo ? 'Ocultar' : 'Exibir'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </PagePanel>
-        )}
-      />
+      {configLoading ? (
+        <LoadingState inline message="Carregando cores..." />
+      ) : (
+        <div className="flex items-end gap-4 flex-wrap">
+          <ColorField
+            label="Fundo da home"
+            value={homeBackground.fundo}
+            onChange={(v) => setHomeBackground({ fundo: v })}
+          />
+          <div
+            className="w-40 h-16 rounded-lg border border-white/10 shrink-0"
+            style={{ backgroundColor: homeBackground.fundo }}
+          />
+          <HomeSliderControlsPreview fundo={homeBackground.fundo} />
+          <Button onClick={saveHomeBackground} loading={configSaving}>
+            Salvar cor
+          </Button>
+        </div>
+      )}
     </div>
   );
+
+  const sectionsList = loading ? (
+    <LoadingState inline message="Carregando seções..." />
+  ) : (
+    <SortableOrderList
+      items={sections}
+      onReorder={handleSectionsReorder}
+      disabled={editingId !== null || saving}
+      className="space-y-3"
+      renderItem={(section) => (
+        <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="text-admin-accent text-xs font-bold">#{section.ordem}</span>
+                <h3 className="text-white font-semibold">{section.titulo}</h3>
+                <span className="text-gray-500 text-xs">({TYPE_LABELS[section.tipo]})</span>
+                <StatusBadge variant={section.ativo ? 'success' : 'neutral'}>
+                  {section.ativo ? 'Ativo' : 'Inativo'}
+                </StatusBadge>
+              </div>
+              {section.view_all_link && (
+                <p className="text-gray-500 text-xs">Ver tudo: {section.view_all_link}</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                icon={Pencil}
+                onClick={() => startEdit(section)}
+                disabled={saving}
+                className="!px-3 !py-1.5 !text-xs"
+              >
+                Editar
+              </Button>
+              <Button
+                variant="ghost"
+                icon={Power}
+                onClick={() => toggleAtivo(section)}
+                disabled={saving}
+                className="!px-3 !py-1.5 !text-xs"
+              >
+                {section.ativo ? 'Ocultar' : 'Exibir'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    />
+  );
+
+  const content = (
+    <>
+      {!embedded && (
+        <PageHeader
+          icon={LayoutGrid}
+          title="Seções da Home"
+          description="Defina a ordem das seções na home: Estúdios, Jogos Turbo, Jogos de Mesa, Jogos da PG e Recomendados. Segure o ícone à esquerda e arraste para reorganizar."
+        />
+      )}
+
+      <Modal
+        open={editingId !== null && editingSection !== null}
+        onClose={cancelEdit}
+        title={editingSection ? `Editar: ${TYPE_LABELS[editingSection.tipo]}` : 'Editar seção'}
+        description="Configure título, ordem e opções de exibição da seção na home."
+        icon={Pencil}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} loading={saving}>
+              Salvar alterações
+            </Button>
+          </>
+        }
+      >
+        {editingSection && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Título exibido" value={editForm.titulo} onChange={(v) => setEditForm({ ...editForm, titulo: v })} />
+            <Field
+              label="Ordem (1 = primeiro)"
+              type="number"
+              value={String(editForm.ordem)}
+              onChange={(v) => setEditForm({ ...editForm, ordem: Number(v) })}
+            />
+            {(editingSection.tipo === 'estudios' || editingSection.tipo.startsWith('jogos_')) && (
+              <Field
+                label="Link Ver Tudo"
+                value={editForm.view_all_link}
+                onChange={(v) => setEditForm({ ...editForm, view_all_link: v })}
+                className="md:col-span-2"
+                placeholder="/providers"
+              />
+            )}
+            {editingSection.tipo.startsWith('jogos_') && (
+              <label className="flex items-center gap-2 text-gray-300 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={editForm.use_green_button}
+                  onChange={(e) => setEditForm({ ...editForm, use_green_button: e.target.checked })}
+                  className="rounded"
+                />
+                Botão JOGAR verde
+              </label>
+            )}
+            <label className="flex items-center gap-2 text-gray-300 text-sm">
+              <input
+                type="checkbox"
+                checked={editForm.ativo}
+                onChange={(e) => setEditForm({ ...editForm, ativo: e.target.checked })}
+                className="rounded"
+              />
+              Ativo na home
+            </label>
+          </div>
+        )}
+      </Modal>
+
+      {embedded ? (
+        <>
+          {backgroundPanel}
+          {sectionsList}
+        </>
+      ) : (
+        <>
+          {backgroundPanel}
+          <PagePanel padding={false} className="p-0 border-0 bg-transparent shadow-none">
+            {sectionsList}
+          </PagePanel>
+        </>
+      )}
+    </>
+  );
+
+  return embedded ? content : <div>{content}</div>;
 }
 
 function HomeSliderControlsPreview({ fundo }: { fundo: string }) {

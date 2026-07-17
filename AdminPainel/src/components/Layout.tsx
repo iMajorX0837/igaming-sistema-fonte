@@ -17,15 +17,13 @@ import {
   KeyRound,
   PanelLeft,
   Gamepad2,
-  LayoutGrid,
   Megaphone,
-  Gift,
-  Star,
-  Zap,
   CircleDot,
   Plane,
   Ticket,
   ChevronDown,
+  Home,
+  BadgeCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -71,10 +69,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'promocoes',
     title: 'Promoções',
-    items: [
-      { path: '/cupons', icon: Ticket, label: 'Cupons' },
-      { path: '/roleta', icon: CircleDot, label: 'Roleta de Prêmios' },
-    ],
+    items: [{ path: '/cupons', icon: Ticket, label: 'Cupons' }],
   },
   {
     id: 'jogos',
@@ -82,20 +77,19 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/jogos', icon: Gamepad2, label: 'Catálogo de Jogos' },
       { path: '/aviator-rtp', icon: Plane, label: 'Aviator RTP' },
-      { path: '/todos-jogos', icon: LayoutGrid, label: 'Config. Todos os Jogos' },
+      { path: '/todos-jogos', icon: Gamepad2, label: 'Config. Todos os Jogos' },
     ],
   },
   {
-    id: 'site',
-    title: 'Aparência do Site',
+    id: 'site-layout',
+    title: 'Layout do Site',
     items: [
-      { path: '/banners', icon: Image, label: 'Banners Home' },
-      { path: '/recomendados', icon: Star, label: 'Recomendados' },
-      { path: '/atalhos-home', icon: Zap, label: 'Atalhos da Home' },
-      { path: '/home-secoes', icon: LayoutGrid, label: 'Seções da Home' },
-      { path: '/promocoes', icon: Gift, label: 'Promoções' },
+      { path: '/identidade-site', icon: BadgeCheck, label: 'Identidade do Site' },
+      { path: '/home-cms', icon: Home, label: 'Página Inicial', matchPrefix: true },
+      { path: '/sidebar-cards', icon: PanelLeft, label: 'Sidebar & Layout' },
       { path: '/top-banner', icon: Megaphone, label: 'Banner Topo' },
-      { path: '/sidebar-cards', icon: PanelLeft, label: 'Sidebar' },
+      { path: '/promocoes', icon: Image, label: 'Banners da Página' },
+      { path: '/roleta', icon: CircleDot, label: 'Roleta de Prêmios' },
     ],
   },
   {

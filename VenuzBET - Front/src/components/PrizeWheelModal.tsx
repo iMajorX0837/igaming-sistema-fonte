@@ -369,7 +369,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
                 disabled={!canSpin}
 
-                className={`prize-wheel-modal__spin-btn ${isSpinning ? 'is-spinning' : ''} ${hasSpun ? 'is-used' : ''}`}
+                className={`prize-wheel-modal__spin-btn ${isSpinning ? 'is-spinning' : ''} ${!canSpin && !isSpinning ? 'is-unavailable' : ''}`}
 
                 aria-label={isSpinning ? 'Roleta girando' : 'Girar roleta'}
 
@@ -404,16 +404,6 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
               {!isAuthenticated && (
 
                 <p className="text-sm text-amber-300">Faça login para girar a roleta.</p>
-
-              )}
-
-              {isAuthenticated && status && !status.pode_girar && !hasSpun && (
-
-                <p className="text-sm text-gray-300">
-
-                  Você já utilizou seu giro. Volte em {status.cooldown_horas}h para girar novamente.
-
-                </p>
 
               )}
 

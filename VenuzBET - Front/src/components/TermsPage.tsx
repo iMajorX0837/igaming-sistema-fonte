@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface TermsPageProps {
   onBack: () => void;
 }
 
 export default function TermsPage({ onBack }: TermsPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -39,15 +41,15 @@ export default function TermsPage({ onBack }: TermsPageProps) {
                   </p>
                   <p>
                     Leia estes Termos com atenção, pois eles constituem um acordo legal vinculativo entre você, que é nosso cliente (o "Cliente" ou "você"), e nós, que
-                    operamos o Royal Bet. Ao abrir uma conta (a "Conta") em nossa plataforma e utilizar o Serviço, você confirma que leu, compreendeu e concorda
+                    operamos o {nomeBet}. Ao abrir uma conta (a "Conta") em nossa plataforma e utilizar o Serviço, você confirma que leu, compreendeu e concorda
                     integralmente com estes Termos.
                   </p>
                   <p>
-                    O Serviço é fornecido pelo Royal Bet, empresa autorizada a operar apostas de quota fixa no Brasil, conforme regulamentação da Secretaria de Prêmios e
+                    O Serviço é fornecido pelo {nomeBet}, empresa autorizada a operar apostas de quota fixa no Brasil, conforme regulamentação da Secretaria de Prêmios e
                     Apostas do Ministério da Fazenda.
                   </p>
                   <p>
-                    Todo o uso do Site e da Plataforma do Royal Bet está sujeito a estes Termos e Condições.
+                    Todo o uso do Site e da Plataforma do {nomeBet} está sujeito a estes Termos e Condições.
                   </p>
                 </div>
               </section>
@@ -203,7 +205,7 @@ export default function TermsPage({ onBack }: TermsPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">PROPRIEDADE INTELECTUAL</h2>
                 <div className="space-y-4">
                   <p>
-                    Todo o conteúdo disponível no Site, incluindo textos, gráficos, logos, imagens, vídeos e software, é de propriedade exclusiva do Royal Bet ou de seus
+                    Todo o conteúdo disponível no Site, incluindo textos, gráficos, logos, imagens, vídeos e software, é de propriedade exclusiva do {nomeBet} ou de seus
                     licenciadores e está protegido por leis de direitos autorais e propriedade intelectual.
                   </p>
                   <p>

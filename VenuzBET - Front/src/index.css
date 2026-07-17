@@ -35,6 +35,15 @@
     height: 0 !important;
   }
 
+  .game-player-stage:fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    background-color: #000 !important;
+  }
+
   .owner-alert {
     display: flex;
     flex-direction: column;
@@ -276,9 +285,9 @@
     animation: prizeWheelSpinPulse 0.8s ease-in-out infinite;
   }
 
-  .prize-wheel-modal__spin-btn.is-used {
+  .prize-wheel-modal__spin-btn.is-unavailable img {
+    filter: grayscale(1);
     opacity: 0.85;
-    filter: grayscale(0.2);
   }
 
   @keyframes prizeWheelSpinPulse {

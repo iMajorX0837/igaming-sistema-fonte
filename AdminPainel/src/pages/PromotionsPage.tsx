@@ -10,7 +10,8 @@ import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-import { Gift } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import { Gift, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 
 interface PromotionBanner {
   id: string;
@@ -77,6 +78,7 @@ export default function PromotionsPage() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(emptyForm);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadBanners = async () => {
@@ -177,14 +179,14 @@ export default function PromotionsPage() {
     setCreateForm(emptyForm);
   };
 
-  const saveEdit = async (id: string) => {
-    if (!validateForm(editForm)) return;
+  const saveEdit = async () => {
+    if (!editingId || !validateForm(editForm)) return;
     setSaving(true);
     try {
       const { error: updateError } = await supabase
         .from('cms_items')
         .update(buildPayload(editForm))
-        .eq('id', id)
+        .eq('id', editingId)
         .eq('secao', CMS_SECAO);
 
       if (updateError) {
@@ -222,17 +224,18 @@ export default function PromotionsPage() {
     }
   };
 
-  const deleteBanner = async (id: string) => {
-    if (!window.confirm('Deseja excluir esta promoção?')) return;
+  const deleteBanner = async () => {
+    if (!deletingId) return;
     setSaving(true);
     try {
-      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', id).eq('secao', CMS_SECAO);
+      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', deletingId).eq('secao', CMS_SECAO);
       if (deleteError) {
         showToast('Erro ao excluir promoção.', 'error');
         return;
       }
       showToast('Promoção excluída!', 'success');
-      if (editingId === id) cancelEdit();
+      if (editingId === deletingId) cancelEdit();
+      setDeletingId(null);
       await loadBanners();
     } catch {
       showToast('Erro ao excluir promoção.', 'error');
@@ -337,34 +340,8 @@ export default function PromotionsPage() {
     </>
   );
 
-  const renderForm = (
-    title: string,
-    form: typeof emptyForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>,
-    onSave: () => void,
-    onCancel: () => void
-  ) => (
-    <div>
-      <h3 className="text-white font-semibold mb-4">{title}</h3>
-      {renderFormFields(form, setForm, title)}
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-4 py-2 rounded bg-admin-info hover:bg-admin-info/90 text-white text-sm font-medium disabled:opacity-50"
-        >
-          Salvar
-        </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-white text-sm font-medium"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
+  const bannerToDelete = banners.find((b) => b.id === deletingId);
+  const modalBusy = editingId !== null || isCreating || saving || deletingId !== null;
 
   return (
     <div>
@@ -373,13 +350,9 @@ export default function PromotionsPage() {
         title="Promoções"
         description={`Configure os banners da página de Promoções no tamanho fixo ${BANNER_WIDTH}x${BANNER_HEIGHT}px. Segure o ícone à esquerda e arraste para reorganizar a ordem.`}
         actions={
-          <button
-            onClick={startCreate}
-            disabled={isCreating || saving}
-            className="px-4 py-2 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
-          >
+          <Button icon={Plus} onClick={startCreate} disabled={modalBusy}>
             Nova promoção
-          </button>
+          </Button>
         }
       />
 
@@ -404,6 +377,51 @@ export default function PromotionsPage() {
         {renderFormFields(createForm, setCreateForm, 'create')}
       </Modal>
 
+      <Modal
+        open={editingId !== null}
+        onClose={cancelEdit}
+        title={editForm.nome_admin ? `Editar: ${editForm.nome_admin}` : 'Editar promoção'}
+        description={`Atualize o banner de promoção no tamanho ${BANNER_WIDTH}x${BANNER_HEIGHT}px.`}
+        icon={Pencil}
+        size="xl"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} loading={saving}>
+              Salvar alterações
+            </Button>
+          </>
+        }
+      >
+        {renderFormFields(editForm, setEditForm, 'edit')}
+      </Modal>
+
+      <Modal
+        open={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        title="Excluir promoção"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingId(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={deleteBanner} loading={saving}>
+              Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir a promoção{' '}
+          <span className="text-white font-medium">{bannerToDelete?.nome_admin || 'selecionada'}</span>?
+        </p>
+      </Modal>
+
       {loading ? (
         <LoadingState message="Carregando promoções..." />
       ) : error ? (
@@ -418,63 +436,61 @@ export default function PromotionsPage() {
         <SortableOrderList
           items={banners}
           onReorder={handleBannersReorder}
-          disabled={editingId !== null || isCreating || saving}
-          className="space-y-4"
+          disabled={modalBusy}
+          className="space-y-3"
           renderItem={(banner) => (
-            <PagePanel className="p-4 md:p-6">
-              {editingId === banner.id ? (
-                renderForm(`Editar: ${banner.nome_admin}`, editForm, setEditForm, () => saveEdit(banner.id), cancelEdit)
-              ) : (
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <BannerPreview
-                    titulo={banner.titulo}
-                    texto={banner.texto}
-                    imagem_url={banner.imagem_url || ''}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h3 className="text-white font-semibold">{banner.nome_admin}</h3>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          banner.ativo ? 'bg-green-900/50 text-admin-success' : 'bg-gray-700 text-gray-400'
-                        }`}
-                      >
-                        {banner.ativo ? 'Ativo' : 'Inativo'}
-                      </span>
-                      <span className="text-gray-500 text-xs">Ordem: {banner.ordem}</span>
-                    </div>
-                    <p className="text-white text-sm font-medium mb-1">{banner.titulo}</p>
-                    <p className="text-gray-400 text-xs line-clamp-3">{banner.texto}</p>
-                    {banner.imagem_url && (
-                      <p className="text-gray-500 text-xs break-all mt-2">{banner.imagem_url}</p>
-                    )}
+            <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-6">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <BannerPreview
+                  titulo={banner.titulo}
+                  texto={banner.texto}
+                  imagem_url={banner.imagem_url || ''}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="text-white font-semibold">{banner.nome_admin}</h3>
+                    <StatusBadge variant={banner.ativo ? 'success' : 'neutral'}>
+                      {banner.ativo ? 'Ativo' : 'Inativo'}
+                    </StatusBadge>
+                    <span className="text-gray-500 text-xs">Ordem: {banner.ordem}</span>
                   </div>
-                  <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end shrink-0">
-                    <button
-                      onClick={() => startEdit(banner)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-xs font-medium disabled:opacity-50"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => toggleAtivo(banner)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium disabled:opacity-50"
-                    >
-                      {banner.ativo ? 'Desativar' : 'Ativar'}
-                    </button>
-                    <button
-                      onClick={() => deleteBanner(banner.id)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium disabled:opacity-50"
-                    >
-                      Excluir
-                    </button>
-                  </div>
+                  <p className="text-white text-sm font-medium mb-1">{banner.titulo}</p>
+                  <p className="text-gray-400 text-xs line-clamp-3">{banner.texto}</p>
+                  {banner.imagem_url && (
+                    <p className="text-gray-500 text-xs break-all mt-2">{banner.imagem_url}</p>
+                  )}
                 </div>
-              )}
-            </PagePanel>
+                <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch shrink-0">
+                  <Button
+                    variant="secondary"
+                    icon={Pencil}
+                    onClick={() => startEdit(banner)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    icon={Power}
+                    onClick={() => toggleAtivo(banner)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    {banner.ativo ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    icon={Trash2}
+                    onClick={() => setDeletingId(banner.id)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Excluir
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         />
       )}

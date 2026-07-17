@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { CmsLinkTipo } from '../lib/cmsLink';
 
 export interface RecommendedBanner {
   id: string;
   titulo: string | null;
   imagem_url: string;
   imagem_mobile_url: string | null;
-  game_name: string;
-  provider: string;
+  href: string | null;
+  link_tipo: CmsLinkTipo;
   ordem: number;
   ativo: boolean;
 }
@@ -18,8 +19,8 @@ export const DEFAULT_RECOMMENDED_BANNERS: RecommendedBanner[] = [
     titulo: 'Banner 1',
     imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717288225.avif',
     imagem_mobile_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717288225.avif',
-    game_name: 'Aviator',
-    provider: 'Spribe',
+    href: '/spribe/aviator',
+    link_tipo: 'href',
     ordem: 1,
     ativo: true,
   },
@@ -28,8 +29,8 @@ export const DEFAULT_RECOMMENDED_BANNERS: RecommendedBanner[] = [
     titulo: 'Banner 2',
     imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717475647.avif',
     imagem_mobile_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717475647.avif',
-    game_name: 'Fortune Rabbit',
-    provider: 'Pgsoft',
+    href: '/pgsoft/fortune-rabbit',
+    link_tipo: 'href',
     ordem: 2,
     ativo: true,
   },
@@ -38,8 +39,8 @@ export const DEFAULT_RECOMMENDED_BANNERS: RecommendedBanner[] = [
     titulo: 'Banner 3',
     imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717511316.avif',
     imagem_mobile_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717511316.avif',
-    game_name: 'Fortune Tiger',
-    provider: 'Pgsoft',
+    href: '/pgsoft/fortune-tiger',
+    link_tipo: 'href',
     ordem: 3,
     ativo: true,
   },
@@ -54,7 +55,7 @@ export function useRecommendedBanners() {
     try {
       const { data, error } = await supabase
         .from('cms_items')
-        .select('id, titulo, imagem_url, imagem_mobile_url, game_name, provider, ordem, ativo')
+        .select('id, titulo, imagem_url, imagem_mobile_url, href, link_tipo, ordem, ativo')
         .eq('secao', 'recommended')
         .eq('ativo', true)
         .order('ordem', { ascending: true });

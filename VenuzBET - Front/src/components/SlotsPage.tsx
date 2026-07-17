@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Gamepad2, Grid3x3 } from 'lucide-react';
 import LoadingScreen from './LoadingScreen';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,8 @@ import FilterDropdown from './FilterDropdown';
 import { GameInfo } from '../App';
 import { fetchGamesForProviderCached } from '../api/playfiversCache';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useSiteBrand } from '../hooks/useSiteBrand';
+import { getOriginaisLabel } from '../lib/siteBrand';
 import { appPageContainerClass } from '../constants/homeLayout';
 
 interface SlotsPageProps {
@@ -42,9 +44,9 @@ interface Game {
   game_code: string;
 }
 
-const providers = [
+const baseProviders = [
   { id: 'all', name: 'Todos', count: 1447, apiId: null },
-  { id: 'venuzbet', name: 'RoyalBet Originais', count: 3, apiId: null },
+  { id: 'venuzbet', count: 3, apiId: null },
   { id: 'pgsoft', name: 'PG Soft', count: 147, apiId: 1 },
   { id: 'pragmatic', name: 'Pragmatic Play', count: 312, apiId: null },
   { id: 'pragmaticlive', name: 'Pragmatic Live', count: 69, apiId: null },
@@ -136,6 +138,17 @@ const getProviderSlug = (providerName: string): string => {
 export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProps) {
   const navigate = useNavigate();
   const { config: homeConfig } = useHomeConfig();
+  const { nomeBet } = useSiteBrand();
+  const providers = useMemo(
+    () =>
+      baseProviders.map((provider) => {
+        if (provider.id === 'venuzbet') {
+          return { ...provider, name: getOriginaisLabel(nomeBet) };
+        }
+        return provider as { id: string; name: string; count: number; apiId: number | null };
+      }),
+    [nomeBet],
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('slots');

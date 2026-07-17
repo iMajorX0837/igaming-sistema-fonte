@@ -1,11 +1,19 @@
 ﻿import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
-import { ArrowDownCircle, ArrowUpCircle, Loader2, Repeat, Save, Settings, Users } from 'lucide-react';
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Repeat,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
 import FormField from '../components/ui/FormField';
+import Button from '../components/ui/Button';
 
 interface PlataformaConfig {
   deposito_minimo: number;
@@ -16,6 +24,48 @@ interface PlataformaConfig {
   rollover_padrao: number;
   indicacao_recompensa: number;
   indicacao_deposito_minimo: number;
+}
+
+function formatCurrency(value: string) {
+  const n = Number(value.replace(',', '.').trim());
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function ConfigSection({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <PagePanel className="h-full">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-9 h-9 rounded-lg bg-admin-accent/12 border border-admin-accent/20 flex items-center justify-center shrink-0">
+          <Icon className="w-4 h-4 text-admin-foreground" />
+        </div>
+        <div>
+          <h2 className="text-white text-base font-semibold">{title}</h2>
+          <p className="text-gray-400 text-sm mt-0.5">{description}</p>
+        </div>
+      </div>
+      {children}
+    </PagePanel>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5 border-b border-admin-border last:border-0">
+      <span className="text-gray-500 text-sm">{label}</span>
+      <span className="text-white text-sm font-medium text-right">{value}</span>
+    </div>
+  );
 }
 
 export default function ConfiguracoesPage() {
@@ -119,7 +169,7 @@ export default function ConfiguracoesPage() {
     if (indicacaoRecompensa === null) return;
     const indicacaoDepositoMin = parseNonNegative(
       indicacaoForm.depositoMinimo,
-      'Depósito mínimo de indicação'
+      'Depósito mínimo de indicação',
     );
     if (indicacaoDepositoMin === null) return;
 
@@ -166,147 +216,193 @@ export default function ConfiguracoesPage() {
     return <LoadingState message="Carregando configurações..." />;
   }
 
+  const rolloverValue = Number(rolloverForm.padrao.replace(',', '.').trim());
+  const rolloverSummary =
+    Number.isFinite(rolloverValue) && rolloverValue === 0
+      ? 'Desativado'
+      : Number.isFinite(rolloverValue)
+        ? `${rolloverValue}x`
+        : '—';
+
   return (
-    <div className="max-w-2xl">
+    <div>
       <PageHeader
         icon={Settings}
-        title="Configurações"
-        description="Defina os limites mínimos e máximos para depósitos e saques na plataforma."
+        title="Configurações da Plataforma"
+        description="Limites financeiros, rollover e regras do programa Indique e Ganhe."
+        actions={
+          <Button onClick={handleSave} loading={saving}>
+            Salvar configurações
+          </Button>
+        }
       />
 
-      <div className="space-y-6">
-        {/* Depósitos */}
-        <PagePanel>
-          <div className="flex items-center gap-3 mb-5">
-            <ArrowUpCircle className="w-5 h-5 text-admin-foreground" />
-            <h2 className="text-white text-lg font-semibold">Configurações de Depósito</h2>
-          </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+          <ConfigSection
+            icon={ArrowUpCircle}
+            title="Depósitos"
+            description="Valores mínimo e máximo aceitos na plataforma."
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                label="Mínimo (R$)"
+                required
+                hint="Valor mínimo por depósito."
+                type="number"
+                min="1"
+                step="1"
+                value={depositoForm.minimo}
+                onChange={(v) => setDepositoForm({ ...depositoForm, minimo: v })}
+              />
+              <FormField
+                label="Máximo (R$)"
+                required
+                hint="Valor máximo por depósito."
+                type="number"
+                min="1"
+                step="1"
+                value={depositoForm.maximo}
+                onChange={(v) => setDepositoForm({ ...depositoForm, maximo: v })}
+              />
+            </div>
+          </ConfigSection>
 
-          <div className="space-y-4">
-            <FormField
-              label="Depósito Mínimo (R$)"
-              required
-              hint="Valor mínimo permitido para depósitos."
-              type="number"
-              min="1"
-              step="1"
-              value={depositoForm.minimo}
-              onChange={(v) => setDepositoForm({ ...depositoForm, minimo: v })}
-            />
-            <FormField
-              label="Depósito Máximo (R$)"
-              required
-              hint="Valor máximo permitido para depósitos."
-              type="number"
-              min="1"
-              step="1"
-              value={depositoForm.maximo}
-              onChange={(v) => setDepositoForm({ ...depositoForm, maximo: v })}
-            />
-          </div>
-        </PagePanel>
+          <ConfigSection
+            icon={ArrowDownCircle}
+            title="Saques"
+            description="Limites de valor e quantidade diária por usuário."
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  label="Mínimo (R$)"
+                  required
+                  hint="Valor mínimo por saque."
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={saqueForm.minimo}
+                  onChange={(v) => setSaqueForm({ ...saqueForm, minimo: v })}
+                />
+                <FormField
+                  label="Máximo (R$)"
+                  required
+                  hint="Valor máximo por saque."
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={saqueForm.maximo}
+                  onChange={(v) => setSaqueForm({ ...saqueForm, maximo: v })}
+                />
+              </div>
+              <FormField
+                label="Saques diários permitidos"
+                required
+                hint="Quantidade máxima de saques por usuário por dia."
+                type="number"
+                min="1"
+                step="1"
+                value={saqueForm.diarios}
+                onChange={(v) => setSaqueForm({ ...saqueForm, diarios: v })}
+              />
+            </div>
+          </ConfigSection>
 
-        {/* Saques */}
-        <PagePanel>
-          <div className="flex items-center gap-3 mb-5">
-            <ArrowDownCircle className="w-5 h-5 text-admin-foreground" />
-            <h2 className="text-white text-lg font-semibold">Configurações de Saque</h2>
-          </div>
-
-          <div className="space-y-4">
+          <ConfigSection
+            icon={Repeat}
+            title="Rollover"
+            description="Múltiplo exigido em apostas antes de liberar saque."
+          >
             <FormField
-              label="Saque Mínimo (R$)"
+              label="Rollover padrão (x)"
               required
-              hint="Valor mínimo permitido para saques."
-              type="number"
-              min="1"
-              step="1"
-              value={saqueForm.minimo}
-              onChange={(v) => setSaqueForm({ ...saqueForm, minimo: v })}
-            />
-            <FormField
-              label="Saque Máximo (R$)"
-              required
-              hint="Valor máximo permitido para saques."
-              type="number"
-              min="1"
-              step="1"
-              value={saqueForm.maximo}
-              onChange={(v) => setSaqueForm({ ...saqueForm, maximo: v })}
-            />
-            <FormField
-              label="Saques Diários Permitidos"
-              required
-              hint="Número máximo de saques permitidos por dia por usuário."
-              type="number"
-              min="1"
-              step="1"
-              value={saqueForm.diarios}
-              onChange={(v) => setSaqueForm({ ...saqueForm, diarios: v })}
-            />
-          </div>
-        </PagePanel>
-
-        {/* Rollover */}
-        <PagePanel>
-          <div className="flex items-center gap-3 mb-5">
-            <Repeat className="w-5 h-5 text-admin-foreground" />
-            <h2 className="text-white text-lg font-semibold">Configurações de Rollover</h2>
-          </div>
-
-          <div className="space-y-4">
-            <FormField
-              label="Rollover Padrão (x)"
-              required
-              hint="Múltiplo padrão para rollover em depósitos. Ex.: 2x em depósito de R$ 50 exige R$ 100 em apostas para sacar. Use 0 para desativar."
+              hint="Ex.: 2x em depósito de R$ 50 exige R$ 100 em apostas. Use 0 para desativar."
               type="number"
               min="0"
               step="1"
               value={rolloverForm.padrao}
               onChange={(v) => setRolloverForm({ ...rolloverForm, padrao: v })}
             />
-          </div>
-        </PagePanel>
+          </ConfigSection>
 
-        {/* Indique e Ganhe */}
-        <PagePanel>
-          <div className="flex items-center gap-3 mb-5">
-            <Users className="w-5 h-5 text-admin-foreground" />
-            <h2 className="text-white text-lg font-semibold">Indique e Ganhe</h2>
-          </div>
+          <ConfigSection
+            icon={Users}
+            title="Indique e Ganhe"
+            description="Recompensa do indicador e depósito mínimo do indicado."
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                label="Recompensa (R$)"
+                required
+                hint="Creditada na carteira comum. Use 0 para desativar."
+                type="number"
+                min="0"
+                step="0.01"
+                value={indicacaoForm.recompensa}
+                onChange={(v) => setIndicacaoForm({ ...indicacaoForm, recompensa: v })}
+              />
+              <FormField
+                label="Depósito mínimo (R$)"
+                required
+                hint="Primeiro depósito do indicado para validar."
+                type="number"
+                min="0"
+                step="0.01"
+                value={indicacaoForm.depositoMinimo}
+                onChange={(v) => setIndicacaoForm({ ...indicacaoForm, depositoMinimo: v })}
+              />
+            </div>
+          </ConfigSection>
+        </div>
 
-          <div className="space-y-4">
-            <FormField
-              label="Recompensa do Indicador (R$)"
-              required
-              hint="Valor que o player recebe quando seu indicado faz o primeiro depósito. A recompensa vai direto para a carteira comum (pode sacar). Use 0 para desativar."
-              type="number"
-              min="0"
-              step="0.01"
-              value={indicacaoForm.recompensa}
-              onChange={(v) => setIndicacaoForm({ ...indicacaoForm, recompensa: v })}
-            />
-            <FormField
-              label="Depósito Mínimo (R$)"
-              required
-              hint="Valor mínimo do primeiro depósito do indicado para validar a indicação."
-              type="number"
-              min="0"
-              step="0.01"
-              value={indicacaoForm.depositoMinimo}
-              onChange={(v) => setIndicacaoForm({ ...indicacaoForm, depositoMinimo: v })}
-            />
-          </div>
-        </PagePanel>
+        <div className="xl:col-span-1">
+          <PagePanel className="xl:sticky xl:top-24">
+            <h3 className="text-white font-semibold mb-1">Resumo atual</h3>
+            <p className="text-gray-400 text-sm mb-4">
+              Valores que serão aplicados após salvar.
+            </p>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? 'Salvando...' : 'Salvar configurações'}
-        </button>
+            <div className="rounded-lg border border-admin-border bg-admin-panel/50 px-4 py-1">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
+                Depósitos
+              </p>
+              <SummaryRow
+                label="Faixa permitida"
+                value={`${formatCurrency(depositoForm.minimo)} — ${formatCurrency(depositoForm.maximo)}`}
+              />
+
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
+                Saques
+              </p>
+              <SummaryRow
+                label="Faixa permitida"
+                value={`${formatCurrency(saqueForm.minimo)} — ${formatCurrency(saqueForm.maximo)}`}
+              />
+              <SummaryRow label="Por dia / usuário" value={`${saqueForm.diarios || '—'} saque(s)`} />
+
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
+                Rollover
+              </p>
+              <SummaryRow label="Padrão" value={rolloverSummary} />
+
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
+                Indique e Ganhe
+              </p>
+              <SummaryRow label="Recompensa" value={formatCurrency(indicacaoForm.recompensa)} />
+              <SummaryRow
+                label="Depósito mínimo"
+                value={formatCurrency(indicacaoForm.depositoMinimo)}
+              />
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-admin-border">
+              <Button onClick={handleSave} loading={saving} className="w-full">
+                Salvar configurações
+              </Button>
+            </div>
+          </PagePanel>
+        </div>
       </div>
     </div>
   );

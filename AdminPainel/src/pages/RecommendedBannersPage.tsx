@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import SortableOrderList from '../components/SortableOrderList';
@@ -10,15 +10,16 @@ import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-import { Star } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import { Star, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 
 interface RecommendedBanner {
   id: string;
   titulo: string | null;
   imagem_url: string;
   imagem_mobile_url: string | null;
-  game_name: string;
-  provider: string;
+  href: string | null;
+  link_tipo: 'href' | 'external' | null;
   ordem: number;
   ativo: boolean;
 }
@@ -29,26 +30,123 @@ const emptyForm = {
   titulo: '',
   imagem_url: '',
   imagem_mobile_url: '',
-  game_name: '',
-  provider: '',
+  href: '',
   ordem: 1,
   ativo: true,
 };
 
+function normalizeRecommendedLink(href: string): { href: string | null; link_tipo: 'href' | 'external' | null } {
+  const trimmed = href.trim();
+  if (!trimmed) return { href: null, link_tipo: null };
+  if (/^https?:\/\//i.test(trimmed)) return { href: trimmed, link_tipo: 'external' };
+  return { href: trimmed.startsWith('/') ? trimmed : `/${trimmed}`, link_tipo: 'href' };
+}
+
 function buildPayload(form: typeof emptyForm) {
+  const link = normalizeRecommendedLink(form.href);
   return {
     secao: CMS_SECAO,
     titulo: form.titulo.trim() || null,
     imagem_url: form.imagem_url.trim(),
     imagem_mobile_url: form.imagem_mobile_url.trim() || null,
-    game_name: form.game_name.trim(),
-    provider: form.provider.trim(),
+    href: link.href,
+    link_tipo: link.link_tipo,
+    game_name: null,
+    provider: null,
     ordem: form.ordem,
     ativo: form.ativo,
   };
 }
 
-export default function RecommendedBannersPage() {
+function BannerFormFields({
+  form,
+  setForm,
+  idPrefix,
+}: {
+  form: typeof emptyForm;
+  setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>;
+  idPrefix: string;
+}) {
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Título (opcional)</label>
+          <input
+            type="text"
+            value={form.titulo}
+            onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="Banner promocional"
+          />
+        </div>
+        <div>
+          <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
+          <input
+            type="number"
+            value={form.ordem}
+            onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-gray-300 text-sm mb-1 block">URL da imagem (desktop)</label>
+          <input
+            type="url"
+            value={form.imagem_url}
+            onChange={(e) => setForm({ ...form, imagem_url: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="https://..."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-gray-300 text-sm mb-1 block">URL da imagem mobile (opcional)</label>
+          <input
+            type="url"
+            value={form.imagem_mobile_url}
+            onChange={(e) => setForm({ ...form, imagem_mobile_url: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="Deixe vazio para usar a imagem desktop"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-gray-300 text-sm mb-1 block">Link ou rota</label>
+          <input
+            type="text"
+            value={form.href}
+            onChange={(e) => setForm({ ...form, href: e.target.value })}
+            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+            placeholder="/spribe/aviator, /help/promotions ou https://..."
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            id={`${idPrefix}-ativo`}
+            type="checkbox"
+            checked={form.ativo}
+            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
+            className="rounded"
+          />
+          <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">
+            Ativo
+          </label>
+        </div>
+      </div>
+      {form.imagem_url && (
+        <div className="mt-4">
+          <p className="text-gray-400 text-xs mb-2">Pré-visualização</p>
+          <img
+            src={form.imagem_url}
+            alt="Pré-visualização"
+            className="max-h-32 rounded-lg object-contain bg-admin-panel p-2"
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function RecommendedBannersPage({ embedded = false }: { embedded?: boolean }) {
   const { showToast } = useToast();
   const [banners, setBanners] = useState<RecommendedBanner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +155,7 @@ export default function RecommendedBannersPage() {
   const [editForm, setEditForm] = useState(emptyForm);
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState(emptyForm);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadBanners = async () => {
@@ -93,8 +192,7 @@ export default function RecommendedBannersPage() {
       titulo: banner.titulo || '',
       imagem_url: banner.imagem_url,
       imagem_mobile_url: banner.imagem_mobile_url || '',
-      game_name: banner.game_name,
-      provider: banner.provider,
+      href: banner.href || '',
       ordem: banner.ordem,
       ativo: banner.ativo,
     });
@@ -122,19 +220,15 @@ export default function RecommendedBannersPage() {
       showToast('Informe a URL da imagem desktop.', 'error');
       return false;
     }
-    if (!form.game_name.trim()) {
-      showToast('Informe o nome do jogo.', 'error');
-      return false;
-    }
-    if (!form.provider.trim()) {
-      showToast('Informe o provedor do jogo.', 'error');
+    if (!form.href.trim()) {
+      showToast('Informe o link ou rota do banner.', 'error');
       return false;
     }
     return true;
   };
 
-  const saveEdit = async (id: string) => {
-    if (!validateForm(editForm)) return;
+  const saveEdit = async () => {
+    if (!editingId || !validateForm(editForm)) return;
 
     setSaving(true);
     try {
@@ -144,7 +238,7 @@ export default function RecommendedBannersPage() {
           ...buildPayload(editForm),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id)
+        .eq('id', editingId)
         .eq('secao', CMS_SECAO);
 
       if (updateError) {
@@ -184,12 +278,12 @@ export default function RecommendedBannersPage() {
     }
   };
 
-  const deleteBanner = async (id: string) => {
-    if (!window.confirm('Deseja excluir este banner?')) return;
+  const deleteBanner = async () => {
+    if (!deletingId) return;
 
     setSaving(true);
     try {
-      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', id).eq('secao', CMS_SECAO);
+      const { error: deleteError } = await supabase.from('cms_items').delete().eq('id', deletingId).eq('secao', CMS_SECAO);
 
       if (deleteError) {
         showToast('Erro ao excluir banner.', 'error');
@@ -197,7 +291,8 @@ export default function RecommendedBannersPage() {
       }
 
       showToast('Banner excluído!', 'success');
-      if (editingId === id) cancelEdit();
+      if (editingId === deletingId) cancelEdit();
+      setDeletingId(null);
       await loadBanners();
     } catch {
       showToast('Erro ao excluir banner.', 'error');
@@ -241,100 +336,31 @@ export default function RecommendedBannersPage() {
     }
   };
 
-  const renderFormFields = (
-    form: typeof emptyForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>,
-    idPrefix: string
-  ) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Título (opcional)</label>
-        <input
-          type="text"
-          value={form.titulo}
-          onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Banner promocional"
-        />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
-        <input
-          type="number"
-          value={form.ordem}
-          onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-        />
-      </div>
-      <div className="md:col-span-2">
-        <label className="text-gray-300 text-sm mb-1 block">URL da imagem (desktop)</label>
-        <input
-          type="url"
-          value={form.imagem_url}
-          onChange={(e) => setForm({ ...form, imagem_url: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="https://..."
-        />
-      </div>
-      <div className="md:col-span-2">
-        <label className="text-gray-300 text-sm mb-1 block">URL da imagem mobile (opcional)</label>
-        <input
-          type="url"
-          value={form.imagem_mobile_url}
-          onChange={(e) => setForm({ ...form, imagem_mobile_url: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Deixe vazio para usar a imagem desktop"
-        />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Nome do jogo</label>
-        <input
-          type="text"
-          value={form.game_name}
-          onChange={(e) => setForm({ ...form, game_name: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Aviator"
-        />
-      </div>
-      <div>
-        <label className="text-gray-300 text-sm mb-1 block">Provedor</label>
-        <input
-          type="text"
-          value={form.provider}
-          onChange={(e) => setForm({ ...form, provider: e.target.value })}
-          className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          placeholder="Spribe"
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          id={`${idPrefix}-ativo`}
-          type="checkbox"
-          checked={form.ativo}
-          onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-          className="rounded"
-        />
-        <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">Ativo</label>
-      </div>
-    </div>
-  );
+  const bannerToDelete = banners.find((b) => b.id === deletingId);
+  const modalBusy = editingId !== null || isCreating || saving || deletingId !== null;
 
-  return (
-    <div>
-      <PageHeader
-        icon={Star}
-        title="Recomendados"
-        description="Configure os banners da seção Recomendados na home. Segure o ícone à esquerda e arraste para reorganizar a ordem."
-        actions={
-          <button
-            onClick={startCreate}
-            disabled={isCreating || saving}
-            className="px-4 py-2 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
-          >
+  const content = (
+    <>
+      {!embedded && (
+        <PageHeader
+          icon={Star}
+          title="Recomendados"
+          description="Configure os banners da seção Recomendados na home. Segure o ícone à esquerda e arraste para reorganizar a ordem."
+          actions={
+            <Button icon={Plus} onClick={startCreate} disabled={modalBusy}>
+              Novo banner
+            </Button>
+          }
+        />
+      )}
+
+      {embedded && (
+        <div className="flex justify-end mb-4">
+          <Button icon={Plus} onClick={startCreate} disabled={modalBusy}>
             Novo banner
-          </button>
-        }
-      />
+          </Button>
+        </div>
+      )}
 
       <Modal
         open={isCreating}
@@ -354,117 +380,141 @@ export default function RecommendedBannersPage() {
           </>
         }
       >
-        {renderFormFields(createForm, setCreateForm, 'create')}
-        {createForm.imagem_url && (
-          <div className="mt-4">
-            <p className="text-gray-400 text-xs mb-2">Pré-visualização</p>
-            <img
-              src={createForm.imagem_url}
-              alt="Pré-visualização"
-              className="max-h-32 rounded-lg object-contain bg-admin-panel p-2"
-            />
-          </div>
-        )}
+        <BannerFormFields form={createForm} setForm={setCreateForm} idPrefix="create" />
+      </Modal>
+
+      <Modal
+        open={editingId !== null}
+        onClose={cancelEdit}
+        title={editForm.titulo ? `Editar: ${editForm.titulo}` : 'Editar banner recomendado'}
+        description="Atualize as informações do banner da seção Recomendados."
+        icon={Pencil}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelEdit} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} loading={saving}>
+              Salvar alterações
+            </Button>
+          </>
+        }
+      >
+        <BannerFormFields form={editForm} setForm={setEditForm} idPrefix="edit" />
+      </Modal>
+
+      <Modal
+        open={deletingId !== null}
+        onClose={() => setDeletingId(null)}
+        title="Excluir banner"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingId(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={deleteBanner} loading={saving}>
+              Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir o banner{' '}
+          <span className="text-white font-medium">{bannerToDelete?.titulo || 'selecionado'}</span>?
+        </p>
       </Modal>
 
       {loading ? (
-        <LoadingState message="Carregando banners..." />
+        <LoadingState message="Carregando banners..." inline={embedded} />
       ) : error ? (
-        <PagePanel>
+        embedded ? (
           <p className="text-admin-danger">{error}</p>
-        </PagePanel>
+        ) : (
+          <PagePanel>
+            <p className="text-admin-danger">{error}</p>
+          </PagePanel>
+        )
       ) : banners.length === 0 ? (
-        <PagePanel>
+        embedded ? (
           <EmptyState icon={Star} title="Nenhum banner cadastrado." description="Clique em Novo banner para começar." />
-        </PagePanel>
+        ) : (
+          <PagePanel>
+            <EmptyState icon={Star} title="Nenhum banner cadastrado." description="Clique em Novo banner para começar." />
+          </PagePanel>
+        )
       ) : (
         <SortableOrderList
           items={banners}
           onReorder={handleBannersReorder}
-          disabled={editingId !== null || isCreating || saving}
-          className="space-y-4"
+          disabled={modalBusy}
+          className="space-y-3"
           renderItem={(banner) => (
-            <PagePanel className="p-4 md:p-6">
+            <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
               <div className="flex flex-col lg:flex-row gap-4">
                 <img
                   src={banner.imagem_url}
-                  alt={banner.titulo || banner.game_name}
+                  alt={banner.titulo || 'Banner recomendado'}
                   className="w-full lg:w-48 h-28 object-contain rounded-lg bg-admin-panel p-2 shrink-0"
                 />
 
                 <div className="flex-1 min-w-0">
-                  {editingId === banner.id ? (
-                    <div className="space-y-3">
-                      {renderFormFields(editForm, setEditForm, `edit-${banner.id}`)}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => saveEdit(banner.id)}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-admin-info hover:bg-admin-info/90 text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          disabled={saving}
-                          className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="text-white font-semibold">{banner.titulo || 'Sem título'}</h3>
+                    <StatusBadge variant={banner.ativo ? 'success' : 'neutral'}>
+                      {banner.ativo ? 'Ativo' : 'Inativo'}
+                    </StatusBadge>
+                    <span className="text-gray-500 text-xs">Ordem: {banner.ordem}</span>
+                  </div>
+                  {banner.href ? (
+                    <p className="text-admin-info text-sm mb-1 break-all">
+                      Link: <span className="text-white">{banner.href}</span>
+                    </p>
                   ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <h3 className="text-white font-semibold">{banner.titulo || banner.game_name}</h3>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            banner.ativo ? 'bg-green-900/50 text-admin-success' : 'bg-gray-700 text-gray-400'
-                          }`}
-                        >
-                          {banner.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <span className="text-gray-500 text-xs">Ordem: {banner.ordem}</span>
-                      </div>
-                      <p className="text-gray-300 text-sm mb-1">
-                        Jogo: <span className="text-white">{banner.game_name}</span> · Provedor:{' '}
-                        <span className="text-white">{banner.provider}</span>
-                      </p>
-                      <p className="text-gray-400 text-xs break-all">{banner.imagem_url}</p>
-                    </>
+                    <p className="text-admin-warning text-sm mb-1">Sem link configurado</p>
                   )}
+                  <p className="text-gray-400 text-xs break-all">{banner.imagem_url}</p>
                 </div>
 
-                {editingId !== banner.id && (
-                  <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end shrink-0">
-                    <button
-                      onClick={() => startEdit(banner)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-xs font-medium disabled:opacity-50"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => toggleAtivo(banner)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs font-medium disabled:opacity-50"
-                    >
-                      {banner.ativo ? 'Desativar' : 'Ativar'}
-                    </button>
-                    <button
-                      onClick={() => deleteBanner(banner.id)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-xs font-medium disabled:opacity-50"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch shrink-0">
+                  <Button
+                    variant="secondary"
+                    icon={Pencil}
+                    onClick={() => startEdit(banner)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    icon={Power}
+                    onClick={() => toggleAtivo(banner)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    {banner.ativo ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    icon={Trash2}
+                    onClick={() => setDeletingId(banner.id)}
+                    disabled={saving}
+                    className="!px-3 !py-1.5 !text-xs"
+                  >
+                    Excluir
+                  </Button>
+                </div>
               </div>
-            </PagePanel>
+            </div>
           )}
         />
       )}
-    </div>
+    </>
   );
+
+  return embedded ? content : <div>{content}</div>;
 }

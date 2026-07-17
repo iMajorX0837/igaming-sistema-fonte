@@ -1,4 +1,4 @@
-﻿import { Copy } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import { useState, useEffect } from 'react';
@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -15,6 +16,7 @@ export default function ReferralPage() {
   const { user, isAuthenticated } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const { config: plataformaConfig } = usePlataformaConfig();
+  const { nomeBet } = useSiteBrand();
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -264,7 +266,7 @@ export default function ReferralPage() {
                 <p className="text-slate-300 leading-relaxed text-sm">
                   {recompensa > 0 ? (
                     <>
-                      Indique seus amigos para a Royal Bet e receba{' '}
+                      Indique seus amigos para a {nomeBet} e receba{' '}
                       <span className="text-violet-400 font-bold">{formatCurrency(recompensa)}</span> em
                       saldo real por cada um que se cadastrar com o seu link e fizer o primeiro depósito de
                       no mínimo{' '}

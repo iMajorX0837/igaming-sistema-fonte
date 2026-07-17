@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
@@ -7,7 +7,19 @@ import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-import { CircleDot } from 'lucide-react';
+import StatusBadge from '../components/ui/StatusBadge';
+import {
+  CircleDot,
+  Image as ImageIcon,
+  Pencil,
+  Plus,
+  Power,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
+
+type TabKey = 'config' | 'segmentos';
+type StatusFilter = 'all' | 'active' | 'inactive';
 
 interface WheelConfig {
   id: number;
@@ -61,19 +73,44 @@ const emptySegmentForm = {
   ativo: true,
 };
 
+const IMAGE_FIELDS = [
+  { key: 'titulo_imagem_url' as const, label: 'Título', hint: 'Imagem do título acima da roleta.' },
+  { key: 'banner_imagem_url' as const, label: 'Banner prêmio', hint: 'Banner exibido ao ganhar um prêmio.' },
+  { key: 'roleta_imagem_url' as const, label: 'Disco da roleta', hint: 'Imagem circular da roleta.' },
+  { key: 'widget_imagem_url' as const, label: 'Widget flutuante', hint: 'Ícone para abrir a roleta no site.' },
+  { key: 'centro_imagem_url' as const, label: 'Botão girar', hint: 'Imagem central para iniciar o giro.' },
+];
+
+const TABS: { key: TabKey; label: string; icon: typeof Settings2; description: string }[] = [
+  {
+    key: 'config',
+    label: 'Configuração',
+    icon: Settings2,
+    description: 'Status, limites de giro e imagens da roleta de prêmios.',
+  },
+  {
+    key: 'segmentos',
+    label: 'Segmentos',
+    icon: CircleDot,
+    description: 'Prêmios da roleta vinculados a cupons de rodadas grátis.',
+  },
+];
+
 export default function RoletaPage() {
   const { showToast } = useToast();
-  const [config, setConfig] = useState<WheelConfig | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>('config');
   const [configForm, setConfigForm] = useState(defaultConfigForm);
   const [segments, setSegments] = useState<WheelSegment[]>([]);
   const [cupons, setCupons] = useState<CupomOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
   const [editSegmentForm, setEditSegmentForm] = useState(emptySegmentForm);
   const [isCreatingSegment, setIsCreatingSegment] = useState(false);
   const [createSegmentForm, setCreateSegmentForm] = useState(emptySegmentForm);
+  const [deletingSegmentId, setDeletingSegmentId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -101,7 +138,6 @@ export default function RoletaPage() {
 
       if (configRes.data) {
         const row = configRes.data as WheelConfig;
-        setConfig(row);
         setConfigForm({
           ativo: row.ativo,
           titulo_imagem_url: row.titulo_imagem_url ?? '',
@@ -145,7 +181,7 @@ export default function RoletaPage() {
                 }
               : undefined,
           };
-        })
+        }),
       );
 
       setCupons(
@@ -156,7 +192,7 @@ export default function RoletaPage() {
           valor: Number(row.valor) || 0,
           jogo_nome: (row.jogo_nome as string | null) ?? null,
           deposito_minimo: row.deposito_minimo != null ? Number(row.deposito_minimo) : null,
-        }))
+        })),
       );
     } catch {
       setError('Erro ao carregar configuração da roleta.');
@@ -168,6 +204,24 @@ export default function RoletaPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const filteredSegments = useMemo(() => {
+    if (statusFilter === 'active') return segments.filter((s) => s.ativo);
+    if (statusFilter === 'inactive') return segments.filter((s) => !s.ativo);
+    return segments;
+  }, [segments, statusFilter]);
+
+  const segmentCounts = useMemo(
+    () => ({
+      all: segments.length,
+      active: segments.filter((s) => s.ativo).length,
+      inactive: segments.filter((s) => !s.ativo).length,
+    }),
+    [segments],
+  );
+
+  const modalBusy =
+    editingSegmentId !== null || isCreatingSegment || saving || deletingSegmentId !== null;
 
   const saveConfig = async () => {
     const girosPeriodo = Number(configForm.giros_por_periodo);
@@ -273,14 +327,14 @@ export default function RoletaPage() {
     }
   };
 
-  const saveEditSegment = async (id: string) => {
-    if (!validateSegmentForm(editSegmentForm)) return;
+  const saveEditSegment = async () => {
+    if (!editingSegmentId || !validateSegmentForm(editSegmentForm)) return;
     setSaving(true);
     try {
       const { error: updateError } = await supabase
         .from('prize_wheel_segments')
         .update(buildSegmentPayload(editSegmentForm))
-        .eq('id', id);
+        .eq('id', editingSegmentId);
 
       if (updateError) {
         showToast('Erro ao salvar segmento.', 'error');
@@ -288,7 +342,7 @@ export default function RoletaPage() {
       }
 
       showToast('Segmento atualizado!', 'success');
-      setEditingSegmentId(null);
+      cancelEditSegment();
       await loadData();
     } catch {
       showToast('Erro ao salvar segmento.', 'error');
@@ -297,17 +351,21 @@ export default function RoletaPage() {
     }
   };
 
-  const deleteSegment = async (id: string) => {
-    if (!window.confirm('Excluir este segmento da roleta?')) return;
+  const deleteSegment = async () => {
+    if (!deletingSegmentId) return;
     setSaving(true);
     try {
-      const { error: deleteError } = await supabase.from('prize_wheel_segments').delete().eq('id', id);
+      const { error: deleteError } = await supabase
+        .from('prize_wheel_segments')
+        .delete()
+        .eq('id', deletingSegmentId);
       if (deleteError) {
         showToast('Erro ao excluir segmento.', 'error');
         return;
       }
       showToast('Segmento excluído!', 'success');
-      if (editingSegmentId === id) setEditingSegmentId(null);
+      if (editingSegmentId === deletingSegmentId) cancelEditSegment();
+      setDeletingSegmentId(null);
       await loadData();
     } catch {
       showToast('Erro ao excluir segmento.', 'error');
@@ -351,9 +409,28 @@ export default function RoletaPage() {
     });
   };
 
+  const startEditSegment = (segment: WheelSegment) => {
+    setIsCreatingSegment(false);
+    setEditingSegmentId(segment.id);
+    setEditSegmentForm({
+      nome_admin: segment.nome_admin,
+      label: segment.label,
+      cupom_id: segment.cupom_id,
+      peso: String(segment.peso),
+      ordem: String(segment.ordem),
+      ativo: segment.ativo,
+    });
+  };
+
+  const cancelEditSegment = () => {
+    setEditingSegmentId(null);
+    setEditSegmentForm(emptySegmentForm);
+  };
+
   const renderSegmentFormFields = (
     form: typeof emptySegmentForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptySegmentForm>>
+    setForm: React.Dispatch<React.SetStateAction<typeof emptySegmentForm>>,
+    idPrefix: string,
   ) => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -365,6 +442,7 @@ export default function RoletaPage() {
         />
         <Field
           label="Rótulo na roleta"
+          hint="Exibido no disco. Será convertido para maiúsculas."
           value={form.label}
           onChange={(v) => setForm({ ...form, label: v })}
           placeholder="85 GIROS"
@@ -397,50 +475,26 @@ export default function RoletaPage() {
         />
         <div className="flex items-center gap-2">
           <input
+            id={`segment-ativo-${idPrefix}`}
             type="checkbox"
             checked={form.ativo}
             onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
             className="rounded"
           />
-          <label className="text-gray-300 text-sm">Ativo</label>
+          <label htmlFor={`segment-ativo-${idPrefix}`} className="text-gray-300 text-sm">
+            Ativo
+          </label>
         </div>
       </div>
       {cupons.length === 0 && (
-        <p className="text-admin-warning text-xs mt-3">
+        <p className="text-admin-warning text-xs mt-4">
           Crie cupons do tipo &quot;Rodadas Grátis&quot; na página de Cupons antes de adicionar segmentos.
         </p>
       )}
     </>
   );
 
-  const renderSegmentForm = (
-    title: string,
-    form: typeof emptySegmentForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptySegmentForm>>,
-    onSave: () => void,
-    onCancel: () => void
-  ) => (
-    <div>
-      <h3 className="text-white font-semibold mb-4">{title}</h3>
-      {renderSegmentFormFields(form, setForm)}
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-4 py-2 rounded bg-admin-info hover:bg-admin-info/90 text-white text-sm disabled:opacity-50"
-        >
-          Salvar
-        </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-white text-sm"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
+  const segmentToDelete = segments.find((s) => s.id === deletingSegmentId);
 
   if (loading) {
     return <LoadingState message="Carregando roleta..." />;
@@ -455,82 +509,286 @@ export default function RoletaPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
         icon={CircleDot}
-        title="Roleta"
-        description="Configure a roleta de prêmios. Cada segmento deve estar vinculado a um cupom de rodadas grátis. O cupom define o jogo, quantidade de giros e se exige depósito para ativar."
+        title="Roleta de Prêmios"
+        description="Configure a roleta exibida no site. Cada segmento deve estar vinculado a um cupom de rodadas grátis."
+        actions={
+          activeTab === 'config' ? (
+            <Button onClick={saveConfig} loading={saving}>
+              Salvar configuração
+            </Button>
+          ) : (
+            <Button icon={Plus} onClick={startCreateSegment} disabled={modalBusy}>
+              Novo segmento
+            </Button>
+          )
+        }
       />
 
-      <PagePanel>
-        <h2 className="text-white font-semibold mb-4">Configuração Geral</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-2 md:col-span-2">
-            <input
-              type="checkbox"
-              checked={configForm.ativo}
-              onChange={(e) => setConfigForm({ ...configForm, ativo: e.target.checked })}
-              className="rounded"
-            />
-            <label className="text-gray-300 text-sm">Roleta ativa no site</label>
-          </div>
-          <Field
-            label="URL imagem título"
-            value={configForm.titulo_imagem_url}
-            onChange={(v) => setConfigForm({ ...configForm, titulo_imagem_url: v })}
-          />
-          <Field
-            label="URL imagem banner prêmio"
-            value={configForm.banner_imagem_url}
-            onChange={(v) => setConfigForm({ ...configForm, banner_imagem_url: v })}
-          />
-          <Field
-            label="URL imagem roleta"
-            value={configForm.roleta_imagem_url}
-            onChange={(v) => setConfigForm({ ...configForm, roleta_imagem_url: v })}
-          />
-          <Field
-            label="URL imagem widget (abrir roleta)"
-            value={configForm.widget_imagem_url}
-            onChange={(v) => setConfigForm({ ...configForm, widget_imagem_url: v })}
-          />
-          <Field
-            label="URL imagem centro (girar)"
-            value={configForm.centro_imagem_url}
-            onChange={(v) => setConfigForm({ ...configForm, centro_imagem_url: v })}
-          />
-          <Field
-            label="Giros permitidos por período"
-            type="number"
-            value={configForm.giros_por_periodo}
-            onChange={(v) => setConfigForm({ ...configForm, giros_por_periodo: v })}
-          />
-          <Field
-            label="Cooldown (horas)"
-            type="number"
-            value={configForm.cooldown_horas}
-            onChange={(v) => setConfigForm({ ...configForm, cooldown_horas: v })}
-          />
+      <PagePanel padding={false} className="overflow-hidden">
+        <div className="flex border-b border-admin-border overflow-x-auto px-4 gap-1">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+                  isActive
+                    ? 'text-white border-white'
+                    : 'text-gray-500 border-transparent hover:text-gray-300'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-        <button
-          onClick={saveConfig}
-          disabled={saving}
-          className="mt-4 px-4 py-2 rounded bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm disabled:opacity-50"
-        >
-          Salvar configuração
-        </button>
-      </PagePanel>
 
-      <div className="flex justify-between items-center">
-        <h2 className="text-white font-semibold">Segmentos da Roleta</h2>
-        <button
-          onClick={startCreateSegment}
-          disabled={isCreatingSegment || saving}
-          className="px-4 py-2 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm disabled:opacity-50"
-        >
-          Novo segmento
-        </button>
-      </div>
+        <div className="p-5 md:p-6">
+          {activeTab === 'config' && (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+              <div className="lg:col-span-3 space-y-5">
+                <PagePanel className="!p-0 border-0 bg-transparent">
+                  <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Settings2 className="w-4 h-4 text-admin-muted" />
+                        <h3 className="text-white font-semibold">Status e limites</h3>
+                      </div>
+                      <StatusBadge variant={configForm.ativo ? 'success' : 'neutral'}>
+                        {configForm.ativo ? 'Ativa' : 'Inativa'}
+                      </StatusBadge>
+                    </div>
+
+                    <label className="flex items-center gap-2.5 text-gray-300 text-sm mb-4 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={configForm.ativo}
+                        onChange={(e) => setConfigForm({ ...configForm, ativo: e.target.checked })}
+                        className="rounded"
+                      />
+                      Roleta ativa no site
+                    </label>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Field
+                        label="Giros permitidos por período"
+                        type="number"
+                        value={configForm.giros_por_periodo}
+                        onChange={(v) => setConfigForm({ ...configForm, giros_por_periodo: v })}
+                      />
+                      <Field
+                        label="Cooldown (horas)"
+                        hint="Tempo de espera entre períodos de giros."
+                        type="number"
+                        value={configForm.cooldown_horas}
+                        onChange={(v) => setConfigForm({ ...configForm, cooldown_horas: v })}
+                      />
+                    </div>
+                  </div>
+                </PagePanel>
+
+                <PagePanel className="!p-0 border-0 bg-transparent">
+                  <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <ImageIcon className="w-4 h-4 text-admin-muted" />
+                      <h3 className="text-white font-semibold">Imagens</h3>
+                    </div>
+
+                    <div className="space-y-5">
+                      {IMAGE_FIELDS.map((field) => (
+                        <ImageUrlField
+                          key={field.key}
+                          label={field.label}
+                          hint={field.hint}
+                          value={configForm[field.key]}
+                          onChange={(v) => setConfigForm({ ...configForm, [field.key]: v })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </PagePanel>
+              </div>
+
+              <div className="lg:col-span-2">
+                <PagePanel className="!p-0 border-0 bg-transparent lg:sticky lg:top-6">
+                  <div className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CircleDot className="w-4 h-4 text-admin-muted" />
+                      <h3 className="text-white font-semibold">Resumo</h3>
+                    </div>
+
+                    <div className="space-y-2 mb-5">
+                      <SummaryRow label="Status" value={configForm.ativo ? 'Ativa' : 'Inativa'} />
+                      <SummaryRow
+                        label="Giros / período"
+                        value={configForm.giros_por_periodo || '1'}
+                      />
+                      <SummaryRow
+                        label="Cooldown"
+                        value={`${configForm.cooldown_horas || '0'}h`}
+                      />
+                      <SummaryRow
+                        label="Segmentos"
+                        value={`${segmentCounts.active} ativos de ${segmentCounts.all}`}
+                      />
+                    </div>
+
+                    <p className="text-gray-500 text-[11px] uppercase tracking-wide mb-3">Prévia das imagens</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {IMAGE_FIELDS.map((field) => (
+                        <ImageThumb
+                          key={field.key}
+                          label={field.label}
+                          url={configForm[field.key]}
+                        />
+                      ))}
+                    </div>
+
+                    {!configForm.ativo ? (
+                      <p className="text-admin-warning text-xs mt-4">
+                        Roleta desativada — não será exibida no site.
+                      </p>
+                    ) : null}
+                  </div>
+                </PagePanel>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'segmentos' && (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-admin-border bg-admin-panel-2/30 p-4 md:p-5">
+                <p className="text-gray-300 text-sm">
+                  Cada segmento representa um prêmio na roleta. O cupom vinculado define o jogo, quantidade de
+                  giros e se exige depósito mínimo para ativar.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {(
+                    [
+                      { key: 'all' as const, label: 'Todos' },
+                      { key: 'active' as const, label: 'Ativos' },
+                      { key: 'inactive' as const, label: 'Inativos' },
+                    ] as const
+                  ).map((filter) => (
+                    <button
+                      key={filter.key}
+                      type="button"
+                      onClick={() => setStatusFilter(filter.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        statusFilter === filter.key
+                          ? 'bg-admin-accent text-[#0d0e10]'
+                          : 'bg-admin-panel text-gray-400 hover:text-white border border-admin-border'
+                      }`}
+                    >
+                      {filter.label} ({segmentCounts[filter.key]})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredSegments.length === 0 ? (
+                <EmptyState
+                  icon={CircleDot}
+                  title={
+                    segments.length === 0
+                      ? 'Nenhum segmento cadastrado.'
+                      : 'Nenhum segmento neste filtro.'
+                  }
+                  description={
+                    segments.length === 0
+                      ? 'Clique em Novo segmento para adicionar um prêmio à roleta.'
+                      : 'Altere o filtro ou crie um novo segmento.'
+                  }
+                />
+              ) : (
+                <div className="space-y-3">
+                  {filteredSegments.map((segment) => (
+                    <div
+                      key={segment.id}
+                      className="rounded-xl border border-admin-border bg-admin-panel-2/50 p-4 md:p-5"
+                    >
+                      <div className="flex flex-col lg:flex-row gap-4">
+                        <div className="shrink-0">
+                          <div className="w-20 h-20 rounded-full border-2 border-admin-accent/40 bg-admin-panel flex items-center justify-center">
+                            <span className="text-admin-accent text-[10px] font-bold text-center leading-tight px-2">
+                              {segment.label}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h3 className="text-white font-semibold">{segment.nome_admin}</h3>
+                            <StatusBadge variant={segment.ativo ? 'success' : 'neutral'}>
+                              {segment.ativo ? 'Ativo' : 'Inativo'}
+                            </StatusBadge>
+                            <span className="text-gray-500 text-xs">Ordem: {segment.ordem}</span>
+                            <span className="text-gray-500 text-xs">Peso: {segment.peso}</span>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                            <InfoItem label="Cupom" value={segment.cupom?.codigo ?? '—'} />
+                            <InfoItem
+                              label="Giros"
+                              value={segment.cupom ? `${segment.cupom.valor} giros` : '—'}
+                            />
+                            <InfoItem label="Jogo" value={segment.cupom?.jogo_nome ?? '—'} />
+                            <InfoItem
+                              label="Dep. mínimo"
+                              value={
+                                segment.cupom?.deposito_minimo != null
+                                  ? `R$ ${segment.cupom.deposito_minimo.toFixed(2)}`
+                                  : 'Não exige'
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch shrink-0">
+                          <Button
+                            variant="secondary"
+                            icon={Pencil}
+                            onClick={() => startEditSegment(segment)}
+                            disabled={saving}
+                            className="!px-3 !py-1.5 !text-xs"
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            icon={Power}
+                            onClick={() => toggleSegmentAtivo(segment)}
+                            disabled={saving}
+                            className="!px-3 !py-1.5 !text-xs"
+                          >
+                            {segment.ativo ? 'Desativar' : 'Ativar'}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            icon={Trash2}
+                            onClick={() => setDeletingSegmentId(segment.id)}
+                            disabled={saving}
+                            className="!px-3 !py-1.5 !text-xs"
+                          >
+                            Excluir
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </PagePanel>
 
       <Modal
         open={isCreatingSegment}
@@ -550,104 +808,114 @@ export default function RoletaPage() {
           </>
         }
       >
-        {renderSegmentFormFields(createSegmentForm, setCreateSegmentForm)}
+        {renderSegmentFormFields(createSegmentForm, setCreateSegmentForm, 'create')}
       </Modal>
 
-      {segments.length === 0 ? (
-        <PagePanel>
-          <EmptyState
-            icon={CircleDot}
-            title="Nenhum segmento cadastrado."
-            description="Clique em Novo segmento para adicionar um prêmio à roleta."
+      <Modal
+        open={editingSegmentId !== null}
+        onClose={cancelEditSegment}
+        title={editSegmentForm.nome_admin ? `Editar: ${editSegmentForm.nome_admin}` : 'Editar segmento'}
+        description="Atualize o prêmio vinculado a este segmento da roleta."
+        icon={Pencil}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cancelEditSegment} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEditSegment} loading={saving}>
+              Salvar alterações
+            </Button>
+          </>
+        }
+      >
+        {renderSegmentFormFields(editSegmentForm, setEditSegmentForm, 'edit')}
+      </Modal>
+
+      <Modal
+        open={deletingSegmentId !== null}
+        onClose={() => setDeletingSegmentId(null)}
+        title="Excluir segmento"
+        description="Esta ação não pode ser desfeita."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingSegmentId(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={deleteSegment} loading={saving}>
+              Excluir
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300 text-sm">
+          Deseja excluir o segmento{' '}
+          <span className="text-white font-medium">{segmentToDelete?.nome_admin || 'selecionado'}</span>?
+        </p>
+      </Modal>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <span className="text-gray-500 text-sm">{label}</span>
+      <span className="text-white text-sm font-medium text-right">{value}</span>
+    </div>
+  );
+}
+
+function ImageThumb({ label, url }: { label: string; url: string }) {
+  return (
+    <div>
+      <p className="text-gray-500 text-[11px] mb-1.5 truncate">{label}</p>
+      <div className="aspect-square rounded-lg border border-white/10 bg-black/20 overflow-hidden flex items-center justify-center">
+        {url.trim() ? (
+          <img
+            src={url}
+            alt={label}
+            className="w-full h-full object-contain p-1"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
           />
-        </PagePanel>
-      ) : (
-        <div className="space-y-4">
-          {segments.map((segment) => (
-            <PagePanel key={segment.id} className="p-4 md:p-6">
-              {editingSegmentId === segment.id ? (
-                renderSegmentForm(
-                  `Editar: ${segment.nome_admin}`,
-                  editSegmentForm,
-                  setEditSegmentForm,
-                  () => saveEditSegment(segment.id),
-                  () => setEditingSegmentId(null)
-                )
-              ) : (
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h3 className="text-white font-semibold">{segment.nome_admin}</h3>
-                      <span className="px-2 py-0.5 rounded bg-admin-panel-3 text-admin-accent text-xs font-bold">
-                        {segment.label}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs ${
-                          segment.ativo ? 'bg-green-900/50 text-admin-success' : 'bg-gray-700 text-gray-400'
-                        }`}
-                      >
-                        {segment.ativo ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                      <InfoItem label="Cupom" value={segment.cupom?.codigo ?? '—'} />
-                      <InfoItem
-                        label="Giros"
-                        value={segment.cupom ? `${segment.cupom.valor} giros` : '—'}
-                      />
-                      <InfoItem label="Jogo" value={segment.cupom?.jogo_nome ?? '—'} />
-                      <InfoItem
-                        label="Dep. Mínimo"
-                        value={
-                          segment.cupom?.deposito_minimo != null
-                            ? `R$ ${segment.cupom.deposito_minimo.toFixed(2)}`
-                            : 'Não exige'
-                        }
-                      />
-                      <InfoItem label="Peso" value={String(segment.peso)} />
-                      <InfoItem label="Ordem" value={String(segment.ordem)} />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 lg:flex-col lg:items-end">
-                    <button
-                      onClick={() => {
-                        setIsCreatingSegment(false);
-                        setEditingSegmentId(segment.id);
-                        setEditSegmentForm({
-                          nome_admin: segment.nome_admin,
-                          label: segment.label,
-                          cupom_id: segment.cupom_id,
-                          peso: String(segment.peso),
-                          ordem: String(segment.ordem),
-                          ativo: segment.ativo,
-                        });
-                      }}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-xs disabled:opacity-50"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => toggleSegmentAtivo(segment)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-500 text-white text-xs disabled:opacity-50"
-                    >
-                      {segment.ativo ? 'Desativar' : 'Ativar'}
-                    </button>
-                    <button
-                      onClick={() => deleteSegment(segment.id)}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded bg-red-700 hover:bg-red-600 text-white text-xs disabled:opacity-50"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              )}
-            </PagePanel>
-          ))}
+        ) : (
+          <ImageIcon className="w-5 h-5 text-gray-600" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ImageUrlField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <Field label={label} hint={hint} value={value} onChange={onChange} placeholder="https://..." />
+      {value.trim() ? (
+        <div className="mt-2 p-2 rounded-lg border border-white/10 bg-black/20 inline-block">
+          <img
+            src={value}
+            alt={label}
+            className="h-16 w-auto max-w-[200px] object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -663,12 +931,14 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 
 function Field({
   label,
+  hint,
   value,
   onChange,
   type = 'text',
   placeholder,
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -676,13 +946,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-gray-300 text-sm mb-1 block">{label}</label>
+      <label className="text-gray-200 text-sm font-medium mb-1 block">{label}</label>
+      {hint ? <p className="text-gray-500 text-xs mb-2">{hint}</p> : null}
       <input
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+        className="w-full px-4 py-2.5 text-white text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
       />
     </div>
   );
@@ -701,11 +972,11 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="text-gray-300 text-sm mb-1 block">{label}</label>
+      <label className="text-gray-200 text-sm font-medium mb-1 block">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
+        className="w-full px-4 py-2.5 text-white text-sm rounded-lg bg-admin-panel border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
       >
         {options.map((opt) => (
           <option key={opt.value || 'empty'} value={opt.value}>

@@ -6,12 +6,14 @@ import {
   hydrateDocumentTheme,
   persistSiteTheme,
   type AuthModalsConfig,
+  type BrandConfig,
   type FooterConfig,
   type HeaderConfig,
   type HomeConfig,
   type SidebarConfig,
   type SiteTheme,
 } from '../lib/siteConfigCache';
+import { applyBrandToDocument } from '../lib/siteBrand';
 
 interface SiteConfigContextValue extends SiteTheme {
   loading: boolean;
@@ -21,7 +23,14 @@ interface SiteConfigContextValue extends SiteTheme {
 const SiteConfigContext = createContext<SiteConfigContextValue | null>(null);
 
 export function SiteConfigProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<SiteTheme>(getInitialSiteTheme);
+  const [theme, setTheme] = useState<SiteTheme>(() => {
+    const initial = getInitialSiteTheme();
+    hydrateDocumentTheme(initial);
+    if (initial.brand.nome_bet || initial.brand.site_titulo) {
+      applyBrandToDocument(initial.brand);
+    }
+    return initial;
+  });
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -29,7 +38,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('site_config')
         .select(
-          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url',
+          'header_fundo, header_logo_url, footer_fundo, home_fundo, sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, login_modal_imagem_url, register_modal_imagem_url, nome_bet, site_titulo',
         )
         .eq('id', 1)
         .maybeSingle();
@@ -41,6 +50,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       setTheme(nextTheme);
       persistSiteTheme(nextTheme);
       hydrateDocumentTheme(nextTheme);
+      applyBrandToDocument(nextTheme.brand);
     } catch (error) {
       console.error('Erro ao buscar tema do site:', error);
     } finally {
@@ -49,6 +59,14 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem('venuz-site-theme-v2');
+      localStorage.removeItem('venuz-site-theme-v3');
+      localStorage.removeItem('venuz-site-theme-v4');
+    } catch {
+      // ignore
+    }
     void refresh();
   }, [refresh]);
 
@@ -60,6 +78,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
         home: theme.home,
         sidebar: theme.sidebar,
         authModals: theme.authModals,
+        brand: theme.brand,
         loading,
         refresh,
       }}
@@ -106,4 +125,9 @@ export function useAuthModalsConfig() {
   return { config: authModals, loading, refresh };
 }
 
-export type { HeaderConfig, FooterConfig, HomeConfig, SidebarConfig, AuthModalsConfig };
+export function useSiteBrand() {
+  const { brand, loading, refresh } = useSiteConfigContext();
+  return { nomeBet: brand.nome_bet, siteTitulo: brand.site_titulo, loading, refresh };
+}
+
+export type { HeaderConfig, FooterConfig, HomeConfig, SidebarConfig, AuthModalsConfig, BrandConfig };

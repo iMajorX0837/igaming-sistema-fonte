@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface PrivacyPolicyPageProps {
   onBack: () => void;
 }
 
 export default function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -34,11 +36,11 @@ export default function PrivacyPolicyPage({ onBack }: PrivacyPolicyPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">INTRODUÇÃO</h2>
                 <div className="space-y-4">
                   <p>
-                    O Royal Bet ("nós", "nosso", "empresa") está comprometido em proteger sua privacidade. Esta Política de Privacidade explica como coletamos, usamos,
+                    O {nomeBet} ("nós", "nosso", "empresa") está comprometido em proteger sua privacidade. Esta Política de Privacidade explica como coletamos, usamos,
                     divulgamos e protegemos suas informações.
                   </p>
                   <p>
-                    Por favor, leia esta política com atenção. Ao acessar e usar a plataforma Royal Bet, você concorda com as práticas descritas neste documento.
+                    Por favor, leia esta política com atenção. Ao acessar e usar a plataforma {nomeBet}, você concorda com as práticas descritas neste documento.
                   </p>
                 </div>
               </section>

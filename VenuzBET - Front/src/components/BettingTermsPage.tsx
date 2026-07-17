@@ -2,12 +2,14 @@ import { FileText, Calendar } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 
 interface BettingTermsPageProps {
   onBack: () => void;
 }
 
 export default function BettingTermsPage({ onBack }: BettingTermsPageProps) {
+  const { nomeBet } = useSiteBrand();
 
   return (
     <AppPageScaffold>
@@ -34,7 +36,7 @@ export default function BettingTermsPage({ onBack }: BettingTermsPageProps) {
                 <h2 className="text-white text-xl font-bold mb-4">VISÃO GERAL</h2>
                 <div className="space-y-4">
                   <p>
-                    Os Termos de Apostas estabelecem as regras e condições específicas para todas as atividades de apostas esportivas realizadas na plataforma Royal Bet.
+                    Os Termos de Apostas estabelecem as regras e condições específicas para todas as atividades de apostas esportivas realizadas na plataforma {nomeBet}.
                     Estes termos complementam e se integram aos Termos e Condições gerais da plataforma.
                   </p>
                   <p>
@@ -93,7 +95,7 @@ export default function BettingTermsPage({ onBack }: BettingTermsPageProps) {
                   </p>
                   <p>
                     Os resultados são atualizados na plataforma assim que forem confirmados oficialmente. Em caso de inconsistências entre diferentes fontes, a decisão
-                    final da Royal Bet será baseada na informação oficial da entidade reguladora.
+                    final da {nomeBet} será baseada na informação oficial da entidade reguladora.
                   </p>
                   <p>
                     Apostas vencedoras são creditadas automaticamente em sua conta. Apostas perdidas têm seus valores retirados imediatamente após a confirmação do

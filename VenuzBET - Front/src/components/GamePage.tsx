@@ -1,4 +1,4 @@
-﻿import Header from './Header';
+import Header from './Header';
 import Sidebar from './Sidebar';
 import TopBanner from './TopBanner';
 import Footer from './Footer';
@@ -7,7 +7,7 @@ import RegisterModal from './RegisterModal';
 import DepositModal from './DepositModal';
 import LoadingScreen from './LoadingScreen';
 import BackButton from './BackButton';
-import { useState, useEffect, useCallback, useRef, forwardRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useListenOpenMobileMenu } from '../hooks/useListenOpenMobileMenu';
@@ -52,16 +52,15 @@ const GAME_PLAYER_HEIGHT_STANDARD = 'h-[80dvh] min-h-[360px] max-h-[calc(100dvh-
 
 const gamePlayerStageClass = 'relative w-full flex-1 min-h-0 overflow-hidden';
 
-const GamePlayerShell = forwardRef<
-  HTMLDivElement,
-  { children: ReactNode; className?: string }
->(function GamePlayerShell({ children, className = '' }, ref) {
-  return (
-    <div ref={ref} className={`${gamePlayerShellClass} ${className}`.trim()}>
-      {children}
-    </div>
-  );
-});
+function GamePlayerShell({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`${gamePlayerShellClass} ${className}`.trim()}>{children}</div>;
+}
 
 interface GameInformationBarProps {
   gameName: string;
@@ -80,6 +79,8 @@ function GameInformationBar({
   onToggleFullscreen,
   isFullscreen = false,
 }: GameInformationBarProps) {
+  if (isFullscreen) return null;
+
   return (
     <div
       className={`shrink-0 border-t border-slate-800/60 px-3 md:px-4 py-2.5 md:py-3 ${className}`}
@@ -108,6 +109,25 @@ function GameInformationBar({
         )}
       </div>
     </div>
+  );
+}
+
+function FullscreenExitButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute top-3 right-3 z-30 flex items-center justify-center rounded-lg bg-black/55 p-2 text-white opacity-90 transition-opacity hover:opacity-100 hover:bg-black/70"
+      aria-label="Sair da tela cheia"
+      title="Sair da tela cheia"
+    >
+      <span
+        className="iconify i-mingcute:fullscreen-exit-fill"
+        data-icon="mingcute:fullscreen-exit-fill"
+        aria-hidden="true"
+        style={{ fontSize: '28px' }}
+      />
+    </button>
   );
 }
 
@@ -328,7 +348,7 @@ export default function GamePage({
   const { config: homeConfig } = useHomeConfig();
   const { isAuthenticated, user } = useAuth();
   const prevGameCodeRef = useRef(gameCode);
-  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const playerStageRef = useRef<HTMLDivElement>(null);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(() => {
     if (!gameCode || !sessionStorage.getItem(`game_url_${gameCode}`)) {
@@ -527,7 +547,7 @@ export default function GamePage({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      setIsPlayerFullscreen(document.fullscreenElement === playerContainerRef.current);
+      setIsPlayerFullscreen(document.fullscreenElement === playerStageRef.current);
     };
 
     document.addEventListener('fullscreenchange', onFullscreenChange);
@@ -535,14 +555,14 @@ export default function GamePage({
   }, []);
 
   const togglePlayerFullscreen = useCallback(async () => {
-    const container = playerContainerRef.current;
-    if (!container) return;
+    const stage = playerStageRef.current;
+    if (!stage) return;
 
     try {
-      if (document.fullscreenElement === container) {
+      if (document.fullscreenElement === stage) {
         await document.exitFullscreen();
       } else {
-        await container.requestFullscreen();
+        await stage.requestFullscreen();
       }
     } catch (err) {
       console.error('Erro ao alternar tela cheia:', err);
@@ -572,16 +592,19 @@ export default function GamePage({
             <div className="flex flex-col w-full">
               {fullscreen ? (
                 <div className="w-full shrink-0">
-                  <GamePlayerShell
-                    ref={playerContainerRef}
-                    className={`w-full shrink-0 ${playerShellHeightClass}`}
-                  >
-                    <div className={`${gamePlayerStageClass} bg-black`}>
+                  <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
+                    <div
+                      ref={playerStageRef}
+                      className={`game-player-stage ${gamePlayerStageClass} bg-black`}
+                    >
                       <div
                         className="absolute inset-0 bg-cover bg-center"
                         style={{ backgroundImage: `url(${gameImage})` }}
                       />
                       <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
+                      {isPlayerFullscreen && (
+                        <FullscreenExitButton onClick={togglePlayerFullscreen} />
+                      )}
                     </div>
                     <GameInformationBar {...gameInfoBarProps} />
                   </GamePlayerShell>
@@ -594,16 +617,19 @@ export default function GamePage({
                       gameName={gameName}
                       backgroundColor={homeConfig.fundo}
                     />
-                    <GamePlayerShell
-                      ref={playerContainerRef}
-                      className={`w-full shrink-0 ${playerShellHeightClass}`}
-                    >
-                      <div className={`${gamePlayerStageClass} bg-black`}>
+                    <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
+                      <div
+                        ref={playerStageRef}
+                        className={`game-player-stage ${gamePlayerStageClass} bg-black`}
+                      >
                         <div
                           className="absolute inset-0 bg-cover bg-center"
                           style={{ backgroundImage: `url(${gameImage})` }}
                         />
                         <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
+                        {isPlayerFullscreen && (
+                          <FullscreenExitButton onClick={togglePlayerFullscreen} />
+                        )}
                       </div>
                       <GameInformationBar {...gameInfoBarProps} />
                     </GamePlayerShell>
@@ -640,11 +666,11 @@ export default function GamePage({
                 <>
                   {fullscreen ? (
                     <div className="w-full shrink-0">
-                      <GamePlayerShell
-                        ref={playerContainerRef}
-                        className={`w-full shrink-0 ${playerShellHeightClass}`}
-                      >
-                        <div className={`${gamePlayerStageClass} bg-black`}>
+                      <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
+                        <div
+                          ref={playerStageRef}
+                          className={`game-player-stage ${gamePlayerStageClass} bg-black`}
+                        >
                           {gameUrl ? (
                             <GameIframe
                               gameUrl={gameUrl}
@@ -666,6 +692,9 @@ export default function GamePage({
                               <LoadingScreen variant="inline" showText={false} />
                             </div>
                           )}
+                          {isPlayerFullscreen && (
+                            <FullscreenExitButton onClick={togglePlayerFullscreen} />
+                          )}
                         </div>
                         <GameInformationBar {...gameInfoBarProps} />
                       </GamePlayerShell>
@@ -679,12 +708,10 @@ export default function GamePage({
                         gameName={gameName}
                         backgroundColor={homeConfig.fundo}
                       />
-                      <GamePlayerShell
-                        ref={playerContainerRef}
-                        className={`w-full shrink-0 ${playerShellHeightClass}`}
-                      >
+                      <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
                         <div
-                          className={gamePlayerStageClass}
+                          ref={playerStageRef}
+                          className={`game-player-stage ${gamePlayerStageClass}`}
                           style={{ backgroundColor: homeConfig.fundo }}
                         >
                           {gameUrl ? (
@@ -707,6 +734,9 @@ export default function GamePage({
                             <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 backdrop-blur-[1px] transition-opacity duration-300">
                               <LoadingScreen variant="inline" showText={false} />
                             </div>
+                          )}
+                          {isPlayerFullscreen && (
+                            <FullscreenExitButton onClick={togglePlayerFullscreen} />
                           )}
                         </div>
                         <GameInformationBar {...gameInfoBarProps} />

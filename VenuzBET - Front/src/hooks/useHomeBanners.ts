@@ -5,6 +5,8 @@ export interface HomeBanner {
   id: string;
   titulo: string | null;
   imagem_url: string;
+  href: string | null;
+  link_tipo: 'href' | 'external' | null;
   ordem: number;
   ativo: boolean;
 }
@@ -35,7 +37,7 @@ export function useHomeBanners() {
     try {
       const { data, error } = await supabase
         .from('cms_items')
-        .select('id, titulo, imagem_url, ordem, ativo')
+        .select('id, titulo, imagem_url, href, link_tipo, ordem, ativo')
         .eq('secao', 'home_banner')
         .eq('ativo', true)
         .order('ordem', { ascending: true });

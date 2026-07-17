@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useHomeBanners } from '../hooks/useHomeBanners';
+import { useNavigate } from 'react-router-dom';
+import { openCmsLink } from '../lib/cmsLink';
+import { useHomeBanners, type HomeBanner } from '../hooks/useHomeBanners';
 
 const DRAG_THRESHOLD = 48;
 
 export default function Banner() {
+  const navigate = useNavigate();
   const { banners } = useHomeBanners();
   const [currentBanner, setCurrentBanner] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const dragStartX = useRef(0);
+  const didDragRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +61,7 @@ export default function Banner() {
       setDragOffset(0);
 
       if (Math.abs(delta) >= DRAG_THRESHOLD) {
+        didDragRef.current = true;
         if (delta > 0) goToPrevious();
         else goToNext();
       } else {
@@ -70,6 +75,7 @@ export default function Banner() {
     if (banners.length <= 1 || event.button !== 0) return;
     if ((event.target as HTMLElement).closest('button')) return;
     event.preventDefault();
+    didDragRef.current = false;
     setIsDragging(true);
     setIsPaused(true);
     dragStartX.current = event.clientX;
@@ -91,6 +97,7 @@ export default function Banner() {
 
   const handleTouchStart = (event: React.TouchEvent) => {
     if (banners.length <= 1) return;
+    didDragRef.current = false;
     setIsDragging(true);
     setIsPaused(true);
     dragStartX.current = event.touches[0].clientX;
@@ -117,6 +124,14 @@ export default function Banner() {
     window.addEventListener('mouseup', handleWindowMouseUp);
     return () => window.removeEventListener('mouseup', handleWindowMouseUp);
   }, [isDragging, finishDrag]);
+
+  const handleBannerClick = (banner: HomeBanner) => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    openCmsLink(banner.href, banner.link_tipo, navigate);
+  };
 
   if (banners.length === 0) return null;
 
@@ -146,7 +161,17 @@ export default function Banner() {
         {banners.map((banner) => (
           <div
             key={banner.id}
-            className="h-full shrink-0"
+            role={banner.href ? 'link' : undefined}
+            tabIndex={banner.href ? 0 : undefined}
+            onClick={() => handleBannerClick(banner)}
+            onKeyDown={(event) => {
+              if (!banner.href) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openCmsLink(banner.href, banner.link_tipo, navigate);
+              }
+            }}
+            className={`h-full shrink-0 ${banner.href ? 'cursor-pointer' : ''}`}
             style={{ width: `${100 / banners.length}%` }}
           >
             <img
