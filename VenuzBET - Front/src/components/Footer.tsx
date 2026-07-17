@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useFooterConfig } from '../hooks/useFooterConfig';
+import { useSidebarLanguage } from '../contexts/SidebarLanguageContext';
+import { getHeaderFooterCopy } from '../i18n/headerFooter';
 import SiteLogo from './SiteLogo';
 
 interface FooterProps {
@@ -9,6 +11,8 @@ interface FooterProps {
 export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }: FooterProps) {
   const [showMore, setShowMore] = useState(false);
   const { config } = useFooterConfig();
+  const { language } = useSidebarLanguage();
+  const copy = useMemo(() => getHeaderFooterCopy(language).footer, [language]);
 
   useEffect(() => {
     // Garante que o Iconify escaneia os ícones após renderizar
@@ -53,43 +57,43 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
           </div>
 
           <div className="flex flex-col gap-2 text-sm">
-            <p className="pb-1 font-bold text-white text-base">Regras</p>
+            <p className="pb-1 font-bold text-white text-base">{copy.rules}</p>
             <a href="/help/terms" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Termos & Condições
+              {copy.terms}
             </a>
             <a href="/help/betting-terms" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Termos de Apostas
+              {copy.bettingTerms}
             </a>
             <a href="/help/privacy" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Políticas de Privacidade
+              {copy.privacy}
             </a>
             <a href="/help/kyc" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Política KYC
+              {copy.kyc}
             </a>
             <a href="/help/responsible-gaming" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Política de Jogo Responsável
+              {copy.responsibleGaming}
             </a>
             <a href="/help/aml" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Política AML
+              {copy.aml}
             </a>
           </div>
 
           <div className="flex flex-col gap-2 text-sm">
-            <p className="pb-1 font-bold text-white text-base">Comunidade</p>
+            <p className="pb-1 font-bold text-white text-base">{copy.community}</p>
             <a href="/help/mobile" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
               <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
-              Aplicativo Móvel
+              {copy.mobileApp}
             </a>
           </div>
 
           <div className="flex flex-col gap-2 text-sm">
-            <p className="pb-1 font-bold text-white text-base">Pagamento</p>
+            <p className="pb-1 font-bold text-white text-base">{copy.payment}</p>
             <div className="flex items-center gap-1 mt-2">
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Logo_-_pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.png/1280px-Logo_-_pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.png"
@@ -103,51 +107,51 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
         </div>
 
         <div className="py-6 border-t border-white/10">
-          <h3 className="text-white font-bold text-center mb-3">Cassino 24 horas 🎲 - Pix Instantâneo e Saque Rápido!</h3>
+          <h3 className="text-white font-bold text-center mb-3">{copy.headline}</h3>
           <p className="text-sm text-center leading-relaxed max-w-3xl mx-auto mb-3" style={{ color: '#DCDDDE' }}>
-            Aposte agora no Cassino dos Brasileiros com cashback garantido, bets ilimitadas 🎰 e mais de 1.000 jogos disponíveis para você se divertir. Aproveite promoções exclusivas, suporte 24h e total segurança nas suas apostas! 🍀
+            {copy.summary}
           </p>
 
           {showMore && (
             <div className="text-sm text-center leading-relaxed max-w-4xl mx-auto mb-3" style={{ color: '#DCDDDE' }}>
               <p className="mb-4 text-white font-bold">
-                🎰 Aposte onde a emoção não tem limites! - Pix Instantâneo, Suporte 24h e Saques Rápidos!
+                {copy.expandedTitle1}
               </p>
 
               <p className="mb-4">
-                Curta os melhores jogos de cassino virtual e esportes online. São mais de 1.000 jogos e milhares de opções de apostas em futebol, basquete, tênis, e-sports e muito mais!
+                {copy.expandedP1}
               </p>
 
               <p className="mb-4 text-white font-bold">
-                ⚠️ Proibido para menores de 18 anos
+                {copy.expandedTitle2}
               </p>
 
               <p className="mb-4">
-                Este site é destinado exclusivamente a maiores de 18 anos. Menores de idade não devem fornecer informações pessoais, como nome, e-mail ou telefone. Caso você tenha menos de 18 anos (ou abaixo da idade legal permitida em seu país), pedimos que não acesse esta plataforma. O jogo pode causar dependência. Jogue com responsabilidade. Para mais orientações, acesse nossa seção Jogo Responsável.
+                {copy.expandedP2}
               </p>
 
               <p className="mb-4 text-white font-bold">
-                🔒 Utilizamos cookies para melhorar sua experiência
+                {copy.expandedTitle3}
               </p>
 
               <p className="mb-4">
-                Ao continuar navegando, você concorda com o uso de cookies que melhoram sua experiência. Utilizamos apenas cookies essenciais e respeitamos sua privacidade. Para saber mais, consulte nossa Política de Privacidade.
+                {copy.expandedP3}
               </p>
 
               <p className="mb-4 text-white font-bold">
-                🎯 Jogo Responsável: Diversão com Consciência Sempre em Primeiro Lugar
+                {copy.expandedTitle4}
               </p>
 
               <p className="mb-4">
-                Apostar deve ser uma atividade leve, segura e feita com equilíbrio. Nosso compromisso é oferecer um ambiente saudável, onde o entretenimento vem acompanhado de responsabilidade. Por isso, disponibilizamos ferramentas que ajudam você a manter o controle da sua jornada, como limites personalizáveis e pausas voluntárias. Também oferecemos acesso a canais de apoio para quem precisa de orientação. Nosso objetivo é garantir que sua experiência seja sempre positiva, consciente e segura.
+                {copy.expandedP4}
               </p>
 
               <p className="mb-4 text-white font-bold">
-                ⚡ Apostas em Tempo Real: Emoção Segundo a Segundo
+                {copy.expandedTitle5}
               </p>
 
               <p>
-                Mergulhe na intensidade das apostas em tempo real! Nossa plataforma permite que você acompanhe cada lance dos eventos esportivos enquanto faz suas apostas com rapidez e estratégia. Tome decisões instantâneas, aproveite cotações que mudam ao vivo e explore diversos tipos de mercados em uma experiência interativa e cheia de adrenalina. Para quem busca emoção de verdade, o jogo acontece aqui e agora!
+                {copy.expandedP5}
               </p>
             </div>
           )}
@@ -158,7 +162,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
               className="text-sm font-medium transition-colors duration-200 underline"
               style={{ color: '#DCDDDE' }}
             >
-              {showMore ? 'Ver menos' : 'Ver mais'}
+              {showMore ? copy.showLess : copy.showMore}
             </button>
           </div>
         </div>

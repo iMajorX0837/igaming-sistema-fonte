@@ -2,11 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import {
-  getStoredSidebarLanguage,
   SIDEBAR_LANGUAGES,
-  storeSidebarLanguage,
   type SidebarLanguage,
 } from '../i18n/sidebar';
+import { useSidebarLanguage } from '../contexts/SidebarLanguageContext';
 import {
   getSidebarCardLabels,
   getSidebarCardTitle,
@@ -207,10 +206,10 @@ function SidebarPromoCardContent({
   );
 }
 
-// Componente para Ìcones SVG customizados removido ó menu usa CMS (iconify/imagem)
+// Componente para ùcones SVG customizados removido ù menu usa CMS (iconify/imagem)
 
 export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
-  const [language, setLanguage] = useState<SidebarLanguage>(getStoredSidebarLanguage);
+  const { language, setLanguage } = useSidebarLanguage();
   const [sectionsExpanded, setSectionsExpanded] = useState<Record<string, boolean>>({});
   const { cards: promoCards } = useSidebarPromoCards();
   const { config: sidebarConfig } = useSidebarConfig();
@@ -238,7 +237,6 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
 
   const handleLanguageSelect = (lang: SidebarLanguage) => {
     setLanguage(lang);
-    storeSidebarLanguage(lang);
   };
 
   const toggleSection = (sectionSlug: string) => {

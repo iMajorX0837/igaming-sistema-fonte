@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import { SiteConfigProvider } from './contexts/SiteConfigContext.tsx';
+import { SidebarLanguageProvider } from './contexts/SidebarLanguageContext.tsx';
 import { getInitialSiteTheme, hydrateDocumentTheme, buildSiteThemeFromSiteConfig, persistSiteTheme } from './lib/siteConfigCache';
 import { applyBrandToDocument } from './lib/siteBrand';
 import { supabase } from './lib/supabase';
@@ -39,7 +40,9 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <SiteConfigProvider>
-          <App />
+          <SidebarLanguageProvider>
+            <App />
+          </SidebarLanguageProvider>
         </SiteConfigProvider>
       </AuthProvider>
     </BrowserRouter>
