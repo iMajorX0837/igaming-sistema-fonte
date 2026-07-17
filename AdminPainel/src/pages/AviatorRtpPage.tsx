@@ -10,7 +10,11 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
+  Clock,
+  History,
+  ListOrdered,
   Plane,
+  Radio,
   RefreshCw,
   Save,
   Shield,
@@ -151,6 +155,75 @@ function secondsUntilCrash(crashAtMs: number, clockOffset: number) {
   return Math.max(0, Math.floor((crashAtMs - now) / 1000));
 }
 
+type CrashTier = 'low' | 'mid' | 'high' | 'mega';
+
+function crashTier(x: number): CrashTier {
+  if (x >= 50) return 'mega';
+  if (x >= 10) return 'high';
+  if (x >= 2) return 'mid';
+  return 'low';
+}
+
+function crashTierLabel(tier: CrashTier) {
+  switch (tier) {
+    case 'low':
+      return 'Baixa';
+    case 'mid':
+      return 'Média';
+    case 'high':
+      return 'Alta';
+    case 'mega':
+      return 'Muito alta';
+  }
+}
+
+function crashTierStyles(tier: CrashTier) {
+  switch (tier) {
+    case 'low':
+      return {
+        text: 'text-emerald-400',
+        bar: 'bg-emerald-500',
+        chip: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
+      };
+    case 'mid':
+      return {
+        text: 'text-gray-200',
+        bar: 'bg-gray-400',
+        chip: 'bg-white/5 text-gray-300 border-white/10',
+      };
+    case 'high':
+      return {
+        text: 'text-amber-400',
+        bar: 'bg-amber-500',
+        chip: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
+      };
+    case 'mega':
+      return {
+        text: 'text-rose-400',
+        bar: 'bg-rose-500',
+        chip: 'bg-rose-500/15 text-rose-300 border-rose-500/25',
+      };
+  }
+}
+
+function crashBarWidth(x: number) {
+  const capped = Math.min(Math.max(x, 1.01), 50);
+  return Math.max(8, (Math.log10(capped) / Math.log10(50)) * 100);
+}
+
+function formatCrashX(x: number) {
+  return `${Number(x || 0).toFixed(2)}x`;
+}
+
+function summarizeUpcoming(rounds: AviatorScheduleEntry[]) {
+  if (!rounds.length) return null;
+  const values = rounds.map((r) => Number(r.crash_x));
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const low = values.filter((v) => v < 2).length;
+  const high = values.filter((v) => v >= 10).length;
+  return { avg, low, high, total: rounds.length };
+}
+
 export default function AviatorRtpPage() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -165,6 +238,7 @@ export default function AviatorRtpPage() {
   const [upcomingRounds, setUpcomingRounds] = useState<AviatorScheduleEntry[]>([]);
   const [pastRounds, setPastRounds] = useState<AviatorScheduleEntry[]>([]);
   const [clockOffset, setClockOffset] = useState(0);
+  const [, setTick] = useState(0);
 
   const applyConfigToForm = (config: AviatorConfig) => {
     setForm({
@@ -282,6 +356,18 @@ export default function AviatorRtpPage() {
     void loadConfig({ initial: true });
   }, [loadConfig]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadPreview();
+    }, 10000);
+    return () => window.clearInterval(id);
+  }, [loadPreview]);
+
   const handleSave = async () => {
     const rtpBase = pctToFactor(form.rtp_base_pct);
     const rtpMin = pctToFactor(form.rtp_min_pct);
@@ -362,6 +448,8 @@ export default function AviatorRtpPage() {
   const houseGgr = Number(stats?.ggr ?? 0);
   const houseProfit = houseGgr >= 0;
   const ggrTargetPct = Number(form.ggr_target_pct) || 0;
+  const upcomingPreview = upcomingRounds.slice(0, 12);
+  const upcomingStats = summarizeUpcoming(upcomingPreview);
 
   if (loading) {
     return <LoadingState message="Carregando Aviator..." className="w-full" />;
@@ -640,58 +728,117 @@ export default function AviatorRtpPage() {
 
         <PagePanel className="xl:col-span-5 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:flex xl:flex-col">
           <div className="flex items-center justify-between mb-1 shrink-0">
-            <h2 className="text-white text-lg font-semibold">Rodadas do motor</h2>
+            <div>
+              <h2 className="text-white text-lg font-semibold">Rodadas do motor</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Preview em tempo real · atualiza a cada 10s</p>
+            </div>
             <button
               type="button"
               onClick={() => void refreshData()}
               disabled={refreshingPreview}
               className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-50"
-              title="Atualizar"
+              title="Atualizar agora"
             >
               <RefreshCw className={`w-4 h-4 ${refreshingPreview ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          <p className="text-xs text-gray-500 mb-4 shrink-0">Preview técnico — o que o servidor vai sortear.</p>
 
-          <div className="xl:overflow-y-auto xl:flex-1 xl:min-h-0 space-y-5">
-            <section>
-              <h3 className="text-xs uppercase tracking-wide text-admin-accent font-semibold mb-2">Ao vivo</h3>
-              {!liveRound ? (
-                <p className="text-gray-400 text-sm">Motor offline ou indisponível.</p>
+          <div className="xl:overflow-y-auto xl:flex-1 xl:min-h-0 space-y-4 mt-3">
+            <section className="rounded-xl border border-admin-accent/25 bg-admin-accent/[0.06] overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-admin-accent/15 bg-admin-accent/[0.04]">
+                <Radio className="w-3.5 h-3.5 text-admin-accent" />
+                <h3 className="text-xs uppercase tracking-wide text-admin-accent font-semibold">Ao vivo agora</h3>
+              </div>
+              <div className="p-3">
+                {!liveRound ? (
+                  <p className="text-gray-400 text-sm py-2 text-center">Motor offline ou indisponível.</p>
+                ) : (
+                  <LiveRoundCard item={liveRound} clockOffset={clockOffset} />
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-admin-border bg-black/20 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="w-3.5 h-3.5 text-gray-400" />
+                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                    Próximas velas
+                  </h3>
+                </div>
+                {upcomingRounds.length > 0 && (
+                  <span className="text-[10px] text-gray-500 tabular-nums">{upcomingRounds.length} na fila</span>
+                )}
+              </div>
+
+              {upcomingRounds.length === 0 ? (
+                <p className="text-gray-500 text-sm px-3 py-4 text-center">Nenhuma vela na fila.</p>
               ) : (
-                <VelaCard item={liveRound} clockOffset={clockOffset} variant="live" />
+                <>
+                  {upcomingStats && <UpcomingSummary stats={upcomingStats} />}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-gray-500 border-b border-admin-border/80">
+                          <th className="py-2 pl-3 pr-1 text-left font-medium w-8">#</th>
+                          <th className="py-2 px-1 text-left font-medium">Rodada</th>
+                          <th className="py-2 px-1 text-left font-medium min-w-[88px]">Intensidade</th>
+                          <th className="py-2 px-1 text-right font-medium">Crash</th>
+                          <th className="py-2 px-1 text-right font-medium hidden sm:table-cell">Início</th>
+                          <th className="py-2 pr-3 pl-1 text-right font-medium">Falta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {upcomingPreview.map((item, idx) => (
+                          <UpcomingRow
+                            key={`up-${item.round_id}-${item.queue_position ?? idx}`}
+                            item={item}
+                            index={idx + 1}
+                            clockOffset={clockOffset}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
 
-            {upcomingRounds.length > 0 && (
-              <section>
-                <h3 className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">
-                  Próximas ({upcomingRounds.length})
-                </h3>
-                <ul className="grid grid-cols-1 gap-2">
-                  {upcomingRounds.slice(0, 6).map((item) => (
-                    <li key={`up-${item.round_id}-${item.index ?? item.queue_position}`}>
-                      <VelaCard item={item} clockOffset={clockOffset} variant="upcoming" />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <section className="rounded-xl border border-admin-border bg-black/20 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25">
+                <div className="flex items-center gap-2">
+                  <History className="w-3.5 h-3.5 text-gray-400" />
+                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                    Velas recentes
+                  </h3>
+                </div>
+                {pastRounds.length > 0 && (
+                  <span className="text-[10px] text-gray-500 tabular-nums">{pastRounds.length} registradas</span>
+                )}
+              </div>
 
-            {pastRounds.length > 0 && (
-              <section>
-                <h3 className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">
-                  Recentes ({pastRounds.length})
-                </h3>
-                <ul className="grid grid-cols-1 gap-2">
-                  {pastRounds.slice(0, 4).map((item) => (
-                    <li key={`past-${item.round_id}`}>
-                      <VelaCard item={item} clockOffset={clockOffset} variant="past" />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+              {pastRounds.length === 0 ? (
+                <p className="text-gray-500 text-sm px-3 py-4 text-center">Nenhuma vela recente.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-gray-500 border-b border-admin-border/80">
+                        <th className="py-2 pl-3 pr-1 text-left font-medium w-8">#</th>
+                        <th className="py-2 px-1 text-left font-medium">Rodada</th>
+                        <th className="py-2 px-1 text-left font-medium min-w-[88px]">Resultado</th>
+                        <th className="py-2 pr-3 pl-1 text-right font-medium">Horário</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pastRounds.slice(0, 10).map((item, idx) => (
+                        <PastRow key={`past-${item.round_id}-${idx}`} item={item} index={idx + 1} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </div>
         </PagePanel>
       </div>
@@ -699,54 +846,134 @@ export default function AviatorRtpPage() {
   );
 }
 
-function VelaCard({
-  item,
-  clockOffset,
-  variant,
-}: {
-  item: AviatorScheduleEntry;
-  clockOffset: number;
-  variant: 'live' | 'upcoming' | 'past';
-}) {
+function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; clockOffset: number }) {
   const countdown = secondsUntilCrash(item.crash_at_ms, clockOffset);
-  const isLive = variant === 'live';
-  const isPast = variant === 'past';
-
-  const shellClass = isLive
-    ? 'bg-admin-accent/10 border-admin-accent/24'
-    : isPast
-      ? 'bg-black/10 border-white/5 opacity-80'
-      : 'bg-black/20 border-transparent';
+  const tier = crashTier(Number(item.crash_x));
+  const styles = crashTierStyles(tier);
 
   return (
-    <div className={`text-sm px-3 py-3 rounded-lg border ${shellClass}`}>
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-gray-300 font-medium">#{item.round_id}</span>
-        {isLive && (
-          <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-admin-accent text-[#0d0e10]">
-            Ao vivo
-          </span>
-        )}
-      </div>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className={`font-mono ${isLive ? 'text-white text-xl' : 'text-white text-lg'}`}>
-          {Number(item.crash_x).toFixed(2)}x
+    <div className="space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-gray-500">Rodada #{item.round_id}</p>
+          <p className={`font-mono text-3xl font-semibold tabular-nums ${styles.text}`}>
+            {formatCrashX(Number(item.crash_x))}
+          </p>
+        </div>
+        <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-admin-accent text-[#0d0e10] font-semibold shrink-0">
+          {item.phase || 'Ao vivo'}
         </span>
-        {!isPast && (
-          <span
-            className={`text-xs font-medium ${
-              isLive && countdown <= 5 ? 'text-admin-warning' : 'text-gray-400'
+      </div>
+
+      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div className={`h-full rounded-full ${styles.bar}`} style={{ width: `${crashBarWidth(Number(item.crash_x))}%` }} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-black/25 border border-white/5 px-2.5 py-2">
+          <p className="text-gray-500 mb-0.5">Crash previsto</p>
+          <p className="text-gray-200 font-medium tabular-nums">{formatLocalTime(item.crash_at)}</p>
+        </div>
+        <div className="rounded-lg bg-black/25 border border-white/5 px-2.5 py-2">
+          <p className="text-gray-500 mb-0.5 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Tempo restante
+          </p>
+          <p
+            className={`font-medium tabular-nums ${
+              countdown <= 5 ? 'text-admin-warning' : 'text-gray-200'
             }`}
           >
             {formatCountdown(countdown)}
-          </span>
-        )}
+          </p>
+        </div>
       </div>
-      <p className="text-xs text-gray-500 mt-2">
-        {isPast ? 'Crashou' : 'Crash'} às{' '}
-        <span className="text-gray-300">{formatLocalTime(item.crash_at)}</span>
-      </p>
     </div>
+  );
+}
+
+function UpcomingSummary({
+  stats,
+}: {
+  stats: { avg: number; low: number; high: number; total: number };
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-px bg-admin-border/50 border-b border-admin-border/80 text-[10px]">
+      <div className="bg-black/20 px-3 py-2">
+        <p className="text-gray-500">Média</p>
+        <p className="text-gray-200 font-mono font-medium tabular-nums">{formatCrashX(stats.avg)}</p>
+      </div>
+      <div className="bg-black/20 px-3 py-2">
+        <p className="text-gray-500">Baixas (&lt;2x)</p>
+        <p className="text-emerald-400 font-medium tabular-nums">{stats.low}</p>
+      </div>
+      <div className="bg-black/20 px-3 py-2">
+        <p className="text-gray-500">Altas (≥10x)</p>
+        <p className="text-amber-400 font-medium tabular-nums">{stats.high}</p>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingRow({
+  item,
+  index,
+  clockOffset,
+}: {
+  item: AviatorScheduleEntry;
+  index: number;
+  clockOffset: number;
+}) {
+  const x = Number(item.crash_x);
+  const tier = crashTier(x);
+  const styles = crashTierStyles(tier);
+  const countdown = secondsUntilCrash(item.crash_at_ms, clockOffset);
+
+  return (
+    <tr className="border-b border-admin-border/40 last:border-0 hover:bg-white/[0.02]">
+      <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
+      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
+      <td className="py-2.5 px-1">
+        <div className="flex items-center gap-2 min-w-[88px]">
+          <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className={`h-full rounded-full ${styles.bar}`} style={{ width: `${crashBarWidth(x)}%` }} />
+          </div>
+          <span className="text-[10px] text-gray-500 w-10 shrink-0">{crashTierLabel(tier)}</span>
+        </div>
+      </td>
+      <td className={`py-2.5 px-1 text-right font-mono font-semibold tabular-nums ${styles.text}`}>
+        {formatCrashX(x)}
+      </td>
+      <td className="py-2.5 px-1 text-right text-gray-500 tabular-nums hidden sm:table-cell">
+        {formatLocalTime(item.bet_start_at || item.crash_at)}
+      </td>
+      <td className="py-2.5 pr-3 pl-1 text-right text-gray-400 tabular-nums">{formatCountdown(countdown)}</td>
+    </tr>
+  );
+}
+
+function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number }) {
+  const x = Number(item.crash_x);
+  const tier = crashTier(x);
+  const styles = crashTierStyles(tier);
+
+  return (
+    <tr className="border-b border-admin-border/40 last:border-0 hover:bg-white/[0.02]">
+      <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
+      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
+      <td className="py-2.5 px-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums ${styles.chip}`}
+          >
+            {formatCrashX(x)}
+          </span>
+        </div>
+      </td>
+      <td className="py-2.5 pr-3 pl-1 text-right text-gray-500 tabular-nums">
+        {formatLocalTime(item.crash_at)}
+      </td>
+    </tr>
   );
 }
 
