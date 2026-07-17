@@ -55,6 +55,8 @@ export type SupabaseProxyClientOptions = {
 };
 
 const DEFAULT_STORAGE_KEY = 'venuz-auth-session';
+/** Renova o access token antes de expirar (Supabase JWT ~1h). */
+const REFRESH_MARGIN_SEC = 60;
 
 /** Monta URL legível no DevTools → Network (ex.: select/usuarios/saldo.single) */
 function buildQueryPath(spec: QuerySpec): string {
@@ -312,6 +314,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   const pollEntries = new Map<string, PollEntry>();
   let pollIntervalId: ReturnType<typeof setInterval> | null = null;
   let pollInFlight = false;
+  let refreshPromise: Promise<Session | null> | null = null;
 
   function onVisibilityChange(): void {
     if (typeof document !== 'undefined' && !document.hidden) {
@@ -425,6 +428,75 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     });
   }
 
+  function clearSessionAndNotify(): void {
+    writeSession(null);
+    notifyAuth('SIGNED_OUT', null);
+  }
+
+  function sessionNeedsRefresh(session: Session | null): boolean {
+    if (!session?.access_token) return false;
+    if (!session.expires_at) return false;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return session.expires_at <= nowSec + REFRESH_MARGIN_SEC;
+  }
+
+  function isJwtExpiredError(error: { code?: string; message?: string } | null | undefined): boolean {
+    if (!error) return false;
+    if (error.code === 'PGRST303') return true;
+    const msg = (error.message ?? '').toLowerCase();
+    return msg.includes('jwt expired') || msg.includes('token expired');
+  }
+
+  async function performSessionRefresh(): Promise<Session | null> {
+    const local = readSession();
+    if (!local?.refresh_token) {
+      clearSessionAndNotify();
+      return null;
+    }
+
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${apiBase}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: local.refresh_token }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok || payload.error || !payload.data?.session) {
+          clearSessionAndNotify();
+          return null;
+        }
+
+        const merged: Session = {
+          ...local,
+          ...payload.data.session,
+          user: payload.data.session.user ?? local.user,
+        };
+        writeSession(merged);
+        notifyAuth('TOKEN_REFRESHED', merged);
+        return merged;
+      } catch (err) {
+        console.error('[supabase-proxy] refresh session error:', err);
+        clearSessionAndNotify();
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  }
+
+  async function ensureValidSession(): Promise<boolean> {
+    const session = readSession();
+    if (!session?.access_token) return false;
+    if (!sessionNeedsRefresh(session)) return true;
+    return (await performSessionRefresh()) !== null;
+  }
+
   async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set('Content-Type', 'application/json');
@@ -447,31 +519,52 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     });
   }
 
+  async function executeQueryRequest(spec: QuerySpec): Promise<QueryResult<unknown>> {
+    const path = buildQueryPath(spec);
+    const body = JSON.stringify(
+      spec.operation === 'rpc' ? { params: spec.params ?? {} } : { query: spec }
+    );
+
+    const response = await apiFetch(path, { method: 'POST', body });
+
+    if (response.status === 401) {
+      clearSessionAndNotify();
+      const payload = await response.json().catch(() => ({}));
+      return {
+        data: null,
+        error: payload.error ?? { message: 'Não autenticado' },
+        count: null,
+      };
+    }
+
+    const payload = await response.json();
+    return {
+      data: payload.data ?? null,
+      error: payload.error ?? null,
+      count: payload.count ?? null,
+    };
+  }
+
   async function runQuery(spec: QuerySpec): Promise<QueryResult<unknown>> {
     const cacheKey = JSON.stringify(spec);
     const inflight = inflightQueries.get(cacheKey);
     if (inflight) return inflight;
 
     const promise = (async () => {
-      const path = buildQueryPath(spec);
-      const response = await apiFetch(path, {
-        method: 'POST',
-        body: JSON.stringify(
-          spec.operation === 'rpc' ? { params: spec.params ?? {} } : { query: spec }
-        ),
-      });
+      await ensureValidSession();
 
-      if (response.status === 401) {
-        writeSession(null);
-        notifyAuth('SIGNED_OUT', null);
+      let result = await executeQueryRequest(spec);
+
+      if (isJwtExpiredError(result.error)) {
+        const refreshed = await performSessionRefresh();
+        if (refreshed) {
+          result = await executeQueryRequest(spec);
+        } else {
+          clearSessionAndNotify();
+        }
       }
 
-      const payload = await response.json();
-      return {
-        data: payload.data ?? null,
-        error: payload.error ?? null,
-        count: payload.count ?? null,
-      };
+      return result;
     })();
 
     inflightQueries.set(cacheKey, promise);
@@ -484,25 +577,43 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   }
 
   const auth = {
-    /** Lê sessão do localStorage — sem requisição de rede (igual ao SDK Supabase). */
+    /** Lê sessão local; renova o token automaticamente se estiver perto de expirar. */
     async getSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
+      await ensureValidSession();
       return { data: { session: readSession() }, error: null };
     },
 
-    /** Valida token no servidor — use só quando precisar confirmar sessão remotamente. */
+    /** Renova access token usando refresh_token (POST /auth/refresh). */
+    async refreshSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
+      const session = await performSessionRefresh();
+      if (!session) {
+        return { data: { session: null }, error: { message: 'Sessão expirada' } };
+      }
+      return { data: { session }, error: null };
+    },
+
+    /** Valida/renova sessão no servidor — use na inicialização do app. */
     async validateSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
       const local = readSession();
       if (!local?.access_token) {
         return { data: { session: null }, error: null };
       }
 
+      if (sessionNeedsRefresh(local)) {
+        const refreshed = await performSessionRefresh();
+        return { data: { session: refreshed }, error: refreshed ? null : { message: 'Sessão expirada' } };
+      }
+
       const response = await apiFetch('/auth/session');
       const payload = await response.json();
 
-      if (payload.error || !payload.data?.session) {
-        writeSession(null);
-        notifyAuth('SIGNED_OUT', null);
-        return { data: { session: null }, error: payload.error ?? null };
+      if (response.status === 401 || payload.error || !payload.data?.session) {
+        const refreshed = await performSessionRefresh();
+        if (refreshed) {
+          return { data: { session: refreshed }, error: null };
+        }
+        clearSessionAndNotify();
+        return { data: { session: null }, error: payload.error ?? { message: 'Sessão expirada' } };
       }
 
       const merged: Session = {

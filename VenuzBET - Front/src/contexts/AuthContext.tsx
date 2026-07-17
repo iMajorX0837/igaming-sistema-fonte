@@ -45,6 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
+    void supabase.auth.validateSession().finally(() => {
+      setLoading(false);
+    });
+
     return () => {
       subscription.unsubscribe();
     };
