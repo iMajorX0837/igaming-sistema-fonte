@@ -7,7 +7,7 @@ import RegisterModal from './RegisterModal';
 import DepositModal from './DepositModal';
 import LoadingScreen from './LoadingScreen';
 import BackButton from './BackButton';
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, forwardRef, type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useListenOpenMobileMenu } from '../hooks/useListenOpenMobileMenu';
@@ -46,18 +46,22 @@ interface GameLaunchResponse {
 const gamePlayerShellClass =
   'flex flex-col overflow-hidden rounded-lg md:rounded-xl border border-slate-800/60 shadow-2xl';
 
-/** Altura do iframe em tela cheia (viewport menos header do site). */
-const FULLSCREEN_GAME_HEIGHT = 'h-[calc(100dvh-6rem)]';
+/** Altura do bloco iframe + barra de info, ancorada no viewport. */
+const GAME_PLAYER_HEIGHT_FULLSCREEN = 'h-[calc(100dvh-5.75rem)] min-h-[320px]';
+const GAME_PLAYER_HEIGHT_STANDARD = 'h-[80dvh] min-h-[360px] max-h-[calc(100dvh-8rem)]';
 
-function GamePlayerShell({
-  children,
-  className = '',
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return <div className={`${gamePlayerShellClass} ${className}`.trim()}>{children}</div>;
-}
+const gamePlayerStageClass = 'relative w-full flex-1 min-h-0 overflow-hidden';
+
+const GamePlayerShell = forwardRef<
+  HTMLDivElement,
+  { children: ReactNode; className?: string }
+>(function GamePlayerShell({ children, className = '' }, ref) {
+  return (
+    <div ref={ref} className={`${gamePlayerShellClass} ${className}`.trim()}>
+      {children}
+    </div>
+  );
+});
 
 interface GameInformationBarProps {
   gameName: string;
@@ -292,12 +296,13 @@ function GameIframe({
   containerClassName?: string;
 }) {
   return (
-    <div className={`relative ${containerClassName}`.trim()}>
+    <div className={`game-iframe-wrapper relative overflow-hidden ${containerClassName}`.trim()}>
       <iframe
         src={gameUrl}
-        className={`${iframeClassName} ${showInsufficientBalance ? 'blur-md pointer-events-none' : ''}`.trim()}
+        className={`game-iframe scrollbar-hide overflow-hidden ${iframeClassName} ${showInsufficientBalance ? 'blur-md pointer-events-none' : ''}`.trim()}
         allow="fullscreen; autoplay; encrypted-media"
         allowFullScreen
+        scrolling="no"
         title={gameName}
       />
       {showInsufficientBalance && (
@@ -557,27 +562,29 @@ export default function GamePage({
   const handleDepositFromGame = () => setIsDepositOpen(true);
   const handlePlayWithoutDeposit = () => setDismissedDepositPrompt(true);
 
-  const gameBody = (
-    <div
-      className={`flex-1 min-h-0 flex flex-col ${
-        fullscreen ? 'overflow-y-auto' : 'overflow-hidden'
-      }`}
-    >
-          {!isAuthenticated ? (
-            <div className={`flex flex-col ${fullscreen ? '' : 'flex-1 min-h-0 overflow-y-auto'}`}>
-              {fullscreen ? (
-                <div className="flex-1 min-h-0 w-full flex flex-col">
-                  <div className={`relative w-full shrink-0 ${FULLSCREEN_GAME_HEIGHT}`}>
-                    <div
-                      className="w-full h-full bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${gameImage})`,
-                        objectFit: 'cover',
-                      }}
-                    />
+  const playerShellHeightClass = fullscreen
+    ? GAME_PLAYER_HEIGHT_FULLSCREEN
+    : GAME_PLAYER_HEIGHT_STANDARD;
 
-                    <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
-                  </div>
+  const gameBody = (
+    <div className="flex flex-col w-full">
+          {!isAuthenticated ? (
+            <div className="flex flex-col w-full">
+              {fullscreen ? (
+                <div className="w-full shrink-0">
+                  <GamePlayerShell
+                    ref={playerContainerRef}
+                    className={`w-full shrink-0 ${playerShellHeightClass}`}
+                  >
+                    <div className={`${gamePlayerStageClass} bg-black`}>
+                      <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${gameImage})` }}
+                      />
+                      <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
+                    </div>
+                    <GameInformationBar {...gameInfoBarProps} />
+                  </GamePlayerShell>
                 </div>
               ) : (
                 <div className={`shrink-0 ${appPageContainerClass} pt-2 sm:pt-2.5 md:pt-3 pb-2 sm:pb-3 md:pb-6`}>
@@ -587,16 +594,15 @@ export default function GamePage({
                       gameName={gameName}
                       backgroundColor={homeConfig.fundo}
                     />
-                    <GamePlayerShell>
-                      <div className="relative w-full group" style={{ height: '80vh' }}>
+                    <GamePlayerShell
+                      ref={playerContainerRef}
+                      className={`w-full shrink-0 ${playerShellHeightClass}`}
+                    >
+                      <div className={`${gamePlayerStageClass} bg-black`}>
                         <div
-                          className="w-full h-full bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url(${gameImage})`,
-                            objectFit: 'cover',
-                          }}
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${gameImage})` }}
                         />
-
                         <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
                       </div>
                       <GameInformationBar {...gameInfoBarProps} />
@@ -607,7 +613,7 @@ export default function GamePage({
               <Footer containerClassName={appPageContainerClass} />
             </div>
           ) : (
-            <div className={`flex flex-col ${fullscreen ? '' : 'flex-1 min-h-0 overflow-y-auto'}`}>
+            <div className="flex flex-col w-full">
               {error && !gameUrl && (
                 <div className="min-h-full flex flex-col items-center justify-center gap-4 md:gap-8 bg-gradient-to-b from-slate-950/20 via-slate-950/50 to-slate-950/80 px-4">
                   <div className="w-20 h-20 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border-2 border-red-500/40 flex items-center justify-center shadow-2xl backdrop-blur-sm">
@@ -633,48 +639,52 @@ export default function GamePage({
               {!error && (gameUrl || isLoading) && (
                 <>
                   {fullscreen ? (
-                    <div className="flex w-full shrink-0 flex-col">
-                      <div
+                    <div className="w-full shrink-0">
+                      <GamePlayerShell
                         ref={playerContainerRef}
-                        className={`relative w-full ${FULLSCREEN_GAME_HEIGHT} bg-black`}
+                        className={`w-full shrink-0 ${playerShellHeightClass}`}
                       >
-                        {gameUrl ? (
-                          <GameIframe
-                            gameUrl={gameUrl}
-                            gameName={gameName}
-                            showInsufficientBalance={showInsufficientBalance}
-                            onDeposit={handleDepositFromGame}
-                            onPlay={handlePlayWithoutDeposit}
-                            iframeClassName={`w-full h-full border-0 block ${FULLSCREEN_GAME_HEIGHT}`}
-                            containerClassName="w-full h-full"
-                          />
-                        ) : (
-                          <GameLoadingPlaceholder
-                            gameImage={gameImage}
-                            className="w-full h-full"
-                          />
-                        )}
-                        {isLoading && (
-                          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 backdrop-blur-[1px] transition-opacity duration-300">
-                            <LoadingScreen variant="inline" showText={false} />
-                          </div>
-                        )}
-                      </div>
-                      <GameInformationBar {...gameInfoBarProps} />
+                        <div className={`${gamePlayerStageClass} bg-black`}>
+                          {gameUrl ? (
+                            <GameIframe
+                              gameUrl={gameUrl}
+                              gameName={gameName}
+                              showInsufficientBalance={showInsufficientBalance}
+                              onDeposit={handleDepositFromGame}
+                              onPlay={handlePlayWithoutDeposit}
+                              iframeClassName="absolute inset-0 w-full h-full border-0 block"
+                              containerClassName="absolute inset-0 w-full h-full"
+                            />
+                          ) : (
+                            <GameLoadingPlaceholder
+                              gameImage={gameImage}
+                              className="absolute inset-0 w-full h-full"
+                            />
+                          )}
+                          {isLoading && (
+                            <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 backdrop-blur-[1px] transition-opacity duration-300">
+                              <LoadingScreen variant="inline" showText={false} />
+                            </div>
+                          )}
+                        </div>
+                        <GameInformationBar {...gameInfoBarProps} />
+                      </GamePlayerShell>
                     </div>
                   ) : (
-                <div className="min-h-full flex flex-col touch-manipulation">
-                  <div className={`flex-1 min-h-0 ${appPageContainerClass} pt-2 sm:pt-2.5 md:pt-3 pb-2 sm:pb-3 md:pb-6 overflow-hidden flex flex-col`}>
-                    <div className="flex-1 min-h-0 w-full flex flex-col min-w-0 gap-2 md:gap-3">
+                <div className="w-full shrink-0">
+                  <div className={`${appPageContainerClass} pt-2 sm:pt-2.5 md:pt-3 pb-2 sm:pb-3 md:pb-6`}>
+                    <div className="w-full flex flex-col min-w-0 gap-2 md:gap-3">
                       <GameBackRow
                         onBack={onBack}
                         gameName={gameName}
                         backgroundColor={homeConfig.fundo}
                       />
-                      <GamePlayerShell className="flex-1 min-h-0 w-full">
+                      <GamePlayerShell
+                        ref={playerContainerRef}
+                        className={`w-full shrink-0 ${playerShellHeightClass}`}
+                      >
                         <div
-                          ref={playerContainerRef}
-                          className="relative w-full flex-1 min-h-0 md:min-h-[600px]"
+                          className={gamePlayerStageClass}
                           style={{ backgroundColor: homeConfig.fundo }}
                         >
                           {gameUrl ? (
@@ -763,7 +773,7 @@ export default function GamePage({
   if (embedded) {
     return (
       <div
-        className="flex flex-1 min-h-0 flex flex-col animate-page-enter overflow-y-auto"
+        className="flex flex-1 min-h-0 flex-col animate-page-enter overflow-y-auto"
         style={{ backgroundColor: homeConfig.fundo }}
       >
         {gameBody}

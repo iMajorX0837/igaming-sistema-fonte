@@ -180,6 +180,10 @@ class QueryBuilder<T = unknown> implements PromiseLike<QueryResult<T>> {
     return this.clone({ filters: [...(this.spec.filters ?? []), { method: 'not', args: [column, operator, value] }] });
   }
 
+  or(filters: string): QueryBuilder<T> {
+    return this.clone({ filters: [...(this.spec.filters ?? []), { method: 'or', args: [filters] }] });
+  }
+
   order(column: string, options?: OrderSpec['options']): QueryBuilder<T> {
     return this.clone({ orders: [...(this.spec.orders ?? []), { column, options }] });
   }

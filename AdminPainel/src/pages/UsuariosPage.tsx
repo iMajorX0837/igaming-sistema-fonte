@@ -7,8 +7,9 @@ import StatCard from '../components/ui/StatCard';
 import LoadingState from '../components/ui/LoadingState';
 import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
+import FilterPanel from '../components/ui/FilterPanel';
 import Pagination from '../components/jogos/Pagination';
-import { Users, UserCheck, Wallet } from 'lucide-react';
+import { Users, UserCheck, Wallet, Search } from 'lucide-react';
 
 const USUARIOS_LIST_CACHE = 'admin:usuarios:list:';
 const USUARIOS_CARDS_CACHE = 'admin:usuarios:cards';
@@ -33,6 +34,30 @@ interface Usuario {
 
 const ITEMS_PER_PAGE = 11;
 
+const USUARIO_SELECT =
+  'id, nome, usuario_nome, usuario, cpf, email, telefone, created_at, saldo, cargo, vip_nivel, total_depositado, indicado_por';
+
+function buildSearchOrFilter(term: string): string | null {
+  const safe = term.trim().replace(/[,()%\\]/g, '');
+  if (!safe) return null;
+
+  const pattern = `%${safe}%`;
+  const parts = [
+    `nome.ilike.${pattern}`,
+    `usuario_nome.ilike.${pattern}`,
+    `email.ilike.${pattern}`,
+    `usuario.ilike.${pattern}`,
+  ];
+
+  const digits = term.replace(/\D/g, '');
+  if (digits) {
+    parts.push(`cpf.ilike.%${digits}%`);
+    parts.push(`telefone.ilike.%${digits}%`);
+  }
+
+  return parts.join(',');
+}
+
 export default function UsuariosPage() {
   const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -45,6 +70,8 @@ export default function UsuariosPage() {
   const [vipNomes, setVipNomes] = useState<Record<number, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [busca, setBusca] = useState('');
+  const [buscaInput, setBuscaInput] = useState('');
 
   useEffect(() => {
     const loadVipNomes = async () => {
@@ -61,8 +88,12 @@ export default function UsuariosPage() {
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [busca]);
+
+  useEffect(() => {
     const page = currentPage;
-    const listKey = `${USUARIOS_LIST_CACHE}${page}`;
+    const listKey = `${USUARIOS_LIST_CACHE}${page}:${busca}`;
     const listCached = adminPageCache.get<{
       usuarios: Usuario[];
       totalItems: number;
@@ -92,18 +123,59 @@ export default function UsuariosPage() {
       setCardsLoading(true);
     }
 
-    void loadUsuarios(page);
+    void loadUsuarios(page, busca);
     void loadCardsData();
-  }, [currentPage]);
+  }, [currentPage, busca]);
 
-  const loadUsuarios = async (page: number) => {
+  const loadUsuarios = async (page: number, search: string) => {
+    const listKey = `${USUARIOS_LIST_CACHE}${page}:${search}`;
+
     try {
       setError(null);
-      if (!adminPageCache.get(`${USUARIOS_LIST_CACHE}${page}`)) {
+      if (!adminPageCache.get(listKey)) {
         setLoading(true);
       }
 
       const from = (page - 1) * ITEMS_PER_PAGE;
+      const searchFilter = buildSearchOrFilter(search);
+
+      if (searchFilter) {
+        const { count, error: countError } = await supabase
+          .from('usuarios')
+          .select('*', { count: 'exact', head: true })
+          .or(searchFilter);
+
+        let totalCount = 0;
+        if (countError) {
+          console.error('Erro ao contar usuários:', countError);
+        } else {
+          totalCount = count || 0;
+          setTotalItems(totalCount);
+        }
+
+        const { data, error: fetchError } = await supabase
+          .from('usuarios')
+          .select(USUARIO_SELECT)
+          .or(searchFilter)
+          .order('created_at', { ascending: false })
+          .range(from, from + ITEMS_PER_PAGE - 1);
+
+        if (fetchError) {
+          console.error('Erro ao buscar usuários:', fetchError);
+          setError('Erro ao carregar usuários. Tente novamente.');
+          return;
+        }
+
+        const usuariosData = data || [];
+        setUsuarios(usuariosData);
+
+        adminPageCache.set(listKey, {
+          usuarios: usuariosData,
+          totalItems: totalCount,
+          error: null,
+        });
+        return;
+      }
 
       const { data: rpcData, error: rpcError } = await supabase.rpc('listar_usuarios_admin', {
         p_offset: from,
@@ -119,7 +191,7 @@ export default function UsuariosPage() {
         setTotalItems(totalCount);
         setTotalUsuarios(totalCount);
 
-        adminPageCache.set(`${USUARIOS_LIST_CACHE}${page}`, {
+        adminPageCache.set(listKey, {
           usuarios: usuariosData,
           totalItems: totalCount,
           error: null,
@@ -145,9 +217,7 @@ export default function UsuariosPage() {
 
       const { data, error: fetchError } = await supabase
         .from('usuarios')
-        .select(
-          'id, nome, usuario_nome, usuario, cpf, email, telefone, created_at, saldo, cargo, vip_nivel, total_depositado, indicado_por'
-        )
+        .select(USUARIO_SELECT)
         .order('created_at', { ascending: false })
         .range(from, from + ITEMS_PER_PAGE - 1);
 
@@ -161,7 +231,7 @@ export default function UsuariosPage() {
       setUsuarios(usuariosData);
       setTotalUsuarios(totalCount || usuariosData.length);
 
-      adminPageCache.set(`${USUARIOS_LIST_CACHE}${page}`, {
+      adminPageCache.set(listKey, {
         usuarios: usuariosData,
         totalItems: totalCount,
         error: null,
@@ -330,6 +400,11 @@ export default function UsuariosPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusca(buscaInput.trim());
+  };
+
   return (
     <div>
       <PageHeader
@@ -338,11 +413,24 @@ export default function UsuariosPage() {
         description="Gerencie contas, saldos e perfis dos usuários da plataforma."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {cards.map((card) => (
           <StatCard key={card.title} {...card} loading={cardsLoading} />
         ))}
       </div>
+
+      <FilterPanel>
+        <form onSubmit={handleSearch} className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-admin-muted" />
+          <input
+            type="text"
+            value={buscaInput}
+            onChange={(e) => setBuscaInput(e.target.value)}
+            placeholder="Buscar por nome, email, CPF, telefone ou usuário..."
+            className="admin-input pl-10 w-full"
+          />
+        </form>
+      </FilterPanel>
 
       {loading ? (
         <LoadingState message="Carregando usuários..." />
@@ -353,7 +441,10 @@ export default function UsuariosPage() {
       ) : (
         <PagePanel padding={usuarios.length > 0}>
           {usuarios.length === 0 ? (
-            <EmptyState icon={Users} title="Nenhum usuário encontrado." />
+            <EmptyState
+              icon={Users}
+              title={busca ? 'Nenhum usuário encontrado para esta busca.' : 'Nenhum usuário encontrado.'}
+            />
           ) : (
             <>
               <div className="overflow-x-auto">
