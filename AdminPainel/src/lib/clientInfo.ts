@@ -1,27 +1,18 @@
+import { buildLogDeviceValue, LOG_DEVICE_SEPARATOR } from './logDeviceInfo';
+
 const IP_CACHE_KEY = 'admin_client_ip';
 const DEVICE_CACHE_KEY = 'admin_client_device';
-
-function parseDevice(ua: string): string {
-  if (!ua) return 'Desconhecido';
-  if (/iPhone/i.test(ua)) return 'iPhone';
-  if (/iPad/i.test(ua)) return 'iPad';
-  if (/Android/i.test(ua)) return 'Android';
-  if (/Windows/i.test(ua)) return 'Windows';
-  if (/Mac OS X|Macintosh/i.test(ua)) return 'macOS';
-  if (/Linux/i.test(ua)) return 'Linux';
-  return ua.length > 80 ? `${ua.slice(0, 77)}...` : ua;
-}
 
 export function getCachedDevice(): string {
   if (typeof window === 'undefined') return 'Desconhecido';
   try {
     const cached = sessionStorage.getItem(DEVICE_CACHE_KEY);
-    if (cached) return cached;
-    const device = parseDevice(navigator.userAgent);
+    if (cached && cached.includes(LOG_DEVICE_SEPARATOR)) return cached;
+    const device = buildLogDeviceValue(navigator.userAgent);
     sessionStorage.setItem(DEVICE_CACHE_KEY, device);
     return device;
   } catch {
-    return parseDevice(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+    return buildLogDeviceValue(typeof navigator !== 'undefined' ? navigator.userAgent : '');
   }
 }
 

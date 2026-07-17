@@ -9,6 +9,9 @@ import LoadingState from '../components/ui/LoadingState';
 import EmptyState from '../components/ui/EmptyState';
 import PagePanel from '../components/ui/PagePanel';
 import Pagination from '../components/jogos/Pagination';
+import Modal from '../components/ui/Modal';
+import Button from '../components/ui/Button';
+import LogDeviceCell from '../components/LogDeviceCell';
 
 interface LogItem {
   id: string;
@@ -21,6 +24,7 @@ interface LogItem {
   dispositivo: string | null;
   detalhes: string | null;
   categoria: string;
+  metadata: Record<string, unknown> | null;
 }
 
 const ITEMS_PER_PAGE = 20;
@@ -74,6 +78,60 @@ const getStatusLabel = (status: string) => {
   return status;
 };
 
+function buildLogDetailsPayload(log: LogItem): unknown | null {
+  const metadata =
+    log.metadata && typeof log.metadata === 'object' && !Array.isArray(log.metadata)
+      ? log.metadata
+      : {};
+  const hasMetadata = Object.keys(metadata).length > 0;
+
+  if (hasMetadata && log.detalhes) {
+    return { resumo: log.detalhes, ...metadata };
+  }
+
+  if (hasMetadata) {
+    return metadata;
+  }
+
+  if (log.detalhes) {
+    try {
+      return JSON.parse(log.detalhes);
+    } catch {
+      return { mensagem: log.detalhes };
+    }
+  }
+
+  return null;
+}
+
+function formatLogDetailsJson(log: LogItem): string {
+  const payload = buildLogDetailsPayload(log);
+  if (!payload) return '—';
+  return JSON.stringify(payload, null, 2);
+}
+
+function LogDetailsCell({
+  log,
+  onView,
+}: {
+  log: LogItem;
+  onView: (log: LogItem) => void;
+}) {
+  if (!buildLogDetailsPayload(log)) {
+    return <span className="text-gray-500">—</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onView(log)}
+      className="text-sm font-medium text-admin-accent hover:text-admin-accent-hover transition-colors whitespace-nowrap"
+    >
+      Ver detalhes
+    </button>
+  );
+}
+
 export default function LogsPage() {
   const { showToast } = useToast();
   const [logs, setLogs] = useState<LogItem[]>([]);
@@ -87,6 +145,7 @@ export default function LogsPage() {
   const [statusFilter, setStatusFilter] = useState('todos');
   const [buscaInput, setBuscaInput] = useState('');
   const [busca, setBusca] = useState('');
+  const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -276,7 +335,7 @@ export default function LogsPage() {
                     <th className="whitespace-nowrap">Status</th>
                     <th className="whitespace-nowrap">IP</th>
                     <th className="whitespace-nowrap">Dispositivo</th>
-                    <th className="min-w-[200px]">Detalhes</th>
+                    <th className="whitespace-nowrap">Detalhes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,13 +361,11 @@ export default function LogsPage() {
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap font-mono text-xs">
                         {log.ip_address || '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs max-w-[140px] truncate">
-                        {log.dispositivo || '—'}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <LogDeviceCell dispositivo={log.dispositivo} />
                       </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">
-                        <span className="line-clamp-2" title={log.detalhes || undefined}>
-                          {log.detalhes || '—'}
-                        </span>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <LogDetailsCell log={log} onView={setSelectedLog} />
                       </td>
                     </tr>
                   ))}
@@ -329,6 +386,26 @@ export default function LogsPage() {
           </>
         )}
       </PagePanel>
+
+      <Modal
+        open={!!selectedLog}
+        onClose={() => setSelectedLog(null)}
+        title="Detalhes da alteração"
+        description={selectedLog ? `${selectedLog.acao} · ${formatDateTime(selectedLog.created_at)}` : undefined}
+        icon={ScrollText}
+        size="xl"
+        footer={
+          <Button variant="secondary" onClick={() => setSelectedLog(null)}>
+            Fechar
+          </Button>
+        }
+      >
+        {selectedLog ? (
+          <pre className="max-h-[60vh] overflow-auto rounded-lg border border-admin-border bg-admin-panel-2 px-4 py-3 text-xs leading-relaxed text-gray-300 font-mono whitespace-pre-wrap break-all">
+            {formatLogDetailsJson(selectedLog)}
+          </pre>
+        ) : null}
+      </Modal>
     </div>
   );
 }

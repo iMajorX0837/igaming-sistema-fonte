@@ -226,6 +226,27 @@ export default function RoletaPage() {
   const modalBusy =
     editingSegmentId !== null || isCreatingSegment || saving || deletingSegmentId !== null;
 
+  const toggleConfigAtivo = async () => {
+    setSaving(true);
+    try {
+      const next = !configForm.ativo;
+      const { error } = await supabase
+        .from('prize_wheel_config')
+        .update({ ativo: next, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+
+      if (error) {
+        showToast('Erro ao atualizar status da roleta.', 'error');
+        return;
+      }
+
+      setConfigForm((current) => ({ ...current, ativo: next }));
+      showToast(next ? 'Roleta ativada.' : 'Roleta desativada.', 'success');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveConfig = async () => {
     const girosPeriodo = Number(configForm.giros_por_periodo);
     const cooldown = Number(configForm.cooldown_horas);
@@ -476,18 +497,6 @@ export default function RoletaPage() {
           onChange={(v) => setForm({ ...form, ordem: v })}
           placeholder="1"
         />
-        <div className="flex items-center gap-2">
-          <input
-            id={`segment-ativo-${idPrefix}`}
-            type="checkbox"
-            checked={form.ativo}
-            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-            className="rounded"
-          />
-          <label htmlFor={`segment-ativo-${idPrefix}`} className="text-gray-300 text-sm">
-            Ativo
-          </label>
-        </div>
       </div>
       {cupons.length === 0 && (
         <p className="text-admin-warning text-xs mt-4">
@@ -564,20 +573,21 @@ export default function RoletaPage() {
                         <Settings2 className="w-4 h-4 text-admin-muted" />
                         <h3 className="text-white font-semibold">Status e limites</h3>
                       </div>
-                      <StatusBadge variant={configForm.ativo ? 'success' : 'neutral'}>
-                        {configForm.ativo ? 'Ativa' : 'Inativa'}
-                      </StatusBadge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge variant={configForm.ativo ? 'success' : 'neutral'}>
+                          {configForm.ativo ? 'Ativa' : 'Inativa'}
+                        </StatusBadge>
+                        <Button
+                          variant="ghost"
+                          icon={Power}
+                          onClick={() => void toggleConfigAtivo()}
+                          disabled={saving}
+                          className="!px-3 !py-1.5 !text-xs"
+                        >
+                          {configForm.ativo ? 'Desativar' : 'Ativar'}
+                        </Button>
+                      </div>
                     </div>
-
-                    <label className="flex items-center gap-2.5 text-gray-300 text-sm mb-4 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={configForm.ativo}
-                        onChange={(e) => setConfigForm({ ...configForm, ativo: e.target.checked })}
-                        className="rounded"
-                      />
-                      Roleta ativa no site
-                    </label>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Field

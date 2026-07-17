@@ -64,15 +64,6 @@ function BannerFormFields({
             placeholder="Banner promocional"
           />
         </div>
-        <div>
-          <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
-          <input
-            type="number"
-            value={form.ordem}
-            onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
-            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          />
-        </div>
         <div className="md:col-span-2">
           <label className="text-gray-300 text-sm mb-1 block">URL da imagem</label>
           <ImageSizeHint spec={ADMIN_IMAGE_SIZES.homeCarousel} />
@@ -93,18 +84,6 @@ function BannerFormFields({
             className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
             placeholder="/help/promotions ou https://..."
           />
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            id={`${idPrefix}-ativo`}
-            type="checkbox"
-            checked={form.ativo}
-            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-            className="rounded"
-          />
-          <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">
-            Ativo
-          </label>
         </div>
       </div>
       {form.imagem_url && (

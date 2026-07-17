@@ -296,12 +296,6 @@ export default function PromotionsPage() {
           placeholder="Promo de boas-vindas"
         />
         <Field
-          label="Ordem"
-          type="number"
-          value={String(form.ordem)}
-          onChange={(v) => setForm({ ...form, ordem: Number(v) })}
-        />
-        <Field
           label="Título"
           value={form.titulo}
           onChange={(v) => setForm({ ...form, titulo: v })}
@@ -323,18 +317,6 @@ export default function PromotionsPage() {
           placeholder="https://..."
           className="md:col-span-2"
         />
-        <div className="flex items-center gap-2">
-          <input
-            id={`ativo-${idPrefix}`}
-            type="checkbox"
-            checked={form.ativo}
-            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-            className="rounded"
-          />
-          <label htmlFor={`ativo-${idPrefix}`} className="text-gray-300 text-sm">
-            Ativo
-          </label>
-        </div>
       </div>
 
       <div className="mt-4">

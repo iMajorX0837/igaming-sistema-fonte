@@ -784,12 +784,6 @@ function CardEditor({
               onChange={(v) => setForm({ ...form, href: v })}
               placeholder="/help/mobile"
             />
-            <Field
-              label="Ordem"
-              type="number"
-              value={String(form.ordem)}
-              onChange={(v) => setForm({ ...form, ordem: Number(v) })}
-            />
             <SelectField
               label="Layout do texto"
               value={form.layout}
@@ -881,15 +875,6 @@ function CardEditor({
               />
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input
-              type="checkbox"
-              checked={form.ativo}
-              onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-              className="rounded"
-            />
-            Card ativo na sidebar
-          </label>
         </section>
       </div>
 

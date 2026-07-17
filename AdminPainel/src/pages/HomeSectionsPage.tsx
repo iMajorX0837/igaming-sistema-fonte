@@ -204,7 +204,6 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
         .from('home_sections')
         .update({
           titulo: editForm.titulo.trim(),
-          ordem: editForm.ordem,
           ativo: editForm.ativo,
           view_all_link: editForm.view_all_link.trim() || null,
           use_green_button: editForm.use_green_button,
@@ -217,7 +216,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
         return;
       }
 
-      showToast('Seção atualizada! A ordem na home foi reorganizada.', 'success');
+      showToast('Seção atualizada!', 'success');
       cancelEdit();
       await loadSections();
     } finally {
@@ -403,7 +402,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
         open={editingId !== null && editingSection !== null}
         onClose={cancelEdit}
         title={editingSection ? `Editar: ${TYPE_LABELS[editingSection.tipo]}` : 'Editar seção'}
-        description="Configure título, ordem e opções de exibição da seção na home."
+        description="Configure título e opções de exibição da seção na home."
         icon={Pencil}
         size="lg"
         footer={
@@ -420,12 +419,6 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
         {editingSection && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Título exibido" value={editForm.titulo} onChange={(v) => setEditForm({ ...editForm, titulo: v })} />
-            <Field
-              label="Ordem (1 = primeiro)"
-              type="number"
-              value={String(editForm.ordem)}
-              onChange={(v) => setEditForm({ ...editForm, ordem: Number(v) })}
-            />
             {(editingSection.tipo === 'estudios' || editingSection.tipo.startsWith('jogos_')) && (
               <Field
                 label="Link Ver Tudo"
@@ -446,15 +439,6 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
                 Botão JOGAR verde
               </label>
             )}
-            <label className="flex items-center gap-2 text-gray-300 text-sm">
-              <input
-                type="checkbox"
-                checked={editForm.ativo}
-                onChange={(e) => setEditForm({ ...editForm, ativo: e.target.checked })}
-                className="rounded"
-              />
-              Ativo na home
-            </label>
           </div>
         )}
       </Modal>

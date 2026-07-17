@@ -638,8 +638,6 @@ function ProviderEditor({
         onChange={(v) => setForm({ ...form, api_provider_id: v })}
         placeholder="1"
       />
-      <Field label="Ordem" type="number" value={String(form.ordem)} onChange={(v) => setForm({ ...form, ordem: Number(v) })} />
-      <ActiveCheckbox checked={form.ativo} onChange={(v) => setForm({ ...form, ativo: v })} />
     </EditorShell>
   );
 }
@@ -663,8 +661,6 @@ function CategoryEditor({
     <EditorShell title={title} onSave={onSave} onCancel={onCancel} saving={saving}>
       <Field label="Slug (identificador)" value={form.slug} onChange={(v) => setForm({ ...form, slug: v })} placeholder="slots" />
       <Field label="Nome exibido" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} placeholder="Slots" />
-      <Field label="Ordem" type="number" value={String(form.ordem)} onChange={(v) => setForm({ ...form, ordem: Number(v) })} />
-      <ActiveCheckbox checked={form.ativo} onChange={(v) => setForm({ ...form, ativo: v })} />
     </EditorShell>
   );
 }
@@ -691,15 +687,6 @@ function EditorShell({
         <ActionButton label="Cancelar" onClick={onCancel} disabled={saving} color="gray" />
       </div>
     </PagePanel>
-  );
-}
-
-function ActiveCheckbox({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-2 md:col-span-2">
-      <input id="ativo-item" type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="rounded" />
-      <label htmlFor="ativo-item" className="text-gray-300 text-sm">Ativo</label>
-    </div>
   );
 }
 

@@ -311,18 +311,6 @@ export default function CuponsPage() {
             onChange={(v) => setForm({ ...form, codigo: v.toUpperCase() })}
             placeholder="BEMVINDO100"
           />
-          <div className="flex items-center gap-2">
-            <input
-              id={`ativo-${formId}`}
-              type="checkbox"
-              checked={form.ativo}
-              onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor={`ativo-${formId}`} className="text-gray-300 text-sm">
-              Status: Ativo
-            </label>
-          </div>
         </div>
       </section>
 

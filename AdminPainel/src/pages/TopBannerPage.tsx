@@ -6,7 +6,7 @@ import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
-import { Megaphone, MousePointerClick, Settings2, Type, X } from 'lucide-react';
+import { Megaphone, MousePointerClick, Power, Settings2, Type, X } from 'lucide-react';
 
 interface TopBannerForm {
   ativo: boolean;
@@ -73,6 +73,28 @@ export default function TopBannerPage() {
     void loadConfig();
   }, []);
 
+  const toggleAtivo = async () => {
+    setSaving(true);
+    try {
+      const next = !form.ativo;
+      const { error } = await supabase.from('site_config').upsert({
+        id: 1,
+        top_banner_ativo: next,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        showToast('Erro ao atualizar status do banner.', 'error');
+        return;
+      }
+
+      setForm((current) => ({ ...current, ativo: next }));
+      showToast(next ? 'Banner ativado.' : 'Banner desativado.', 'success');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveConfig = async () => {
     if (!form.mensagem.trim()) {
       showToast('Informe a mensagem do banner.', 'error');
@@ -131,17 +153,23 @@ export default function TopBannerPage() {
                 <Settings2 className="w-4 h-4 text-admin-muted" />
                 <h3 className="text-white font-semibold">Status</h3>
               </div>
-              <StatusBadge variant={form.ativo ? 'success' : 'neutral'}>
-                {form.ativo ? 'Ativo' : 'Inativo'}
-              </StatusBadge>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge variant={form.ativo ? 'success' : 'neutral'}>
+                  {form.ativo ? 'Ativo' : 'Inativo'}
+                </StatusBadge>
+                <Button
+                  variant="ghost"
+                  icon={Power}
+                  onClick={() => void toggleAtivo()}
+                  disabled={saving}
+                  className="!px-3 !py-1.5 !text-xs"
+                >
+                  {form.ativo ? 'Desativar' : 'Ativar'}
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3">
-              <ToggleField
-                label="Banner ativo no site"
-                checked={form.ativo}
-                onChange={(v) => setForm({ ...form, ativo: v })}
-              />
               <ToggleField
                 label="Permitir fechar (botão X)"
                 checked={form.permitir_fechar}

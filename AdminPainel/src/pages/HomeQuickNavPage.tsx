@@ -106,15 +106,6 @@ function CardFormFields({
           />
         </div>
         <div>
-          <label className="text-gray-300 text-sm mb-1 block">Ordem</label>
-          <input
-            type="number"
-            value={form.ordem}
-            onChange={(e) => setForm({ ...form, ordem: Number(e.target.value) })}
-            className="w-full px-3 py-2 rounded bg-admin-panel border border-admin-border-strong text-white text-sm"
-          />
-        </div>
-        <div>
           <label className="text-gray-300 text-sm mb-1 block">Tipo de link</label>
           <select
             value={form.link_tipo}
@@ -159,18 +150,6 @@ function CardFormFields({
             />
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id={`${idPrefix}-ativo`}
-            checked={form.ativo}
-            onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-            className="rounded"
-          />
-          <label htmlFor={`${idPrefix}-ativo`} className="text-gray-300 text-sm">
-            Ativo
-          </label>
-        </div>
       </div>
       {form.imagem_url && (
         <div className="mt-4">

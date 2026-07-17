@@ -2,12 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/ui/EmptyState';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
-import Modal from '../components/ui/Modal';
-import Button from '../components/ui/Button';
-import { CheckCircle2, Crosshair, XCircle } from 'lucide-react';
+import { Crosshair, Plus, Trash2 } from 'lucide-react';
 
 interface TrackingPixelRow {
   id: string;
@@ -19,23 +16,48 @@ interface TrackingPixelRow {
   updated_at: string;
 }
 
-const emptyForm = {
-  nome: '',
-  pixel_id: '',
-  ativo: true,
-};
+interface PixelFieldRow {
+  key: string;
+  id: string | null;
+  pixel_id: string;
+}
 
 const PIXEL_ID_PATTERN = /^[0-9]{10,20}$/;
 
+function FacebookIcon({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="12" fill="#1877F2" />
+      <path
+        d="M15.5 8.5H13.6C12.5 8.5 12 9.1 12 10.1V11.5H15.3L15 14.5H12V22H9V14.5H7V11.5H9V9.8C9 7.6 10.1 6 12.7 6H15.5V8.5Z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
+function createDraftRow(): PixelFieldRow {
+  return {
+    key: `draft-${crypto.randomUUID()}`,
+    id: null,
+    pixel_id: '',
+  };
+}
+
+function mapPixelsToRows(pixels: TrackingPixelRow[]): PixelFieldRow[] {
+  return pixels.map((pixel) => ({
+    key: pixel.id,
+    id: pixel.id,
+    pixel_id: pixel.pixel_id,
+  }));
+}
+
 export default function TrackingPage() {
   const { showToast } = useToast();
-  const [pixels, setPixels] = useState<TrackingPixelRow[]>([]);
+  const [rows, setRows] = useState<PixelFieldRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState(emptyForm);
-  const [editForm, setEditForm] = useState(emptyForm);
+  const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
+  const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     try {
@@ -43,14 +65,14 @@ export default function TrackingPage() {
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) {
         showToast('Erro ao carregar pixels. Execute tracking_pixels.sql no Supabase.', 'error');
         return;
       }
 
-      setPixels((data as TrackingPixelRow[]) ?? []);
+      setRows(mapPixelsToRows((data as TrackingPixelRow[]) ?? []));
     } catch {
       showToast('Erro ao carregar pixels de tracking.', 'error');
     } finally {
@@ -62,247 +84,179 @@ export default function TrackingPage() {
     void loadData();
   }, [loadData]);
 
-  const validateForm = (form: typeof emptyForm) => {
-    if (!form.nome.trim()) {
-      showToast('Informe um nome para identificar o pixel.', 'warning');
-      return false;
-    }
-    const pixelId = form.pixel_id.trim();
-    if (!pixelId || !PIXEL_ID_PATTERN.test(pixelId)) {
+  const setSaving = (key: string, active: boolean) => {
+    setSavingKeys((prev) => {
+      const next = new Set(prev);
+      if (active) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const setDeleting = (key: string, active: boolean) => {
+    setDeletingKeys((prev) => {
+      const next = new Set(prev);
+      if (active) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const handleAddRow = () => {
+    setRows((prev) => [...prev, createDraftRow()]);
+  };
+
+  const handleChangePixelId = (key: string, value: string) => {
+    const sanitized = value.replace(/\D/g, '');
+    setRows((prev) =>
+      prev.map((row) => (row.key === key ? { ...row, pixel_id: sanitized } : row)),
+    );
+  };
+
+  const persistRow = async (row: PixelFieldRow) => {
+    const pixelId = row.pixel_id.trim();
+    if (!pixelId) return;
+
+    if (!PIXEL_ID_PATTERN.test(pixelId)) {
       showToast('Informe um Pixel ID válido (apenas números, 10 a 20 dígitos).', 'warning');
-      return false;
+      return;
     }
-    return true;
-  };
 
-  const saveCreate = async () => {
-    if (!validateForm(createForm)) return;
-    setSaving(true);
+    setSaving(row.key, true);
     try {
-      const { error } = await supabase.from('tracking_pixels').insert({
-        nome: createForm.nome.trim(),
-        pixel_id: createForm.pixel_id.trim(),
-        plataforma: 'facebook',
-        ativo: createForm.ativo,
-      });
+      if (row.id) {
+        const { error } = await supabase
+          .from('tracking_pixels')
+          .update({
+            pixel_id: pixelId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', row.id);
 
-      if (error) {
-        showToast(`Erro ao criar: ${error.message}`, 'error');
+        if (error) {
+          showToast(`Erro ao salvar: ${error.message}`, 'error');
+          await loadData();
+          return;
+        }
+
+        showToast('Pixel atualizado!', 'success');
         return;
       }
 
-      showToast('Pixel adicionado!', 'success');
-      setIsCreating(false);
-      setCreateForm(emptyForm);
-      await loadData();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveEdit = async () => {
-    if (!editingId || !validateForm(editForm)) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('tracking_pixels')
-        .update({
-          nome: editForm.nome.trim(),
-          pixel_id: editForm.pixel_id.trim(),
-          ativo: editForm.ativo,
-          updated_at: new Date().toISOString(),
+        .insert({
+          nome: 'Facebook Pixel',
+          pixel_id: pixelId,
+          plataforma: 'facebook',
+          ativo: true,
         })
-        .eq('id', editingId);
+        .select('id')
+        .single();
 
       if (error) {
-        showToast(`Erro ao salvar: ${error.message}`, 'error');
+        showToast(`Erro ao adicionar: ${error.message}`, 'error');
         return;
       }
 
-      showToast('Pixel atualizado!', 'success');
-      setEditingId(null);
-      await loadData();
+      setRows((prev) =>
+        prev.map((item) =>
+          item.key === row.key
+            ? { key: String(data.id), id: String(data.id), pixel_id: pixelId }
+            : item,
+        ),
+      );
+      showToast('Pixel adicionado!', 'success');
     } finally {
-      setSaving(false);
+      setSaving(row.key, false);
     }
   };
 
-  const toggleActive = async (row: TrackingPixelRow) => {
-    const { error } = await supabase
-      .from('tracking_pixels')
-      .update({ ativo: !row.ativo, updated_at: new Date().toISOString() })
-      .eq('id', row.id);
-
-    if (error) {
-      showToast('Erro ao alterar status.', 'error');
-      return;
-    }
-
-    await loadData();
+  const handleBlur = (row: PixelFieldRow) => {
+    void persistRow(row);
   };
 
-  const deletePixel = async (id: string) => {
-    if (!window.confirm('Excluir este pixel?')) return;
+  const handleDelete = async (row: PixelFieldRow) => {
+    if (row.id) {
+      if (!window.confirm('Excluir este pixel?')) return;
 
-    const { error } = await supabase.from('tracking_pixels').delete().eq('id', id);
-    if (error) {
-      showToast('Erro ao excluir pixel.', 'error');
-      return;
+      setDeleting(row.key, true);
+      try {
+        const { error } = await supabase.from('tracking_pixels').delete().eq('id', row.id);
+        if (error) {
+          showToast('Erro ao excluir pixel.', 'error');
+          return;
+        }
+        showToast('Pixel excluído.', 'success');
+      } finally {
+        setDeleting(row.key, false);
+      }
     }
 
-    showToast('Pixel excluído.', 'success');
-    await loadData();
+    setRows((prev) => prev.filter((item) => item.key !== row.key));
   };
-
-  const renderFormFields = (
-    form: typeof emptyForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>,
-  ) => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm text-admin-muted mb-1">Nome</label>
-        <input
-          className="w-full rounded-lg bg-admin-panel-2 border border-admin-border px-3 py-2 text-admin-foreground"
-          value={form.nome}
-          onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-          placeholder="Campanha principal"
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-admin-muted mb-1">Pixel ID (Facebook)</label>
-        <input
-          className="w-full rounded-lg bg-admin-panel-2 border border-admin-border px-3 py-2 text-admin-foreground font-mono"
-          value={form.pixel_id}
-          onChange={(e) => setForm((f) => ({ ...f, pixel_id: e.target.value.replace(/\D/g, '') }))}
-          placeholder="123456789012345"
-          inputMode="numeric"
-        />
-        <p className="mt-1 text-xs text-admin-muted">
-          Encontre em Meta Events Manager → Fontes de dados → seu pixel → ID do pixel.
-        </p>
-      </div>
-      <label className="flex items-center gap-2 text-sm text-admin-foreground">
-        <input
-          type="checkbox"
-          checked={form.ativo}
-          onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
-        />
-        Ativo (dispara PageView no frontend do cassino)
-      </label>
-    </div>
-  );
 
   return (
     <div>
       <PageHeader
         icon={Crosshair}
         title="Tracking"
-        description="Configure pixels do Facebook (Meta) para rastrear PageView no frontend do cassino. Você pode adicionar vários pixels ativos ao mesmo tempo."
-        actions={
-          <Button onClick={() => { setCreateForm(emptyForm); setIsCreating(true); }}>
-            Novo pixel
-          </Button>
-        }
+        description="Configure pixels do Facebook (Meta) para rastrear PageView no frontend do cassino."
       />
 
       {loading ? (
         <LoadingState message="Carregando pixels..." />
-      ) : pixels.length === 0 ? (
-        <PagePanel>
-          <EmptyState
-            icon={Crosshair}
-            title="Nenhum pixel configurado"
-            description="Adicione o Pixel ID do Facebook para começar a rastrear visualizações de página no cassino."
-          />
-        </PagePanel>
       ) : (
-        <PagePanel>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-admin-muted border-b border-admin-border">
-                  <th className="py-3 pr-4">Nome</th>
-                  <th className="py-3 pr-4">Pixel ID</th>
-                  <th className="py-3 pr-4">Plataforma</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pixels.map((row) => (
-                  <tr key={row.id} className="border-b border-admin-border/60">
-                    <td className="py-3 pr-4 font-medium text-admin-foreground">{row.nome}</td>
-                    <td className="py-3 pr-4 font-mono text-admin-muted-2">{row.pixel_id}</td>
-                    <td className="py-3 pr-4 text-admin-muted-2">Facebook</td>
-                    <td className="py-3 pr-4">
-                      <button
-                        type="button"
-                        onClick={() => void toggleActive(row)}
-                        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${row.ativo ? 'bg-emerald-500/15 text-emerald-300' : 'bg-admin-panel-3 text-admin-muted'}`}
-                      >
-                        {row.ativo ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                        {row.ativo ? 'Ativo' : 'Inativo'}
-                      </button>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setEditingId(row.id);
-                            setEditForm({ nome: row.nome, pixel_id: row.pixel_id, ativo: row.ativo });
-                          }}
-                        >
-                          Editar
-                        </Button>
-                        <Button variant="danger" onClick={() => void deletePixel(row.id)}>
-                          Excluir
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <PagePanel padding={false}>
+          <div className="border-b border-admin-border px-5 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <FacebookIcon />
+                <span className="text-sm font-semibold text-admin-foreground">Facebook Pixel</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddRow}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-admin-foreground-soft hover:text-admin-foreground transition-colors shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+            </div>
           </div>
+
+          {rows.length === 0 ? (
+            <div className="px-5 py-6 text-sm text-admin-muted">
+              Nenhum pixel configurado. Clique em Adicionar para incluir um Pixel ID.
+            </div>
+          ) : (
+            <div className="divide-y divide-admin-border">
+              {rows.map((row) => (
+                <div key={row.key} className="flex items-center gap-3 px-5 py-3">
+                  <input
+                    className="flex-1 min-w-0 rounded-lg bg-admin-panel-2 border border-admin-border px-3 py-2.5 text-admin-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent/30"
+                    value={row.pixel_id}
+                    onChange={(e) => handleChangePixelId(row.key, e.target.value)}
+                    onBlur={() => handleBlur(row)}
+                    placeholder="123456789012345"
+                    inputMode="numeric"
+                    disabled={savingKeys.has(row.key) || deletingKeys.has(row.key)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(row)}
+                    disabled={savingKeys.has(row.key) || deletingKeys.has(row.key)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-admin-border bg-admin-panel-2 text-admin-muted hover:text-admin-danger hover:border-admin-danger/40 hover:bg-admin-danger/10 transition-colors disabled:opacity-50 shrink-0"
+                    aria-label="Excluir pixel"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </PagePanel>
       )}
-
-      <Modal
-        open={isCreating}
-        onClose={() => setIsCreating(false)}
-        title="Novo pixel do Facebook"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsCreating(false)}>
-              Cancelar
-            </Button>
-            <Button disabled={saving} onClick={() => void saveCreate()}>
-              {saving ? 'Salvando…' : 'Adicionar'}
-            </Button>
-          </>
-        }
-      >
-        {renderFormFields(createForm, setCreateForm)}
-      </Modal>
-
-      <Modal
-        open={!!editingId}
-        onClose={() => setEditingId(null)}
-        title="Editar pixel"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setEditingId(null)}>
-              Cancelar
-            </Button>
-            <Button disabled={saving} onClick={() => void saveEdit()}>
-              {saving ? 'Salvando…' : 'Salvar'}
-            </Button>
-          </>
-        }
-      >
-        {renderFormFields(editForm, setEditForm)}
-      </Modal>
     </div>
   );
 }

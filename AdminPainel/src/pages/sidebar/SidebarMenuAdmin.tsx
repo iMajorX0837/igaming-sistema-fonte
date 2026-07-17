@@ -767,12 +767,6 @@ export default function SidebarMenuAdmin() {
             { value: 'language', label: 'Seletor de idioma' },
           ]}
         />
-        <Field
-          label="Ordem"
-          type="number"
-          value={String(categoryForm.ordem)}
-          onChange={(value) => setCategoryForm({ ...categoryForm, ordem: Number(value) })}
-        />
       </div>
       <PortugueseLabelField
         label="Título da seção (português)"
@@ -785,14 +779,6 @@ export default function SidebarMenuAdmin() {
           })
         }
       />
-      <label className="flex items-center gap-2 text-sm text-gray-300">
-        <input
-          type="checkbox"
-          checked={categoryForm.ativo}
-          onChange={(e) => setCategoryForm({ ...categoryForm, ativo: e.target.checked })}
-        />
-        Ativa
-      </label>
     </div>
   );
 
@@ -826,12 +812,6 @@ export default function SidebarMenuAdmin() {
             { value: 'external', label: 'Link externo' },
             { value: 'event', label: 'Evento do site' },
           ]}
-        />
-        <Field
-          label="Ordem"
-          type="number"
-          value={String(menuItemForm.ordem)}
-          onChange={(value) => setMenuItemForm({ ...menuItemForm, ordem: Number(value) })}
         />
         {menuItemForm.link_tipo === 'href' ? (
           <Field
@@ -909,14 +889,6 @@ export default function SidebarMenuAdmin() {
           onChange={(e) => setMenuItemForm({ ...menuItemForm, destaque: e.target.checked })}
         />
         Texto em negrito
-      </label>
-      <label className="flex items-center gap-2 text-sm text-gray-300">
-        <input
-          type="checkbox"
-          checked={menuItemForm.ativo}
-          onChange={(e) => setMenuItemForm({ ...menuItemForm, ativo: e.target.checked })}
-        />
-        Ativo
       </label>
     </div>
   );
