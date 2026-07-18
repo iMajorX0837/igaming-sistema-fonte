@@ -803,92 +803,102 @@ if (!AVIATOR_API_ENABLED) {
 // };
 
 /**
- * Webhook para consultar saldo do jogador
- * POST /webhook
- * 
- * Play Fiver envia este webhook para saber o saldo atualizado do jogador
+ * Webhook PlayFivers — consulta de saldo (type: BALANCE)
  */
-app.post('/webhook', async (req, res) => {
+async function handleBalanceWebhook(req, res) {
   try {
     const { type, user_code } = req.body;
-    
-    console.log('📥 Consulta de saldo recebida:', JSON.stringify({ type, user_code }, null, 2));
 
-    // Validar dados básicos
     if (!type || !user_code) {
       return res.status(400).json({
         msg: 'Campos obrigatórios faltando: type, user_code',
-        balance: 0
+        balance: 0,
       });
     }
 
-    // Validar tipo
-    if (type !== 'BALANCE') {
+    if (String(type).trim().toUpperCase() !== 'BALANCE') {
       return res.status(400).json({
-        msg: `Tipo de webhook não suportado: ${type}. Esperado: BALANCE`,
-        balance: 0
+        msg: 'UNSUPPORTED_WEBHOOK_TYPE',
+        balance: 0,
       });
     }
 
-    // Buscar usuário pelo email
-    console.log(`🔍 Buscando saldo do usuário: ${user_code}`);
-    
-    let { data: usuario, error: userError } = await supabase
-      .from('usuarios')
-      .select('id, saldo, email')
-      .eq('email', user_code.trim())
-      .maybeSingle();
+    const { usuario } = await findUsuarioByEmail(user_code);
 
-    // Se não encontrou, tentar busca case-insensitive
-    if (!usuario && (!userError || userError.code === 'PGRST116')) {
-      const { data: usuarioIlike, error: errorIlike } = await supabase
-        .from('usuarios')
-        .select('id, saldo, email')
-        .ilike('email', user_code.trim())
-        .maybeSingle();
-      
-      if (!errorIlike && usuarioIlike) {
-        usuario = usuarioIlike;
-        userError = null;
-      }
-    }
-
-    // Se ainda não encontrou, tentar usar função RPC
     if (!usuario) {
-      const { data: usuarioRpc, error: rpcError } = await supabase
-        .rpc('get_user_by_email', { user_email: user_code.trim() });
-      
-      if (!rpcError && usuarioRpc && usuarioRpc.length > 0) {
-        usuario = usuarioRpc[0];
-      }
-    }
-
-    // Se não encontrou, retorna 404
-    if (!usuario) {
-      console.error(`❌ Usuário não encontrado: ${user_code}`);
+      console.error(`❌ Usuário não encontrado (BALANCE): ${user_code}`);
       return res.status(404).json({
         msg: 'INVALID_USER',
         balance: 0,
       });
     }
 
-    const balance = parseFloat(usuario.saldo) || 0;
-    console.log(`✅ Saldo encontrado: ${balance} para usuário ${usuario.email}`);
+    const balance = roundMoney(usuario.saldo);
+    console.log(`✅ Saldo BALANCE: ${balance} para ${usuario.email}`);
 
-    // Retornar saldo atualizado
-    res.status(200).json({
+    return res.status(200).json({
       msg: '',
-      balance: balance
+      balance,
     });
-
   } catch (error) {
     console.error('❌ Erro ao processar consulta de saldo:', error);
-    res.status(500).json({
+    return res.status(500).json({
       msg: 'ERROR_INTERNAL',
       balance: 0,
     });
   }
-});
+}
+
+function isBalanceWebhook(body) {
+  return String(body?.type || '').trim().toUpperCase() === 'BALANCE';
+}
+
+function isTransactionWebhook(body) {
+  const type = String(body?.type || '').trim().toUpperCase();
+  if (type === 'WINBET') return true;
+  if (body?.game_type) return true;
+  if (body?.slot || body?.sport || body?.sports || body?.live) return true;
+  return false;
+}
+
+/**
+ * Endpoint único da PlayFivers — saldo (BALANCE) e apostas (WinBet) no mesmo callback.
+ * Configure no painel apenas uma URL, ex.: https://api.seudominio.com/webhook
+ */
+async function handlePlayFiverWebhook(req, res) {
+  const body = req.body;
+  console.log(
+    `📥 PlayFiver webhook [${req.method} ${req.path}]:`,
+    JSON.stringify(
+      {
+        type: body?.type,
+        user_code: body?.user_code,
+        game_type: body?.game_type,
+      },
+      null,
+      2
+    )
+  );
+
+  if (isBalanceWebhook(body)) {
+    return handleBalanceWebhook(req, res);
+  }
+
+  if (isTransactionWebhook(body)) {
+    return handleGameCallback(req, res);
+  }
+
+  logGameCallback('error', 'Tipo de webhook desconhecido', {
+    route: req.path,
+    body,
+    payloadKeys: body ? Object.keys(body) : [],
+  });
+
+  return res.status(400).json({
+    msg: 'UNSUPPORTED_WEBHOOK_TYPE',
+    balance: 0,
+  });
+}
 
 /**
  * Webhook / game_callback — transações da Play Fiver (slots, live, esportes, etc.)
@@ -1134,10 +1144,18 @@ async function handleGameCallback(req, res) {
   }
 }
 
-app.post('/api/webhook', handleGameCallback);
-app.post('/webhook/transaction', handleGameCallback);
-app.post('/game_callback', handleGameCallback);
-app.post('/webhook/game_callback', handleGameCallback);
+const PLAYFIVER_WEBHOOK_PATHS = [
+  '/webhook',
+  '/api/webhook',
+  '/api',
+  '/webhook/transaction',
+  '/game_callback',
+  '/webhook/game_callback',
+];
+
+for (const webhookPath of PLAYFIVER_WEBHOOK_PATHS) {
+  app.post(webhookPath, handlePlayFiverWebhook);
+}
 
 /**
  * Página de preview para testes locais (iframe do game_launch em modo mock).
@@ -2413,9 +2431,8 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Play Fiver Webhook API',
     endpoints: {
-      balance: 'POST /webhook - Consulta saldo do jogador',
-      transaction:
-        'POST /api/webhook (oficial PlayFivers) | /webhook/transaction | /game_callback - Transações',
+      balance: 'POST /webhook - Callback único PlayFivers (BALANCE + WinBet)',
+      transaction: 'Mesmo handler em /webhook · /api/webhook · /api',
       providers: 'GET /api/v2/providers - Proxy de provedores (usa IP do servidor)',
       games: 'GET /api/v2/games?provider= - Proxy de jogos por provedor',
       gameLaunch: 'POST /api/game_launch - Proxy para lançar jogos (usa IP do servidor)',
@@ -2463,9 +2480,8 @@ app.get('/', (req, res) => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`💰 Webhook de saldo: http://localhost:${PORT}/webhook`);
-  console.log(`📡 Game callback (PlayFivers): http://localhost:${PORT}/api/webhook`);
-  console.log(`📡 Aliases callback: /webhook/transaction · /game_callback`);
+  console.log(`🔗 Callback PlayFivers (único): http://localhost:${PORT}/webhook`);
+  console.log('   Aliases aceitos: /api/webhook · /api · /game_callback');
   console.log(`📚 Catálogo (providers/games): http://localhost:${PORT}/api/v2/providers`);
   console.log(`🎮 Game Launch Proxy: http://localhost:${PORT}/api/game_launch`);
   if (GAME_LAUNCH_MOCK) {
