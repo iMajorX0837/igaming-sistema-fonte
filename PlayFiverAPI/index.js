@@ -31,6 +31,8 @@ const AVIATOR_API_ENABLED = process.env.AVIATOR_API_ENABLED === 'true';
 const GAME_LAUNCH_MOCK = process.env.GAME_LAUNCH_MOCK === 'true';
 const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const PLAYFIVERS_UPSTREAM = (process.env.PLAYFIVERS_UPSTREAM_URL || 'https://api.playfivers.com').replace(/\/$/, '');
+/** Incremente ao alterar callback/webhook — visível em GET /health */
+const PLAYFIVER_WEBHOOK_VERSION = '2026-07-18-unified-v2';
 
 // Configuração do Supabase
 const supabaseUrl = process.env.SUPABASE_URL || 'https://psoyhrnjnalroihnswoo.supabase.co';
@@ -1049,9 +1051,25 @@ async function handleGameCallback(req, res) {
     }
 
     const currentBalance = roundMoney(usuario.saldo);
+    let workingBalance = currentBalance;
+
+    if (Number.isFinite(userBeforeBalance) && userBeforeBalance >= 0) {
+      if (Math.abs(workingBalance - userBeforeBalance) > 0.01) {
+        logGameCallback('warn', 'Saldo local divergente — usando user_before_balance', {
+          ...baseContext,
+          txnId,
+          extra: {
+            saldo_db: currentBalance,
+            user_before_balance: userBeforeBalance,
+          },
+        });
+        workingBalance = roundMoney(userBeforeBalance);
+      }
+    }
+
     const debitAmount = roundMoney(Math.max(0, bet - win));
 
-    if (debitAmount > 0 && currentBalance + 1e-6 < debitAmount) {
+    if (debitAmount > 0 && workingBalance + 1e-6 < debitAmount) {
       return respondGameCallbackError(res, 400, 'INSUFFICIENT_USER_FUNDS', {
         ...baseContext,
         txnId,
@@ -1061,14 +1079,15 @@ async function handleGameCallback(req, res) {
           bet,
           win,
           debitAmount,
-          saldo_atual: currentBalance,
+          saldo_db: currentBalance,
+          saldo_playfivers: workingBalance,
           game_type: resolvedGameType,
         },
       });
     }
 
     const newBalance = resolveCallbackBalance(
-      currentBalance,
+      workingBalance,
       bet,
       win,
       userAfterBalance
@@ -1146,8 +1165,11 @@ async function handleGameCallback(req, res) {
 
 const PLAYFIVER_WEBHOOK_PATHS = [
   '/webhook',
+  '/webhook/',
   '/api/webhook',
+  '/api/webhook/',
   '/api',
+  '/api/',
   '/webhook/transaction',
   '/game_callback',
   '/webhook/game_callback',
@@ -1156,6 +1178,16 @@ const PLAYFIVER_WEBHOOK_PATHS = [
 for (const webhookPath of PLAYFIVER_WEBHOOK_PATHS) {
   app.post(webhookPath, handlePlayFiverWebhook);
 }
+
+app.get(['/webhook', '/api/webhook', '/api'], (req, res) => {
+  res.json({
+    ok: true,
+    service: 'playfiver-webhook',
+    version: PLAYFIVER_WEBHOOK_VERSION,
+    callback_url: `${PUBLIC_API_URL}/webhook`,
+    accepts: ['BALANCE', 'WinBet'],
+  });
+});
 
 /**
  * Página de preview para testes locais (iframe do game_launch em modo mock).
@@ -2422,7 +2454,8 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'Play Fiver Webhook API'
+    service: 'Play Fiver Webhook API',
+    webhookVersion: PLAYFIVER_WEBHOOK_VERSION,
   });
 });
 
