@@ -1,5 +1,6 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdminSiteBrand } from '../contexts/AdminSiteBrandContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 
@@ -12,7 +13,13 @@ export default function LoginPage() {
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
   const [challengeToken, setChallengeToken] = useState('');
   const { login, verify2FA } = useAuth();
+  const { logoUrl, nomeBet } = useAdminSiteBrand();
   const navigate = useNavigate();
+  const [logoBroken, setLogoBroken] = useState(false);
+
+  useEffect(() => {
+    setLogoBroken(false);
+  }, [logoUrl]);
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,11 +68,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-admin-bg via-admin-sidebar to-admin-bg px-4">
       <div className="rounded-xl border border-admin-border shadow-admin bg-admin-panel p-8 w-full max-w-md ring-1 ring-admin-accent/10 animate-scale-in">
         <div className="text-center mb-8">
-          <img
-            src="https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757715806714.png"
-            alt="RoyalBET Logo"
-            className="mx-auto max-w-full h-auto"
-          />
+          {!logoBroken && logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={nomeBet}
+              className="mx-auto max-w-full h-12 object-contain"
+              onError={() => setLogoBroken(true)}
+            />
+          ) : (
+            <span className="block text-white text-lg font-semibold">{nomeBet}</span>
+          )}
         </div>
 
         {step === '2fa' && (

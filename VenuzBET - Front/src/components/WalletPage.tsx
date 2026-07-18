@@ -47,7 +47,7 @@ export default function WalletPage() {
   const [playingRodadaId, setPlayingRodadaId] = useState<string | null>(null);
   const itemsPerPage = 10;
 
-  // FunÁ„o para buscar saques do usu·rio
+  // Fun√ß√£o para buscar saques do usu√°rio
   const fetchSaques = useCallback(async () => {
     if (!isAuthenticated || !user) {
       setSaques([]);
@@ -77,7 +77,7 @@ export default function WalletPage() {
     }
   }, [isAuthenticated, user]);
 
-  // FunÁ„o para buscar depÛsitos do usu·rio
+  // Fun√ß√£o para buscar dep√≥sitos do usu√°rio
   const fetchDepositos = useCallback(async () => {
     if (!isAuthenticated || !user) {
       setDepositos([]);
@@ -92,7 +92,7 @@ export default function WalletPage() {
         .order('data_hora', { ascending: false });
 
       if (error) {
-        console.error('Erro ao buscar depÛsitos:', error);
+        console.error('Erro ao buscar dep√≥sitos:', error);
         return;
       }
 
@@ -100,11 +100,11 @@ export default function WalletPage() {
         setDepositos(data);
       }
     } catch (error) {
-      console.error('Erro ao buscar depÛsitos:', error);
+      console.error('Erro ao buscar dep√≥sitos:', error);
     }
   }, [isAuthenticated, user]);
 
-  // FunÁ„o para buscar transaÁıes de jogos do usu·rio
+  // Fun√ß√£o para buscar transa√ß√µes de jogos do usu√°rio
   const fetchTransacoesJogos = useCallback(async () => {
     if (!isAuthenticated || !user) {
       setTransacoesJogos([]);
@@ -120,7 +120,7 @@ export default function WalletPage() {
         .order('data', { ascending: false });
 
       if (error) {
-        console.error('Erro ao buscar transaÁıes de jogos:', error);
+        console.error('Erro ao buscar transa√ß√µes de jogos:', error);
         return;
       }
 
@@ -128,7 +128,7 @@ export default function WalletPage() {
         setTransacoesJogos(data);
       }
     } catch (error) {
-      console.error('Erro ao buscar transaÁıes de jogos:', error);
+      console.error('Erro ao buscar transa√ß√µes de jogos:', error);
     } finally {
       setLoadingTransacoes(false);
     }
@@ -162,14 +162,14 @@ export default function WalletPage() {
       const data = await listFreeBonuses(user.email);
       setFreeBonuses(data);
     } catch (error) {
-      console.error('Erro ao buscar rodadas gr·tis:', error);
+      console.error('Erro ao buscar rodadas gr√°tis:', error);
       setFreeBonuses([]);
     } finally {
       setLoadingFreeBonuses(false);
     }
   }, [isAuthenticated, user]);
 
-  // Formatar data para exibiÁ„o
+  // Formatar data para exibi√ß√£o
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('pt-BR', {
@@ -182,7 +182,7 @@ export default function WalletPage() {
     }).format(date);
   };
 
-  // Formatar valor monet·rio
+  // Formatar valor monet√°rio
   const formatCurrency = (valor: number): string => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -192,7 +192,7 @@ export default function WalletPage() {
     }).format(valor);
   };
 
-  // FunÁ„o para buscar saldo do usu·rio
+  // Fun√ß√£o para buscar saldo do usu√°rio
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
       try {
@@ -218,32 +218,32 @@ export default function WalletPage() {
     }
   }, [isAuthenticated, user]);
 
-  // Buscar saldo quando o usu·rio est· autenticado
+  // Buscar saldo quando o usu√°rio est√° autenticado
   useEffect(() => {
     fetchSaldo();
   }, [fetchSaldo]);
 
-  // Buscar saques quando o usu·rio est· autenticado
+  // Buscar saques quando o usu√°rio est√° autenticado
   useEffect(() => {
     fetchSaques();
   }, [fetchSaques]);
 
-  // Buscar depÛsitos quando o usu·rio est· autenticado
+  // Buscar dep√≥sitos quando o usu√°rio est√° autenticado
   useEffect(() => {
     fetchDepositos();
   }, [fetchDepositos]);
 
-  // Buscar transaÁıes de jogos quando o usu·rio est· autenticado
+  // Buscar transa√ß√µes de jogos quando o usu√°rio est√° autenticado
   useEffect(() => {
     fetchTransacoesJogos();
   }, [fetchTransacoesJogos]);
 
-  // Buscar cupons quando o usu·rio est· autenticado
+  // Buscar cupons quando o usu√°rio est√° autenticado
   useEffect(() => {
     void fetchCupons();
   }, [fetchCupons]);
 
-  // Resetar p·gina quando trocar de aba
+  // Resetar p√°gina quando trocar de aba
   useEffect(() => {
     setCurrentPage(1);
     if (activeTab === 'cupons') {
@@ -254,7 +254,7 @@ export default function WalletPage() {
     }
   }, [activeTab, fetchCupons, fetchFreeBonuses]);
 
-  // Listener para mudanÁas no saldo em tempo real
+  // Listener para mudan√ßas no saldo em tempo real
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
@@ -281,7 +281,7 @@ export default function WalletPage() {
     };
   }, [isAuthenticated, user]);
 
-  // Listener para novas transaÁıes de jogos em tempo real
+  // Listener para novas transa√ß√µes de jogos em tempo real
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
@@ -296,7 +296,7 @@ export default function WalletPage() {
           filter: `usuario_id=eq.${user.id}`,
         },
         () => {
-          // Recarregar transaÁıes quando uma nova for inserida
+          // Recarregar transa√ß√µes quando uma nova for inserida
           fetchTransacoesJogos();
         }
       )
@@ -307,7 +307,7 @@ export default function WalletPage() {
     };
   }, [isAuthenticated, user, fetchTransacoesJogos]);
 
-  // Formatar saldo para exibiÁ„o
+  // Formatar saldo para exibi√ß√£o
   const formatSaldo = (valor: number): string => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -331,7 +331,7 @@ export default function WalletPage() {
     setIsWithdrawModalOpen(true);
   };
 
-  // Preparar dados formatados para exibiÁ„o
+  // Preparar dados formatados para exibi√ß√£o
   const withdrawalsFormatted = saques.map(saque => ({
     id: saque.id,
     valor: formatCurrency(saque.valor),
@@ -352,7 +352,7 @@ export default function WalletPage() {
     aposta: formatCurrency(transacao.valor || 0),
     retorno: formatCurrency(transacao.retorno || 0),
     status: transacao.status === 'Finalizado' ? 'Aprovado' : transacao.status || 'Aprovado',
-    bonus: transacao.com_bonus || 'N„o',
+    bonus: transacao.com_bonus || 'N√£o',
     data: formatDate(transacao.data || transacao.created_at),
   }));
 
@@ -380,7 +380,7 @@ export default function WalletPage() {
 
   const handleJogarRodadas = async (bonus: FreeBonusItem) => {
     if (!isAuthenticated || !user?.email) {
-      setNotification('FaÁa login para jogar.');
+      setNotification('Fa√ßa login para jogar.');
       return;
     }
 
@@ -393,7 +393,7 @@ export default function WalletPage() {
     try {
       const resolved = await resolveGameByGameCode(bonus.game_id);
       if (!resolved) {
-        setNotification('Jogo n„o encontrado na API PlayFivers.');
+        setNotification('Jogo n√£o encontrado na API PlayFivers.');
         return;
       }
 
@@ -410,7 +410,7 @@ export default function WalletPage() {
 
       navigate(`/${resolved.provider_slug}/${resolved.game_slug}`);
     } catch (error) {
-      console.error('Erro ao abrir jogo com rodadas gr·tis:', error);
+      console.error('Erro ao abrir jogo com rodadas gr√°tis:', error);
       setNotification('Erro ao abrir o jogo. Tente novamente.');
     } finally {
       setPlayingRodadaId(null);
@@ -498,7 +498,7 @@ export default function WalletPage() {
                       </svg>
                     <div className="min-w-0">
                       <p className="text-white font-bold text-lg md:text-xl truncate">{formatSaldo(saldo)}</p>
-                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">Saldo disponÌvel</p>
+                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">Saldo dispon√≠vel</p>
                     </div>
                   </div>
                 </div>
@@ -701,7 +701,7 @@ export default function WalletPage() {
                       </svg>
                     <div className="min-w-0">
                       <p className="text-white font-bold text-lg md:text-xl">B$ 0,00</p>
-                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">BÙnus disponÌvel</p>
+                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">B√¥nus dispon√≠vel</p>
                     </div>
                   </div>
                 </div>
@@ -750,7 +750,7 @@ export default function WalletPage() {
 
             <div className="rounded-xl overflow-hidden border border-slate-700/50">
               <div className="p-3 md:p-4 border-b border-slate-700/50">
-                <h2 className="text-white font-bold text-base md:text-lg">HistÛrico de transaÁıes</h2>
+                <h2 className="text-white font-bold text-base md:text-lg">Hist√≥rico de transa√ß√µes</h2>
               </div>
 
               <div className="border-b border-slate-700/50">
@@ -761,7 +761,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'transacoes' ? 1 : 0.5 }}
                   >
-                    TransaÁıes
+                    Transa√ß√µes
                   </button>
                   <button
                     type="button"
@@ -769,7 +769,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'depositos' ? 1 : 0.5 }}
                   >
-                    DepÛsitos
+                    Dep√≥sitos
                   </button>
                   <button
                     type="button"
@@ -793,7 +793,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'bonus' ? 1 : 0.5 }}
                   >
-                    BÙnus
+                    B√¥nus
                   </button>
                   <button
                     type="button"
@@ -801,7 +801,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'rodadas' ? 1 : 0.5 }}
                   >
-                    Rodadas Gr·tis
+                    Rodadas Gr√°tis
                   </button>
                 </div>
               </div>
@@ -815,7 +815,7 @@ export default function WalletPage() {
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'transacoes' && transactionsFormatted.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma transaÁ„o encontrada</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma transa√ß√£o encontrada</p>
                   </div>
                 ) : (activeTab === 'saques' && loadingSaques) ? (
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
@@ -833,7 +833,7 @@ export default function WalletPage() {
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'rodadas' && rodadasFormatted.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma rodada gr·tis encontrada</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma rodada gr√°tis encontrada</p>
                   </div>
                 ) : (
                   <table className="w-full">
@@ -846,7 +846,7 @@ export default function WalletPage() {
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Aposta</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Retorno</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">BÙnus</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">B√¥nus</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
                           </>
                         ) : activeTab === 'cupons' ? (
@@ -855,7 +855,7 @@ export default function WalletPage() {
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Cupom</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Valor</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">BÙnus</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">B√¥nus</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
                           </>
                         ) : activeTab === 'rodadas' ? (
@@ -866,7 +866,7 @@ export default function WalletPage() {
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Total</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
                             <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">AÁ„o</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">A√ß√£o</th>
                           </>
                         ) : (
                           <>
@@ -948,7 +948,7 @@ export default function WalletPage() {
                                     {playingRodadaId === item.id ? 'Abrindo...' : 'Jogar'}
                                   </button>
                                 ) : (
-                                  <span className="text-[10px] md:text-xs text-slate-500">ó</span>
+                                  <span className="text-[10px] md:text-xs text-slate-500">‚Äî</span>
                                 )}
                               </td>
                             </>
@@ -1054,7 +1054,7 @@ export default function WalletPage() {
         isOpen={isWithdrawModalOpen} 
         onClose={() => {
           setIsWithdrawModalOpen(false);
-          // Recarregar saldo e saques apÛs fechar o modal de saque
+          // Recarregar saldo e saques ap√≥s fechar o modal de saque
           fetchSaldo();
           fetchSaques();
         }} 

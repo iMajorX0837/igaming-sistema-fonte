@@ -6,6 +6,7 @@ import BackButton from './BackButton';
 import AppPageScaffold from './AppPageScaffold';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { getEstudiosCardBackground } from '../lib/homeTheme';
 import { appPageContainerClass } from '../constants/homeLayout';
 import {
   PROPRIETARY_GAMES,
@@ -42,17 +43,17 @@ interface Provider {
   apiId: number;
 }
 
-// Função para criar slug de URL (normalizar para URL-friendly)
+// Fun˜˜o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres não alfanuméricos por hífen
-    .replace(/^-+|-+$/g, ''); // Remove hífens do início e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n˜o alfanum˜ricos por h˜fen
+    .replace(/^-+|-+$/g, ''); // Remove h˜fens do in˜cio e fim
 };
 
-// Função para obter o slug do provider baseado no nome
+// Fun˜˜o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   const providerMap: { [key: string]: string } = {
     'PG Soft': 'pgsoft',
@@ -76,6 +77,7 @@ const getProviderSlug = (providerName: string): string => {
 export default function ProvidersPage() {
   const navigate = useNavigate();
   const { config: homeConfig } = useHomeConfig();
+  const cardBg = getEstudiosCardBackground(homeConfig.fundo);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export default function ProvidersPage() {
         const mappedProviders: Provider[] = filteredProviders.map(provider => ({
           id: provider.id.toString(),
           name: provider.name,
-          games: 0, // Será atualizado depois
+          games: 0, // Ser˜ atualizado depois
           image: provider.image_url,
           apiId: provider.id,
         }));
@@ -209,8 +211,8 @@ export default function ProvidersPage() {
                         }));
                         navigate(providerUrl);
                       }}
-                      className="relative group shrink-0 rounded-md overflow-hidden transition-all duration-200 shadow-lg hover:scale-105 cursor-pointer"
-                      style={{ width: 168, height: 100, backgroundColor: '#0D1237' }}
+                      className="relative group shrink-0 rounded-xl overflow-hidden border border-white/[0.06] transition-all duration-200 shadow-lg hover:scale-105 cursor-pointer"
+                      style={{ width: 168, height: 100, backgroundColor: cardBg }}
                     >
                       <div className="absolute top-2 right-2 z-10">
                         <div className="rounded-full px-2 py-0.5">

@@ -106,7 +106,7 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
         payerName,
         payerDocument: cpfDigits,
         transactionId,
-        description: `Depósito RoyalBet — ${payerName}`,
+        description: `Depósito — ${payerName}`,
       });
 
       const { data: depRow, error: insertError } = await supabase

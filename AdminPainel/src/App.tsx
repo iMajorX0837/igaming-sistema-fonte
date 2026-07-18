@@ -85,7 +85,14 @@ function RedirectToHomeTab({ tab }: { tab: string }) {
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginRoute />} />
+      <Route
+        path="/login"
+        element={
+          <AdminSiteBrandProvider>
+            <LoginRoute />
+          </AdminSiteBrandProvider>
+        }
+      />
       <Route
         path="/"
         element={
