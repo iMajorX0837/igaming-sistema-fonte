@@ -73,6 +73,20 @@ export function isPlayFiverEnabledProvider(prov: ApiProvider): boolean {
   return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov);
 }
 
+/** Provedores da carteira live (Evolution, Pragmatic Live, Ezugi, etc.). */
+export function isLiveProviderName(name: string): boolean {
+  const lower = name.trim().toLowerCase();
+  return (
+    lower.includes('evolution') ||
+    (lower.includes('pragmatic') && lower.includes('live')) ||
+    lower.includes('ezugi')
+  );
+}
+
+export function isSportGameCode(gameCode?: string | null): boolean {
+  return String(gameCode || '').trim().toLowerCase() === 'sport';
+}
+
 function normalizeProviderName(name: string): string {
   const trimmed = name.trim();
   if (trimmed === 'Propria' || trimmed === 'Própria') return 'Spribe';

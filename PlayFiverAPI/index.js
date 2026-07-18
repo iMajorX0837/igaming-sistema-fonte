@@ -218,12 +218,15 @@ async function persistGameTransaction({
   providerCode,
   gameCode,
   processedAt,
+  gameName,
 }) {
-  let nomeJogo = `Jogo ${gameCode}`;
-  try {
-    nomeJogo = await resolvePlayFiversGameName(providerCode, gameCode);
-  } catch (error) {
-    console.warn('⚠️  Erro ao buscar nome do jogo (background):', error);
+  let nomeJogo = gameName || `Jogo ${gameCode}`;
+  if (!gameName) {
+    try {
+      nomeJogo = await resolvePlayFiversGameName(providerCode, gameCode);
+    } catch (error) {
+      console.warn('⚠️  Erro ao buscar nome do jogo (background):', error);
+    }
   }
 
   const transactionData = {
@@ -251,6 +254,202 @@ async function persistGameTransaction({
   }
 
   console.log('💾 Transação salva no banco:', savedTransaction?.id, 'data:', savedTransaction?.data);
+}
+
+function safeJsonStringify(value, maxLen = 12000) {
+  try {
+    const text = JSON.stringify(value, null, 2);
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen)}\n... [truncado ${text.length - maxLen} chars]`;
+  } catch (error) {
+    return `[json serialize error: ${error.message}]`;
+  }
+}
+
+function getGameCallbackNestedKeys(body) {
+  if (!body || typeof body !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(body)
+      .filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value))
+      .map(([key, value]) => [key, Object.keys(value)])
+  );
+}
+
+function logGameCallback(level, title, details = {}) {
+  const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : '🎯';
+  const lines = [
+    '',
+    `${prefix} [game_callback] ${title}`,
+    `   rota: ${details.route || '-'}`,
+    `   horário: ${new Date().toISOString()}`,
+  ];
+
+  if (details.gameType) lines.push(`   game_type: ${details.gameType}`);
+  if (details.source) lines.push(`   payload_source: ${details.source}`);
+  if (details.userCode) lines.push(`   user_code: ${details.userCode}`);
+  if (details.txnId) lines.push(`   txn_id: ${details.txnId}`);
+  if (details.gameCode) lines.push(`   game_code: ${details.gameCode}`);
+  if (details.msg) lines.push(`   msg: ${details.msg}`);
+  if (details.status) lines.push(`   http_status: ${details.status}`);
+  if (details.payloadKeys?.length) lines.push(`   body_keys: ${details.payloadKeys.join(', ')}`);
+  if (details.nestedKeys && Object.keys(details.nestedKeys).length) {
+    lines.push(`   nested_keys: ${JSON.stringify(details.nestedKeys)}`);
+  }
+  if (details.error) {
+    lines.push(`   erro: ${details.error.message || String(details.error)}`);
+    if (details.error.stack) lines.push(details.error.stack);
+  }
+  if (details.extra) lines.push(`   extra: ${safeJsonStringify(details.extra, 4000)}`);
+  if (details.body) {
+    lines.push('   payload:');
+    lines.push(safeJsonStringify(details.body));
+  }
+
+  if (level === 'error') {
+    console.error(lines.join('\n'));
+  } else if (level === 'warn') {
+    console.warn(lines.join('\n'));
+  } else {
+    console.log(lines.join('\n'));
+  }
+}
+
+function mapPlayFiverGamePayload(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  const txnId =
+    data.txn_id ??
+    data.txnId ??
+    data.transaction_id ??
+    data.transactionId ??
+    data.id ??
+    null;
+
+  return {
+    txnId: txnId ? String(txnId) : null,
+    bet: parseFloat(data.bet ?? data.stake ?? data.amount ?? 0) || 0,
+    win: parseFloat(data.win ?? data.payout ?? data.prize ?? 0) || 0,
+    userBeforeBalance:
+      parseFloat(data.user_before_balance ?? data.before_balance ?? NaN) || 0,
+    userAfterBalance: parseFloat(data.user_after_balance ?? data.after_balance ?? NaN),
+    providerCode: data.provider_code ?? data.provider ?? null,
+    gameCode: data.game_code ?? data.game ?? null,
+    roundType: data.type ?? null,
+    roundId: data.round_id ?? data.roundId ?? null,
+    txnType: data.txn_type ?? data.txnType ?? null,
+    createdAt: data.created_at ?? data.createdAt ?? null,
+  };
+}
+
+function extractGameCallbackPayload(transaction) {
+  const gameType = String(transaction?.game_type || '').trim().toLowerCase();
+  const candidates = [];
+
+  // Doc PlayFivers: objeto dinâmico vem do game_type (sport, slot, live...)
+  if (gameType && transaction?.[gameType] && typeof transaction[gameType] === 'object') {
+    candidates.push({ source: gameType, data: transaction[gameType] });
+  }
+
+  // Fallback documentado: muitos payloads ainda enviam os detalhes em "slot"
+  if (transaction?.slot && typeof transaction.slot === 'object') {
+    candidates.push({ source: 'slot', data: transaction.slot });
+  }
+
+  for (const key of ['sport', 'sports', 'live', 'original']) {
+    if (key !== gameType && transaction?.[key] && typeof transaction[key] === 'object') {
+      candidates.push({ source: key, data: transaction[key] });
+    }
+  }
+
+  for (const candidate of candidates) {
+    const mapped = mapPlayFiverGamePayload(candidate.data);
+    if (mapped?.txnId) {
+      return {
+        source: candidate.source,
+        gameType: gameType || candidate.source,
+        ...mapped,
+      };
+    }
+  }
+
+  const flat = mapPlayFiverGamePayload(transaction);
+  if (flat?.txnId) {
+    return {
+      source: 'root',
+      gameType: gameType || 'unknown',
+      ...flat,
+    };
+  }
+
+  return null;
+}
+
+function respondGameCallbackError(res, status, msg, context = {}) {
+  logGameCallback('error', 'Erro no processamento de aposta', {
+    ...context,
+    msg,
+    status,
+  });
+  const balance = context.balance !== undefined ? context.balance : 0;
+  return res.status(status).json({ msg, balance });
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function resolveCallbackBalance(currentBalance, bet, win, userAfterBalance) {
+  if (Number.isFinite(userAfterBalance)) {
+    return roundMoney(userAfterBalance);
+  }
+  return roundMoney(currentBalance + win - bet);
+}
+
+async function findUsuarioByEmail(userCode) {
+  const trimmedEmail = String(userCode || '').trim();
+  let userError = null;
+
+  let { data: usuario, error } = await supabase
+    .from('usuarios')
+    .select('id, saldo, email')
+    .eq('email', trimmedEmail)
+    .maybeSingle();
+
+  userError = error;
+
+  if (!usuario && (!error || error.code === 'PGRST116')) {
+    const { data: usuarioIlike, error: errorIlike } = await supabase
+      .from('usuarios')
+      .select('id, saldo, email')
+      .ilike('email', trimmedEmail)
+      .maybeSingle();
+
+    if (!errorIlike && usuarioIlike) {
+      usuario = usuarioIlike;
+      userError = null;
+    }
+  }
+
+  if (!usuario) {
+    const { data: usuarioRpc, error: rpcError } = await supabase.rpc('get_user_by_email', {
+      user_email: trimmedEmail,
+    });
+
+    if (!rpcError && usuarioRpc && usuarioRpc.length > 0) {
+      usuario = usuarioRpc[0];
+      userError = null;
+    }
+  }
+
+  return { usuario, userError, trimmedEmail };
+}
+
+function resolvePersistedGameName(gameCode, payloadSource) {
+  const normalizedCode = String(gameCode || '').trim().toLowerCase();
+  if (normalizedCode === 'sport' || payloadSource === 'sport' || payloadSource === 'sports') {
+    return 'Esporte';
+  }
+  return null;
 }
 
 function createSlug(text) {
@@ -282,6 +481,79 @@ function getProviderSlug(providerName) {
   };
 
   return providerMap[providerName] || createSlug(providerName);
+}
+
+const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
+
+function isLiveProviderName(name) {
+  const lower = String(name || '').trim().toLowerCase();
+  return (
+    lower.includes('evolution') ||
+    (lower.includes('pragmatic') && lower.includes('live')) ||
+    lower.includes('ezugi')
+  );
+}
+
+function isSportGameLaunch(gameCode) {
+  return String(gameCode || '').trim().toLowerCase() === 'sport';
+}
+
+async function shouldLaunchWithGameOriginal(gameCode, provider, requestedOriginal) {
+  if (requestedOriginal === true) return true;
+  if (isSportGameLaunch(gameCode)) return true;
+  if (provider && isLiveProviderName(provider)) return true;
+
+  if (!gameCode) return false;
+
+  const providersResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/providers`, {
+    headers: PLAYFIVERS_FETCH_HEADERS,
+  });
+
+  if (!providersResponse.ok) return false;
+
+  const providersData = await providersResponse.json();
+  if (providersData.status !== 1 || !Array.isArray(providersData.data)) return false;
+
+  const liveProviders = providersData.data.filter(
+    (prov) => prov.status === 1 && prov.wallet?.name === PLAYFIVERS_LIVE_WALLET
+  );
+
+  if (liveProviders.length === 0) return false;
+
+  let providersToSearch = liveProviders;
+  if (provider) {
+    const providerId = parseInt(provider, 10);
+    const byId = !Number.isNaN(providerId)
+      ? liveProviders.find((prov) => prov.id === providerId)
+      : null;
+    const bySlug =
+      byId ||
+      liveProviders.find((prov) => getProviderSlug(prov.name) === provider) ||
+      null;
+    if (bySlug) providersToSearch = [bySlug];
+  }
+
+  const normalizedCode = String(gameCode).toLowerCase();
+  for (const prov of providersToSearch) {
+    const gamesResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/games?provider=${prov.id}`, {
+      headers: PLAYFIVERS_FETCH_HEADERS,
+    });
+
+    if (!gamesResponse.ok) continue;
+
+    const gamesData = await gamesResponse.json();
+    if (gamesData.status !== 1 || !Array.isArray(gamesData.data)) continue;
+
+    const foundGame = gamesData.data.find(
+      (game) =>
+        game.status &&
+        String(game.game_code || '').toLowerCase() === normalizedCode
+    );
+
+    if (foundGame) return true;
+  }
+
+  return false;
 }
 
 async function resolveGameCodeFromSlug(jogoSlug, providerSlug, jogoNome) {
@@ -595,8 +867,8 @@ app.post('/webhook', async (req, res) => {
     if (!usuario) {
       console.error(`❌ Usuário não encontrado: ${user_code}`);
       return res.status(404).json({
-        msg: `Usuário não encontrado: ${user_code}`,
-        balance: 0
+        msg: 'INVALID_USER',
+        balance: 0,
       });
     }
 
@@ -612,96 +884,112 @@ app.post('/webhook', async (req, res) => {
   } catch (error) {
     console.error('❌ Erro ao processar consulta de saldo:', error);
     res.status(500).json({
-      msg: 'Erro interno do servidor',
-      balance: 0
+      msg: 'ERROR_INTERNAL',
+      balance: 0,
     });
   }
 });
 
 /**
- * Webhook para receber transações da Play Fiver
- * POST /webhook/transaction
- * 
- * Para configurar na Play Fiver, use a URL: https://seu-dominio.com/webhook/transaction
+ * Webhook / game_callback — transações da Play Fiver (slots, live, esportes, etc.)
+ * POST /webhook/transaction | /game_callback | /webhook/game_callback
  */
-app.post('/webhook/transaction', async (req, res) => {
+async function handleGameCallback(req, res) {
+  const route = req.path;
+  const transaction = req.body;
+  const baseContext = {
+    route,
+    body: transaction,
+    payloadKeys: transaction ? Object.keys(transaction) : [],
+    nestedKeys: getGameCallbackNestedKeys(transaction),
+    gameType: transaction?.game_type,
+    userCode: transaction?.user_code,
+  };
+
+  logGameCallback('info', 'Callback recebido', baseContext);
+
   try {
-    const transaction = req.body;
-    
-    console.log('📥 Transação recebida:', JSON.stringify(transaction, null, 2));
-
-    // Validar dados básicos da transação
     if (!transaction) {
-      return res.status(400).json({
-        msg: 'Dados da transação não fornecidos',
-        balance: 0
-      });
+      return respondGameCallbackError(res, 400, 'Dados da transação não fornecidos', baseContext);
     }
 
-    // Extrair dados principais
-    const {
-      type, // 'WinBet', etc.
-      user_code,
-      game_type, // 'slot', 'live', etc.
-      agent_code,
-      agent_secret,
-      game_original,
-      slot, // objeto com dados do slot
-      // Pode haver outros tipos: live, etc.
-    } = transaction;
+    const { type, user_code, game_type, game_original } = transaction;
 
-    // Validar campos obrigatórios
     if (!type || !user_code) {
-      return res.status(400).json({
-        msg: 'Campos obrigatórios faltando: type, user_code',
-        balance: 0
-      });
+      return respondGameCallbackError(
+        res,
+        400,
+        'Campos obrigatórios faltando: type, user_code',
+        {
+          ...baseContext,
+          extra: { type, user_code, game_type, game_original },
+        }
+      );
     }
 
-    // Extrair dados do jogo baseado no tipo (slot, live, etc.)
-    let gameData = null;
-    let txnId = null;
-    let bet = 0;
-    let win = 0;
-    let userBeforeBalance = 0;
-    let userAfterBalance = 0;
-    let providerCode = null;
-    let gameCode = null;
-    let roundType = null;
-    let roundId = null;
-    let txnType = null;
-    let createdAt = null;
+    const extracted = extractGameCallbackPayload(transaction);
 
-    if (game_type === 'slot' && slot) {
-      gameData = slot;
-      txnId = slot.txn_id;
-      bet = parseFloat(slot.bet) || 0;
-      win = parseFloat(slot.win) || 0;
-      userBeforeBalance = parseFloat(slot.user_before_balance) || 0;
-      userAfterBalance = parseFloat(slot.user_after_balance) || 0;
-      providerCode = slot.provider_code;
-      gameCode = slot.game_code;
-      roundType = slot.type; // 'BASE', 'BONUS', etc.
-      roundId = slot.round_id;
-      txnType = slot.txn_type;
-      createdAt = slot.created_at ?? transaction.created_at ?? null;
-    } else {
-      // Para outros tipos de jogos (live, etc.), implementar conforme necessário
-      return res.status(400).json({
-        msg: `Tipo de jogo não suportado: ${game_type}`,
-        balance: 0
-      });
+    if (!extracted) {
+      const { usuario: previewUser } = await findUsuarioByEmail(user_code);
+      const previewBalance = previewUser ? roundMoney(previewUser.saldo) : 0;
+
+      return respondGameCallbackError(
+        res,
+        400,
+        `UNSUPPORTED_GAME_TYPE:${game_type || 'unknown'}`,
+        {
+          ...baseContext,
+          balance: previewBalance,
+          extra: {
+            type,
+            game_type,
+            game_original,
+            nested_keys: getGameCallbackNestedKeys(transaction),
+            hint: 'Esperado objeto dinâmico em transaction[game_type] ou transaction.slot',
+          },
+        }
+      );
     }
 
-    // Validar txn_id
+    const {
+      source,
+      gameType: resolvedGameType,
+      txnId,
+      bet,
+      win,
+      userBeforeBalance,
+      userAfterBalance,
+      providerCode,
+      gameCode,
+      createdAt,
+    } = extracted;
+
+    logGameCallback('info', 'Payload interpretado', {
+      ...baseContext,
+      source,
+      gameType: resolvedGameType,
+      txnId,
+      gameCode,
+      extra: {
+        type,
+        bet,
+        win,
+        user_before_balance: userBeforeBalance,
+        user_after_balance: userAfterBalance,
+        provider_code: providerCode,
+        game_original,
+      },
+    });
+
     if (!txnId) {
-      return res.status(400).json({
-        msg: 'txn_id não encontrado nos dados do jogo',
-        balance: 0
+      return respondGameCallbackError(res, 400, 'txn_id não encontrado nos dados do jogo', {
+        ...baseContext,
+        source,
+        gameType: resolvedGameType,
+        extra: extracted,
       });
     }
 
-    // Verificar se a transação já foi processada (evitar duplicatas)
     const { data: existingTransaction } = await supabase
       .from('transacoes_jogos')
       .select('id')
@@ -709,127 +997,116 @@ app.post('/webhook/transaction', async (req, res) => {
       .maybeSingle();
 
     if (existingTransaction) {
-      console.log(`⚠️  Transação já processada: ${txnId}`);
-      // Retornar saldo atual do usuário mesmo se a transação já foi processada
       const { data: usuarioExistente } = await supabase
         .from('usuarios')
         .select('saldo')
         .eq('email', user_code.trim())
         .maybeSingle();
-      
+
       const balance = usuarioExistente ? parseFloat(usuarioExistente.saldo) || 0 : 0;
-      
+
+      logGameCallback('warn', 'Transação duplicada — retornando saldo atual', {
+        ...baseContext,
+        txnId,
+        extra: { balance },
+      });
+
       return res.status(200).json({
         msg: '',
-        balance: balance
+        balance,
       });
     }
 
-    // Buscar usuário pelo email (user_code da Play Fiver deve ser o email do usuário)
-    // IMPORTANTE: Usar service role key para bypass do RLS
-    console.log(`🔍 Buscando usuário com email: ${user_code}`);
-    
-    // Tentar busca exata primeiro (mais rápida)
-    let { data: usuario, error: userError } = await supabase
-      .from('usuarios')
-      .select('id, saldo, email')
-      .eq('email', user_code.trim()) // Remove espaços e busca exata
-      .maybeSingle(); // Usa maybeSingle ao invés de single para evitar erro se não encontrar
+    const { usuario, userError, trimmedEmail } = await findUsuarioByEmail(user_code);
 
-    // Se não encontrou, tentar busca case-insensitive
-    if (!usuario && (!userError || userError.code === 'PGRST116')) {
-      console.log(`Tentando busca case-insensitive para: ${user_code}`);
-      const { data: usuarioIlike, error: errorIlike } = await supabase
-        .from('usuarios')
-        .select('id, saldo, email')
-        .ilike('email', user_code.trim())
-        .maybeSingle();
-      
-      if (!errorIlike && usuarioIlike) {
-        usuario = usuarioIlike;
-        userError = null;
-        console.log(`✅ Usuário encontrado (case-insensitive): ${usuario.email}`);
-      }
-    }
-
-    // Se ainda não encontrou, tentar usar função RPC (bypass RLS)
     if (!usuario) {
-      console.log('Tentando buscar via função RPC (bypass RLS)...');
-      const { data: usuarioRpc, error: rpcError } = await supabase
-        .rpc('get_user_by_email', { user_email: user_code.trim() });
-      
-      if (!rpcError && usuarioRpc && usuarioRpc.length > 0) {
-        usuario = usuarioRpc[0];
-        userError = null;
-        console.log(`✅ Usuário encontrado via RPC: ${usuario.email}`);
-      }
-    }
-
-    // Se ainda não encontrou, retorna erro com mais detalhes
-    if (!usuario) {
-      console.error('❌ Erro ao buscar usuário:', userError);
-      console.error(`Email buscado: "${user_code}"`);
-      console.error(`Email trimmed: "${user_code.trim()}"`);
-      
-      // Tentar listar alguns emails existentes para debug
       const { data: usuariosSample, error: sampleError } = await supabase
         .from('usuarios')
         .select('email')
         .limit(10);
-      
-      if (!sampleError && usuariosSample) {
-        console.log('📋 Emails existentes no banco:', usuariosSample.map(u => `"${u.email}"`));
-      } else {
-        console.error('❌ Erro ao listar usuários:', sampleError);
-        console.error('Isso pode indicar problema com RLS ou service key não configurada');
-      }
-      
-      // Verificar se está usando service key
-      const isUsingServiceKey = !!supabaseServiceKey;
-      console.log(`🔑 Service key configurada: ${isUsingServiceKey}`);
-      if (!isUsingServiceKey) {
-        console.warn('⚠️  ATENÇÃO: SUPABASE_SERVICE_KEY não está configurada! Configure no arquivo .env');
-      }
-      
-      return res.status(404).json({
-        msg: `Usuário não encontrado: ${user_code}`,
-        balance: 0
+
+      return respondGameCallbackError(res, 404, 'INVALID_USER', {
+        ...baseContext,
+        txnId,
+        balance: 0,
+        extra: {
+          email_buscado: trimmedEmail,
+          supabase_error: userError,
+          service_key_configurada: !!supabaseServiceKey,
+          emails_exemplo: sampleError ? null : usuariosSample?.map((item) => item.email),
+        },
       });
     }
 
-    console.log(`✅ Usuário encontrado: ${usuario.email} (ID: ${usuario.id}, Saldo: ${usuario.saldo})`);
+    const currentBalance = roundMoney(usuario.saldo);
+    const debitAmount = roundMoney(Math.max(0, bet - win));
 
-    // Atualizar saldo do usuário usando o saldo após a transação
+    if (debitAmount > 0 && currentBalance + 1e-6 < debitAmount) {
+      return respondGameCallbackError(res, 400, 'INSUFFICIENT_USER_FUNDS', {
+        ...baseContext,
+        txnId,
+        gameCode,
+        balance: currentBalance,
+        extra: {
+          bet,
+          win,
+          debitAmount,
+          saldo_atual: currentBalance,
+          game_type: resolvedGameType,
+        },
+      });
+    }
+
+    const newBalance = resolveCallbackBalance(
+      currentBalance,
+      bet,
+      win,
+      userAfterBalance
+    );
+
     const { error: updateError } = await supabase
       .from('usuarios')
-      .update({ saldo: userAfterBalance })
+      .update({ saldo: newBalance })
       .eq('id', usuario.id);
 
     if (updateError) {
-      console.error('❌ Erro ao atualizar saldo:', updateError);
-      return res.status(500).json({
-        msg: 'Erro ao atualizar saldo do usuário',
-        balance: 0
+      return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
+        ...baseContext,
+        txnId,
+        gameCode,
+        balance: currentBalance,
+        error: updateError,
+        extra: {
+          usuario_id: usuario.id,
+          saldo_anterior: currentBalance,
+          saldo_novo: newBalance,
+        },
       });
     }
 
-    console.log('✅ Transação processada:', {
-      txn_id: txnId,
-      usuario: user_code,
-      tipo: type,
-      bet,
-      win,
-      saldo_anterior: userBeforeBalance,
-      saldo_novo: userAfterBalance,
-      playfivers_created_at: createdAt ?? null,
+    logGameCallback('info', 'Aposta processada com sucesso', {
+      ...baseContext,
+      source,
+      gameType: resolvedGameType,
+      txnId,
+      gameCode,
+      extra: {
+        type,
+        bet,
+        win,
+        saldo_anterior: currentBalance,
+        saldo_novo: newBalance,
+        usuario: usuario.email,
+        playfivers_created_at: createdAt ?? null,
+      },
     });
 
     const processedAt = new Date().toISOString();
+    const persistedGameName = resolvePersistedGameName(gameCode, source);
 
-    // PlayFivers exige resposta rápida no game_callback — responder antes de I/O lento
     res.status(200).json({
       msg: '',
-      balance: userAfterBalance,
+      balance: newBalance,
     });
 
     void persistGameTransaction({
@@ -840,18 +1117,27 @@ app.post('/webhook/transaction', async (req, res) => {
       providerCode,
       gameCode,
       processedAt,
+      gameName: persistedGameName,
     }).catch((error) => {
-      console.error('❌ Erro ao persistir transação (background):', error);
+      logGameCallback('error', 'Erro ao persistir transação (background)', {
+        ...baseContext,
+        txnId,
+        gameCode,
+        error,
+      });
     });
-
   } catch (error) {
-    console.error('❌ Erro ao processar webhook:', error);
-    res.status(500).json({
-      msg: 'Erro interno do servidor',
-      balance: 0
+    return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
+      ...baseContext,
+      error,
     });
   }
-});
+}
+
+app.post('/api/webhook', handleGameCallback);
+app.post('/webhook/transaction', handleGameCallback);
+app.post('/game_callback', handleGameCallback);
+app.post('/webhook/game_callback', handleGameCallback);
 
 /**
  * Página de preview para testes locais (iframe do game_launch em modo mock).
@@ -957,7 +1243,10 @@ app.post('/api/game_launch', async (req, res) => {
       lang
     } = req.body;
 
-    console.log('🎮 Requisição de game_launch recebida:', JSON.stringify({ user_code, game_code, provider, game_original }, null, 2));
+    console.log(
+      '🎮 Requisição de game_launch recebida:',
+      JSON.stringify({ user_code, game_code, provider, game_original }, null, 2)
+    );
 
     // Aviator próprio — abre o clone local com carteira Supabase
     if (AVIATOR_GAME_ENABLED && isAviatorGameCode(game_code, provider)) {
@@ -997,6 +1286,21 @@ app.post('/api/game_launch', async (req, res) => {
     }
 
     // Fazer requisição para a API Play Fiver usando o IP do servidor
+    const resolvedGameOriginal = await shouldLaunchWithGameOriginal(
+      game_code,
+      provider,
+      game_original
+    );
+
+    console.log(
+      '🎮 game_original resolvido:',
+      JSON.stringify(
+        { game_code, provider, requested: game_original, resolved: resolvedGameOriginal },
+        null,
+        2
+      )
+    );
+
     const playFiverResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/game_launch`, {
       method: 'POST',
       headers: PLAYFIVERS_FETCH_HEADERS,
@@ -1006,7 +1310,7 @@ app.post('/api/game_launch', async (req, res) => {
         user_code,
         game_code,
         ...(provider !== undefined && provider !== null && provider !== '' ? { provider } : {}),
-        game_original: game_original !== undefined ? game_original : false,
+        game_original: resolvedGameOriginal,
         user_balance: user_balance || 0,
         user_rtp: user_rtp || 70,
         lang: lang || 'pt',
@@ -2110,7 +2414,8 @@ app.get('/', (req, res) => {
     message: 'Play Fiver Webhook API',
     endpoints: {
       balance: 'POST /webhook - Consulta saldo do jogador',
-      transaction: 'POST /webhook/transaction - Recebe transações',
+      transaction:
+        'POST /api/webhook (oficial PlayFivers) | /webhook/transaction | /game_callback - Transações',
       providers: 'GET /api/v2/providers - Proxy de provedores (usa IP do servidor)',
       games: 'GET /api/v2/games?provider= - Proxy de jogos por provedor',
       gameLaunch: 'POST /api/game_launch - Proxy para lançar jogos (usa IP do servidor)',
@@ -2159,7 +2464,8 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`💰 Webhook de saldo: http://localhost:${PORT}/webhook`);
-  console.log(`📡 Webhook de transação: http://localhost:${PORT}/webhook/transaction`);
+  console.log(`📡 Game callback (PlayFivers): http://localhost:${PORT}/api/webhook`);
+  console.log(`📡 Aliases callback: /webhook/transaction · /game_callback`);
   console.log(`📚 Catálogo (providers/games): http://localhost:${PORT}/api/v2/providers`);
   console.log(`🎮 Game Launch Proxy: http://localhost:${PORT}/api/game_launch`);
   if (GAME_LAUNCH_MOCK) {

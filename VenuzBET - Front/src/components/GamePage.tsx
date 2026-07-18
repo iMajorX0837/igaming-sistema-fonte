@@ -14,6 +14,7 @@ import { useListenOpenMobileMenu } from '../hooks/useListenOpenMobileMenu';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { getSidebarInitiallyOpen } from '../utils/sidebarInitialOpen';
 import { appPageContainerClass } from '../constants/homeLayout';
+import { isLiveProviderName, isSportGameCode } from '../api/playfiversCache';
 
 interface GamePageProps {
   gameName: string;
@@ -22,7 +23,7 @@ interface GamePageProps {
   gameCode?: string;
   /** Enviado à PlayFivers no game_launch (ex.: "Original" para esportes). */
   launchProvider?: string;
-  /** game_original no payload da PlayFivers (esportes exigem true). */
+  /** game_original no payload da PlayFivers (esportes e cassino ao vivo exigem true). */
   gameOriginal?: boolean;
   onBack: () => void;
   /** @deprecated Alinhamento agora segue a borda do iframe. */
@@ -439,7 +440,7 @@ export default function GamePage({
           user_code: userCode,
           game_code: gameCode,
           ...(launchProvider ? { provider: launchProvider } : {}),
-          game_original: gameOriginal,
+          game_original: gameOriginal || isSportGameCode(gameCode) || isLiveProviderName(gameProvider),
           user_balance: currentBalance,
           user_rtp: 70,
           lang: 'pt',
