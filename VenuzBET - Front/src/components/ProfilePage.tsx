@@ -45,14 +45,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const [isSavingName, setIsSavingName] = useState(false);
   const itemsPerPage = 10;
 
-  // Garante que o Iconify escaneia os ícones após renderizar
+  // Garante que o Iconify escaneia os Ã­cones apÃ³s renderizar
   useEffect(() => {
     if ((window as any).Iconify) {
       (window as any).Iconify.scan();
     }
   });
 
-  // Função para formatar CPF (XXX.XXX.XXX-XX)
+  // FunÃ§Ã£o para formatar CPF (XXX.XXX.XXX-XX)
   const formatCPF = (cpf: string | null): string => {
     if (!cpf) return '';
     const cleaned = cpf.replace(/\D/g, '');
@@ -60,7 +60,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
   };
 
-  // Função para formatar telefone ((XX) XXXXX-XXXX ou (XX) X XXXX-XXXX)
+  // FunÃ§Ã£o para formatar telefone ((XX) XXXXX-XXXX ou (XX) X XXXX-XXXX)
   const formatPhone = (phone: string | null): string => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
@@ -74,7 +74,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     return phone;
   };
 
-  // Função para formatar nome (capitalizar primeira letra de cada palavra)
+  // FunÃ§Ã£o para formatar nome (capitalizar primeira letra de cada palavra)
   const formatName = (name: string | null): string => {
     if (!name) return '';
     return name
@@ -87,19 +87,19 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const fullNameFromRow = (u: UserProfileData) =>
     (u.usuario_nome && u.usuario_nome.trim()) || (u.nome && u.nome.trim()) || '';
 
-  // Função para iniciar edição do nome
+  // FunÃ§Ã£o para iniciar ediÃ§Ã£o do nome
   const handleStartEditName = () => {
     setEditedName(fullNameFromRow(userData));
     setIsEditingName(true);
   };
 
-  // Função para cancelar edição do nome
+  // FunÃ§Ã£o para cancelar ediÃ§Ã£o do nome
   const handleCancelEditName = () => {
     setIsEditingName(false);
     setEditedName('');
   };
 
-  // Função para salvar o nome
+  // FunÃ§Ã£o para salvar o nome
   const handleSaveName = async () => {
     if (!isAuthenticated || !user) return;
 
@@ -163,7 +163,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="material-symbols:security" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Segurança e login
+                    SeguranÃ§a e login
                   </button>
 
                   <button
@@ -176,7 +176,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="iconamoon:history-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Histórico de jogo
+                    HistÃ³rico de jogo
                   </button>
 
                   <button
@@ -189,7 +189,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="hugeicons:face-id" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Verificação KYC
+                    VerificaÃ§Ã£o KYC
                   </button>
 
                   <button
@@ -215,7 +215,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                   >
                     <span className="iconify shrink-0" data-icon="solar:user-block-rounded-bold-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Auto-exclusão
+                    Auto-exclusÃ£o
                   </button>
                 </div>
               </div>
@@ -359,7 +359,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                     <div className="p-3 md:p-4 pt-2">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                        <h2 className="text-white text-base md:text-lg font-semibold">Endereço</h2>
+                        <h2 className="text-white text-base md:text-lg font-semibold">EndereÃ§o</h2>
                         <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
                           Alterar
                         </button>
@@ -409,10 +409,10 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Número</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>NÃºmero</label>
                           <input
                             type="text"
-                            placeholder="Número"
+                            placeholder="NÃºmero"
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
@@ -435,7 +435,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {activeTab === 'seguranca' && (
                   <div className="space-y-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Segurança e login</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">SeguranÃ§a e login</h1>
                       {showPasswordChange && (
                         <button
                           onClick={() => {
@@ -456,8 +456,8 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <div className="p-3 md:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
-                            <h3 className="text-white font-semibold mb-0.5">Alterar senha de segurança</h3>
-                            <p className="text-slate-500 text-sm">••••••••••••</p>
+                            <h3 className="text-white font-semibold mb-0.5">Alterar senha de seguranÃ§a</h3>
+                            <p className="text-slate-500 text-sm">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</p>
                           </div>
                           <button
                             type="button"
@@ -471,9 +471,9 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     ) : (
                       <div className="p-3 md:p-4">
-                        <h3 className="text-white font-semibold mb-1">Alterar senha de segurança</h3>
+                        <h3 className="text-white font-semibold mb-1">Alterar senha de seguranÃ§a</h3>
                         <p className="text-slate-400 text-sm mb-4">
-                          Aqui você pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada é forte e segura
+                          Aqui vocÃª pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada Ã© forte e segura
                         </p>
 
                         <div className="space-y-3">
@@ -587,7 +587,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     <div className="p-3 md:p-4 border-t" style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">Autenticação de dois fatores (2FA)</h3>
+                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">AutenticaÃ§Ã£o de dois fatores (2FA)</h3>
                           <p className="text-slate-500 text-sm">Desativado</p>
                         </div>
                         <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>Em breve</span>
@@ -609,7 +609,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {activeTab === 'historico' && (
                   <div className="space-y-4 md:space-y-6">
                     <div>
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">Histórico de apostas</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">HistÃ³rico de apostas</h1>
                     </div>
 
                     <div className="flex flex-wrap gap-2 mb-4 md:mb-6">
@@ -632,26 +632,26 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '7dias' ? 1 : 0.5 }}
                       >
-                        Últimos 7 dias
+                        Ãšltimos 7 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('30dias'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '30dias' ? 1 : 0.5 }}
                       >
-                        Últimos 30 dias
+                        Ãšltimos 30 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('total'); setCurrentPage(1); }}
                         className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'total' ? 1 : 0.5 }}
                       >
-                        Período total
+                        PerÃ­odo total
                       </button>
                     </div>
 
                     {isLoadingHistory && betHistory.length === 0 && (
-                      <LoadingScreen title="Carregando histórico..." variant="inline" className="py-8" />
+                      <LoadingScreen title="Carregando histÃ³rico..." variant="inline" className="py-8" />
                     )}
 
                     <div className="rounded-xl overflow-hidden">
@@ -664,7 +664,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Valor</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Retorno</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Status</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>c/ bônus</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>c/ bÃ´nus</th>
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Data</th>
                             </tr>
                           </thead>
@@ -779,7 +779,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                 {(activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
                   <div className="p-6 md:p-8 text-center">
-                    <p className="text-slate-400 text-base md:text-lg">Em construção</p>
+                    <p className="text-slate-400 text-base md:text-lg">Em construÃ§Ã£o</p>
                   </div>
                 )}
               </div>
