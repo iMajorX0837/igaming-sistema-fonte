@@ -184,17 +184,21 @@ function MobileGamePlayerFrame({
   children,
   onExitFullscreen,
   showExitFullscreen,
+  scrollable = false,
 }: {
   playerStageRef: RefObject<HTMLDivElement | null>;
   children: ReactNode;
   onExitFullscreen: () => void;
   showExitFullscreen: boolean;
+  scrollable?: boolean;
 }) {
   return (
-    <div className="relative flex min-h-0 flex-1 w-full flex-col overflow-hidden">
+    <div
+      className={`relative flex min-h-0 flex-1 w-full flex-col ${scrollable ? 'overflow-visible' : 'overflow-hidden'}`}
+    >
       <div
         ref={playerStageRef}
-        className="game-player-stage absolute inset-0 overflow-hidden bg-black"
+        className={`game-player-stage absolute inset-0 bg-black ${scrollable ? 'overflow-visible touch-pan-y' : 'overflow-hidden'}`}
       >
         {children}
         {showExitFullscreen && <FullscreenExitButton onClick={onExitFullscreen} />}
@@ -378,6 +382,7 @@ function GameIframe({
   onPlay,
   iframeClassName,
   containerClassName = '',
+  scrollable = false,
 }: {
   gameUrl: string;
   gameName: string;
@@ -386,15 +391,18 @@ function GameIframe({
   onPlay: () => void;
   iframeClassName: string;
   containerClassName?: string;
+  scrollable?: boolean;
 }) {
   return (
-    <div className={`game-iframe-wrapper relative overflow-hidden ${containerClassName}`.trim()}>
+    <div
+      className={`game-iframe-wrapper relative ${scrollable ? 'game-iframe-wrapper--scrollable' : 'overflow-hidden'} ${containerClassName}`.trim()}
+    >
       <iframe
         src={gameUrl}
-        className={`game-iframe scrollbar-hide overflow-hidden ${iframeClassName} ${showInsufficientBalance ? 'blur-md pointer-events-none' : ''}`.trim()}
+        className={`game-iframe ${scrollable ? 'game-iframe--scrollable' : 'scrollbar-hide overflow-hidden'} ${iframeClassName} ${showInsufficientBalance ? 'blur-md pointer-events-none' : ''}`.trim()}
         allow="fullscreen; autoplay; encrypted-media"
         allowFullScreen
-        scrolling="no"
+        scrolling={scrollable ? 'yes' : 'no'}
         title={gameName}
       />
       {showInsufficientBalance && (
@@ -663,6 +671,17 @@ export default function GamePage({
   }, []);
 
   const effectiveFullscreen = fullscreen || isMobile;
+  const iframeScrollable =
+    isSportGameCode(gameCode ?? '') || gameOriginal || (fullscreen && isMobile);
+
+  useEffect(() => {
+    if (!isMobile || !gameUrl) return undefined;
+
+    document.documentElement.classList.add('game-player-active');
+    return () => {
+      document.documentElement.classList.remove('game-player-active');
+    };
+  }, [isMobile, gameUrl]);
 
   const gameInfoBarProps = {
     gameName,
@@ -696,7 +715,11 @@ export default function GamePage({
         gameProvider={gameProvider}
         onClose={onBack}
       />
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{content}</div>
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${iframeScrollable ? 'overflow-visible' : 'overflow-hidden'}`}
+      >
+        {content}
+      </div>
     </div>
   );
 
@@ -715,6 +738,7 @@ export default function GamePage({
                     playerStageRef={playerStageRef}
                     onExitFullscreen={togglePlayerFullscreen}
                     showExitFullscreen={isPlayerFullscreen}
+                    scrollable={iframeScrollable}
                   >
                     <div
                       className="absolute inset-0 bg-cover bg-center"
@@ -803,6 +827,7 @@ export default function GamePage({
                         playerStageRef={playerStageRef}
                         onExitFullscreen={togglePlayerFullscreen}
                         showExitFullscreen={isPlayerFullscreen}
+                        scrollable={iframeScrollable}
                       >
                         {gameUrl ? (
                           <GameIframe
@@ -813,6 +838,7 @@ export default function GamePage({
                             onPlay={handlePlayWithoutDeposit}
                             iframeClassName="absolute inset-0 w-full h-full border-0 block"
                             containerClassName="absolute inset-0 w-full h-full"
+                            scrollable={iframeScrollable}
                           />
                         ) : (
                           <GameLoadingPlaceholder
@@ -842,6 +868,7 @@ export default function GamePage({
                               onPlay={handlePlayWithoutDeposit}
                               iframeClassName="absolute inset-0 w-full h-full border-0 block"
                               containerClassName="absolute inset-0 w-full h-full"
+                              scrollable={iframeScrollable}
                             />
                           ) : (
                             <GameLoadingPlaceholder
@@ -886,6 +913,7 @@ export default function GamePage({
                               onPlay={handlePlayWithoutDeposit}
                               iframeClassName="absolute inset-0 w-full h-full border-0 block"
                               containerClassName="absolute inset-0 w-full h-full"
+                              scrollable={iframeScrollable}
                             />
                           ) : (
                             <GameLoadingPlaceholder

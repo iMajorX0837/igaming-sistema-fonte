@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useFooterConfig } from '../hooks/useFooterConfig';
+import { normalizeWhatsappUrl } from '../lib/siteConfigCache';
 import { useSidebarLanguage } from '../contexts/SidebarLanguageContext';
 import { getHeaderFooterCopy } from '../i18n/headerFooter';
 import SiteLogo from './SiteLogo';
@@ -8,11 +9,50 @@ interface FooterProps {
   containerClassName?: string;
 }
 
+type FooterSocialKey = 'instagram' | 'telegram' | 'whatsapp';
+
+const FOOTER_SOCIAL_META: Record<
+  FooterSocialKey,
+  { icon: string; label: string; resolveUrl: (url: string) => string }
+> = {
+  instagram: {
+    icon: 'mdi:instagram',
+    label: 'Instagram',
+    resolveUrl: (url) => url.trim(),
+  },
+  telegram: {
+    icon: 'ic:baseline-telegram',
+    label: 'Telegram',
+    resolveUrl: (url) => url.trim(),
+  },
+  whatsapp: {
+    icon: 'mdi:whatsapp',
+    label: 'WhatsApp',
+    resolveUrl: normalizeWhatsappUrl,
+  },
+};
+
 export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }: FooterProps) {
   const [showMore, setShowMore] = useState(false);
   const { config } = useFooterConfig();
   const { language } = useSidebarLanguage();
   const copy = useMemo(() => getHeaderFooterCopy(language).footer, [language]);
+
+  const socialLinks = useMemo(() => {
+    return (Object.keys(FOOTER_SOCIAL_META) as FooterSocialKey[])
+      .map((key) => {
+        const social = config[key];
+        const href = FOOTER_SOCIAL_META[key].resolveUrl(social.url);
+        if (!social.ativo || !href) return null;
+        return {
+          key,
+          href,
+          icon: FOOTER_SOCIAL_META[key].icon,
+          label: FOOTER_SOCIAL_META[key].label,
+        };
+      })
+      .filter(Boolean) as Array<{ key: FooterSocialKey; href: string; icon: string; label: string }>;
+  }, [config]);
 
   useEffect(() => {
     // Garante que o Iconify escaneia os ícones após renderizar
@@ -22,7 +62,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [socialLinks.length]);
 
   const linkClassName =
     'hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5 max-md:justify-center max-md:py-1.5 max-md:min-h-[44px] md:justify-start';
@@ -40,26 +80,28 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
         <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-3 sm:gap-12 sm:mb-10 md:grid-cols-4">
           <div className="flex flex-col gap-3 max-md:items-center sm:items-start">
             <SiteLogo className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]" />
-            <div className="flex items-center gap-3 justify-start max-md:justify-center sm:ml-10">
-              <a
-                href="https://instagram.com/royalbet_oficial"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-slate-200 transition-colors duration-200"
-                style={{ color: '#DCDDDE' }}
-              >
-                <span className="iconify" data-icon="mdi:instagram" aria-hidden="true" style={{ fontSize: '24px' }}></span>
-              </a>
-              <a
-                href="https://t.me/royalbet_oficial"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-slate-200 transition-colors duration-200"
-                style={{ color: '#DCDDDE' }}
-              >
-                <span className="iconify" data-icon="ic:baseline-telegram" aria-hidden="true" style={{ fontSize: '24px' }}></span>
-              </a>
-            </div>
+            {socialLinks.length > 0 ? (
+              <div className="flex items-center gap-3 justify-start max-md:justify-center sm:ml-10">
+                {socialLinks.map((social) => (
+                  <a
+                    key={social.key}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.label}
+                    className="hover:text-slate-200 transition-colors duration-200"
+                    style={{ color: '#DCDDDE' }}
+                  >
+                    <span
+                      className="iconify"
+                      data-icon={social.icon}
+                      aria-hidden="true"
+                      style={{ fontSize: '24px' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className={mobileNavSectionClass}>

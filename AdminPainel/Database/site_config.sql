@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS public.site_config (
 
   -- Footer
   footer_fundo TEXT NOT NULL DEFAULT '#121319',
+  footer_instagram_ativo BOOLEAN NOT NULL DEFAULT true,
+  footer_instagram_url TEXT NOT NULL DEFAULT 'https://instagram.com/royalbet_oficial',
+  footer_telegram_ativo BOOLEAN NOT NULL DEFAULT true,
+  footer_telegram_url TEXT NOT NULL DEFAULT 'https://t.me/royalbet_oficial',
+  footer_whatsapp_ativo BOOLEAN NOT NULL DEFAULT false,
+  footer_whatsapp_url TEXT NOT NULL DEFAULT '',
 
   -- Home
   home_fundo TEXT NOT NULL DEFAULT '#121319',

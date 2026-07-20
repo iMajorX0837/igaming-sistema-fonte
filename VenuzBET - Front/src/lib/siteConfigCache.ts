@@ -13,8 +13,16 @@ export interface HeaderConfig {
   logo_url: string;
 }
 
+export interface FooterSocialLinkConfig {
+  ativo: boolean;
+  url: string;
+}
+
 export interface FooterConfig {
   fundo: string;
+  instagram: FooterSocialLinkConfig;
+  telegram: FooterSocialLinkConfig;
+  whatsapp: FooterSocialLinkConfig;
 }
 
 export interface HomeConfig {
@@ -60,6 +68,9 @@ export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
 
 export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
   fundo: '#121319',
+  instagram: { ativo: true, url: 'https://instagram.com/royalbet_oficial' },
+  telegram: { ativo: true, url: 'https://t.me/royalbet_oficial' },
+  whatsapp: { ativo: false, url: '' },
 };
 
 export const DEFAULT_HOME_CONFIG: HomeConfig = {
@@ -95,7 +106,7 @@ export const DEFAULT_SITE_THEME: SiteTheme = {
   brandColors: DEFAULT_BRAND_COLORS,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v9';
+const STORAGE_KEY = 'venuz-site-theme-v10';
 
 export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
@@ -118,9 +129,39 @@ function normalizeHeader(row: Record<string, unknown> | null | undefined): Heade
   };
 }
 
+function normalizeFooterSocialLink(
+  row: Record<string, unknown> | null | undefined,
+  prefix: 'footer_instagram' | 'footer_telegram' | 'footer_whatsapp',
+  defaults: FooterSocialLinkConfig,
+): FooterSocialLinkConfig {
+  if (!row) return defaults;
+
+  const ativoRaw = row[`${prefix}_ativo`];
+  const urlRaw = row[`${prefix}_url`];
+
+  return {
+    ativo: ativoRaw === undefined ? defaults.ativo : Boolean(ativoRaw),
+    url: String(urlRaw ?? defaults.url).trim() || defaults.url,
+  };
+}
+
+export function normalizeWhatsappUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return trimmed;
+  return `https://wa.me/${digits}`;
+}
+
 function normalizeFooter(row: Record<string, unknown> | null | undefined): FooterConfig {
   if (!row) return DEFAULT_FOOTER_CONFIG;
-  return { fundo: String(row.fundo || DEFAULT_FOOTER_CONFIG.fundo) };
+  return {
+    fundo: String(row.fundo ?? DEFAULT_FOOTER_CONFIG.fundo),
+    instagram: normalizeFooterSocialLink(row, 'footer_instagram', DEFAULT_FOOTER_CONFIG.instagram),
+    telegram: normalizeFooterSocialLink(row, 'footer_telegram', DEFAULT_FOOTER_CONFIG.telegram),
+    whatsapp: normalizeFooterSocialLink(row, 'footer_whatsapp', DEFAULT_FOOTER_CONFIG.whatsapp),
+  };
 }
 
 function normalizeHome(row: Record<string, unknown> | null | undefined): HomeConfig {
@@ -222,7 +263,15 @@ export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null
       fundo: row.header_fundo,
       logo_url: row.header_logo_url,
     }),
-    footer: normalizeFooter({ fundo: row.footer_fundo }),
+    footer: normalizeFooter({
+      fundo: row.footer_fundo,
+      footer_instagram_ativo: row.footer_instagram_ativo,
+      footer_instagram_url: row.footer_instagram_url,
+      footer_telegram_ativo: row.footer_telegram_ativo,
+      footer_telegram_url: row.footer_telegram_url,
+      footer_whatsapp_ativo: row.footer_whatsapp_ativo,
+      footer_whatsapp_url: row.footer_whatsapp_url,
+    }),
     home: normalizeHome({ fundo: row.home_fundo }),
     sidebar: normalizeSidebar({
       fundo: row.sidebar_fundo,

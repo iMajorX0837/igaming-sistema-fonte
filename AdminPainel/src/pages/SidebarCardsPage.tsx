@@ -37,8 +37,14 @@ interface SidebarBackgroundConfig {
   idioma_ativo_fundo: string;
 }
 
-interface FooterBackgroundConfig {
+interface FooterSiteConfig {
   fundo: string;
+  instagram_ativo: boolean;
+  instagram_url: string;
+  telegram_ativo: boolean;
+  telegram_url: string;
+  whatsapp_ativo: boolean;
+  whatsapp_url: string;
 }
 
 interface HeaderBackgroundConfig {
@@ -60,8 +66,14 @@ const defaultSidebarBackground: SidebarBackgroundConfig = {
   idioma_ativo_fundo: '#2a1f45',
 };
 
-const defaultFooterBackground: FooterBackgroundConfig = {
+const defaultFooterSiteConfig: FooterSiteConfig = {
   fundo: '#121319',
+  instagram_ativo: true,
+  instagram_url: 'https://instagram.com/royalbet_oficial',
+  telegram_ativo: true,
+  telegram_url: 'https://t.me/royalbet_oficial',
+  whatsapp_ativo: false,
+  whatsapp_url: '',
 };
 
 const defaultHeaderBackground: HeaderBackgroundConfig = {
@@ -90,7 +102,7 @@ export default function SidebarCardsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('aparencia');
   const [configModal, setConfigModal] = useState<ConfigModal>(null);
   const [sidebarBackground, setSidebarBackground] = useState<SidebarBackgroundConfig>(defaultSidebarBackground);
-  const [footerBackground, setFooterBackground] = useState<FooterBackgroundConfig>(defaultFooterBackground);
+  const [footerConfig, setFooterConfig] = useState<FooterSiteConfig>(defaultFooterSiteConfig);
   const [headerBackground, setHeaderBackground] = useState<HeaderBackgroundConfig>(defaultHeaderBackground);
   const [authModalsImages, setAuthModalsImages] = useState<AuthModalsImagesConfig>(defaultAuthModalsImages);
   const [brandColors, setBrandColors] = useState<BrandColorsForm>(defaultBrandColors);
@@ -107,7 +119,7 @@ export default function SidebarCardsPage() {
       const { data, error } = await supabase
         .from('site_config')
         .select(
-          'sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, footer_fundo, header_fundo, login_modal_imagem_url, register_modal_imagem_url, deposit_modal_imagem_url, brand_cor_primaria, brand_cor_hover',
+          'sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo, footer_fundo, footer_instagram_ativo, footer_instagram_url, footer_telegram_ativo, footer_telegram_url, footer_whatsapp_ativo, footer_whatsapp_url, header_fundo, login_modal_imagem_url, register_modal_imagem_url, deposit_modal_imagem_url, brand_cor_primaria, brand_cor_hover',
         )
         .eq('id', 1)
         .maybeSingle();
@@ -123,8 +135,14 @@ export default function SidebarCardsPage() {
           item_fundo: String(data.sidebar_item_fundo || defaultSidebarBackground.item_fundo),
           idioma_ativo_fundo: String(data.sidebar_idioma_ativo_fundo || defaultSidebarBackground.idioma_ativo_fundo),
         });
-        setFooterBackground({
-          fundo: String(data.footer_fundo || defaultFooterBackground.fundo),
+        setFooterConfig({
+          fundo: String(data.footer_fundo || defaultFooterSiteConfig.fundo),
+          instagram_ativo: data.footer_instagram_ativo ?? defaultFooterSiteConfig.instagram_ativo,
+          instagram_url: String(data.footer_instagram_url || defaultFooterSiteConfig.instagram_url),
+          telegram_ativo: data.footer_telegram_ativo ?? defaultFooterSiteConfig.telegram_ativo,
+          telegram_url: String(data.footer_telegram_url || defaultFooterSiteConfig.telegram_url),
+          whatsapp_ativo: data.footer_whatsapp_ativo ?? defaultFooterSiteConfig.whatsapp_ativo,
+          whatsapp_url: String(data.footer_whatsapp_url || ''),
         });
         setHeaderBackground({
           fundo: String(data.header_fundo || defaultHeaderBackground.fundo),
@@ -175,22 +193,41 @@ export default function SidebarCardsPage() {
     }
   };
 
-  const saveFooterBackground = async () => {
+  const saveFooterConfig = async () => {
+    const socialFields: Array<{ label: string; ativo: boolean; url: string }> = [
+      { label: 'Instagram', ativo: footerConfig.instagram_ativo, url: footerConfig.instagram_url },
+      { label: 'Telegram', ativo: footerConfig.telegram_ativo, url: footerConfig.telegram_url },
+      { label: 'WhatsApp', ativo: footerConfig.whatsapp_ativo, url: footerConfig.whatsapp_url },
+    ];
+
+    for (const social of socialFields) {
+      if (social.ativo && !social.url.trim()) {
+        showToast(`Informe a URL do ${social.label} ou desative o ícone.`, 'error');
+        return;
+      }
+    }
+
     setFooterSaving(true);
     try {
       const { error: upsertError } = await supabase.from('site_config').upsert({
         id: 1,
-        footer_fundo: footerBackground.fundo.trim(),
+        footer_fundo: footerConfig.fundo.trim(),
+        footer_instagram_ativo: footerConfig.instagram_ativo,
+        footer_instagram_url: footerConfig.instagram_url.trim(),
+        footer_telegram_ativo: footerConfig.telegram_ativo,
+        footer_telegram_url: footerConfig.telegram_url.trim(),
+        footer_whatsapp_ativo: footerConfig.whatsapp_ativo,
+        footer_whatsapp_url: footerConfig.whatsapp_url.trim(),
         updated_at: new Date().toISOString(),
       });
       if (upsertError) {
-        showToast('Erro ao salvar cor do footer.', 'error');
+        showToast('Erro ao salvar configurações do footer.', 'error');
         return;
       }
-      showToast('Cor do footer salva!', 'success');
+      showToast('Configurações do footer salvas!', 'success');
       setConfigModal(null);
     } catch {
-      showToast('Erro ao salvar cor do footer.', 'error');
+      showToast('Erro ao salvar configurações do footer.', 'error');
     } finally {
       setFooterSaving(false);
     }
@@ -337,10 +374,22 @@ export default function SidebarCardsPage() {
                 <ConfigSummaryCard
                   icon={PanelBottom}
                   title="Footer"
-                  description="Cor de fundo do rodapé em todas as páginas."
+                  description="Cor de fundo e redes sociais do rodapé."
                   onConfigure={() => setConfigModal('footer')}
                 >
-                  <ColorSwatch color={footerBackground.fundo} label="Fundo" />
+                  <div className="space-y-2">
+                    <ColorSwatch color={footerConfig.fundo} label="Fundo" />
+                    <p className="text-gray-500 text-xs">
+                      Redes ativas:{' '}
+                      {[
+                        footerConfig.instagram_ativo ? 'Instagram' : null,
+                        footerConfig.telegram_ativo ? 'Telegram' : null,
+                        footerConfig.whatsapp_ativo ? 'WhatsApp' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(', ') || 'Nenhuma'}
+                    </p>
+                  </div>
                 </ConfigSummaryCard>
 
                 <ConfigSummaryCard
@@ -470,32 +519,60 @@ export default function SidebarCardsPage() {
       <Modal
         open={configModal === 'footer'}
         onClose={() => setConfigModal(null)}
-        title="Cor do Footer"
-        description="Cor de fundo do rodapé em todas as páginas do site."
+        title="Footer"
+        description="Cor de fundo e links de redes sociais exibidos no rodapé do site."
         icon={PanelBottom}
-        size="md"
+        size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setConfigModal(null)} disabled={footerSaving}>
               Cancelar
             </Button>
-            <Button onClick={saveFooterBackground} loading={footerSaving}>
+            <Button onClick={saveFooterConfig} loading={footerSaving}>
               Salvar footer
             </Button>
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           <ColorField
             label="Fundo do footer"
-            value={footerBackground.fundo}
-            onChange={(v) => setFooterBackground({ fundo: v })}
+            value={footerConfig.fundo}
+            onChange={(v) => setFooterConfig({ ...footerConfig, fundo: v })}
           />
           <div>
-            <p className="text-gray-400 text-xs mb-2">Pré-visualização</p>
+            <p className="text-gray-400 text-xs mb-2">Pré-visualização da cor</p>
             <div
               className="w-full h-16 rounded-lg border border-white/10"
-              style={{ backgroundColor: footerBackground.fundo }}
+              style={{ backgroundColor: footerConfig.fundo }}
+            />
+          </div>
+
+          <div className="border-t border-admin-border pt-4 space-y-4">
+            <p className="text-white text-sm font-semibold">Redes sociais</p>
+            <FooterSocialField
+              label="Instagram"
+              ativo={footerConfig.instagram_ativo}
+              url={footerConfig.instagram_url}
+              placeholder="https://instagram.com/sua_bet"
+              onChangeAtivo={(ativo) => setFooterConfig({ ...footerConfig, instagram_ativo: ativo })}
+              onChangeUrl={(url) => setFooterConfig({ ...footerConfig, instagram_url: url })}
+            />
+            <FooterSocialField
+              label="Telegram"
+              ativo={footerConfig.telegram_ativo}
+              url={footerConfig.telegram_url}
+              placeholder="https://t.me/sua_bet"
+              onChangeAtivo={(ativo) => setFooterConfig({ ...footerConfig, telegram_ativo: ativo })}
+              onChangeUrl={(url) => setFooterConfig({ ...footerConfig, telegram_url: url })}
+            />
+            <FooterSocialField
+              label="WhatsApp"
+              ativo={footerConfig.whatsapp_ativo}
+              url={footerConfig.whatsapp_url}
+              placeholder="https://wa.me/5511999999999 ou 5511999999999"
+              onChangeAtivo={(ativo) => setFooterConfig({ ...footerConfig, whatsapp_ativo: ativo })}
+              onChangeUrl={(url) => setFooterConfig({ ...footerConfig, whatsapp_url: url })}
             />
           </div>
         </div>
@@ -656,6 +733,47 @@ export default function SidebarCardsPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function FooterSocialField({
+  label,
+  ativo,
+  url,
+  placeholder,
+  onChangeAtivo,
+  onChangeUrl,
+}: {
+  label: string;
+  ativo: boolean;
+  url: string;
+  placeholder: string;
+  onChangeAtivo: (ativo: boolean) => void;
+  onChangeUrl: (url: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-admin-border bg-admin-panel p-4 space-y-3">
+      <label className="flex items-center justify-between gap-3">
+        <span className="text-gray-200 text-sm font-medium">{label}</span>
+        <span className="flex items-center gap-2 text-xs text-gray-400">
+          <input
+            type="checkbox"
+            checked={ativo}
+            onChange={(e) => onChangeAtivo(e.target.checked)}
+            className="rounded border-admin-border bg-admin-panel-2 text-admin-accent focus:ring-admin-accent/30"
+          />
+          Exibir no footer
+        </span>
+      </label>
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => onChangeUrl(e.target.value)}
+        disabled={!ativo}
+        placeholder={placeholder}
+        className="w-full px-4 py-2.5 text-white text-sm rounded-lg bg-admin-panel-2 border border-admin-border focus:outline-none focus:ring-2 focus:ring-admin-accent/30 disabled:opacity-50"
+      />
     </div>
   );
 }
