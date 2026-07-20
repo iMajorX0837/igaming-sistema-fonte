@@ -24,17 +24,23 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
     return () => clearTimeout(timer);
   }, []);
 
+  const linkClassName =
+    'hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5 max-md:justify-center max-md:py-1.5 max-md:min-h-[44px] md:justify-start';
+
+  const mobileNavSectionClass =
+    'flex flex-col gap-1.5 text-sm max-md:items-center max-md:text-center md:items-start md:text-left';
+
   return (
     <footer
       data-shell-footer
-      className="relative z-50 flex-shrink-0 py-16 border-t border-white/15 w-[100cqw] max-w-none ml-[calc((100%-100cqw)/2)]"
+      className="relative max-md:z-0 md:z-50 flex-shrink-0 border-t border-white/15 w-full max-md:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] py-10 max-md:px-1 md:py-16 md:w-[100cqw] md:max-w-none md:ml-[calc((100%-100cqw)/2)]"
       style={{ backgroundColor: config.fundo }}
     >
-      <div className={containerClassName}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-12 mb-10">
-          <div className="flex flex-col gap-4">
-            <SiteLogo className="h-10 w-auto max-w-[180px] object-contain" />
-            <div className="flex items-center gap-2 justify-start ml-10">
+      <div className={`${containerClassName} max-md:max-w-none`}>
+        <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-3 sm:gap-12 sm:mb-10 md:grid-cols-4">
+          <div className="flex flex-col gap-3 max-md:items-center sm:items-start">
+            <SiteLogo className="h-9 w-auto max-w-[160px] object-contain sm:h-10 sm:max-w-[180px]" />
+            <div className="flex items-center gap-3 justify-start max-md:justify-center sm:ml-10">
               <a
                 href="https://instagram.com/royalbet_oficial"
                 target="_blank"
@@ -56,49 +62,49 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 text-sm">
+          <div className={mobileNavSectionClass}>
             <p className="pb-1 font-bold text-white text-base">{copy.rules}</p>
-            <a href="/help/terms" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/terms" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.terms}
             </a>
-            <a href="/help/betting-terms" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/betting-terms" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.bettingTerms}
             </a>
-            <a href="/help/privacy" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/privacy" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.privacy}
             </a>
-            <a href="/help/kyc" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/kyc" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.kyc}
             </a>
-            <a href="/help/responsible-gaming" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/responsible-gaming" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.responsibleGaming}
             </a>
-            <a href="/help/aml" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/aml" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.aml}
             </a>
           </div>
 
-          <div className="flex flex-col gap-2 text-sm">
+          <div className={mobileNavSectionClass}>
             <p className="pb-1 font-bold text-white text-base">{copy.community}</p>
-            <a href="/help/mobile" className="hover:text-slate-200 transition-colors duration-200 flex items-center gap-1.5" style={{ color: '#DCDDDE' }}>
-              <span className="iconify" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
+            <a href="/help/mobile" className={linkClassName} style={{ color: '#DCDDDE' }}>
+              <span className="iconify shrink-0" data-icon="ic:round-arrow-forward-ios" aria-hidden="true" style={{ fontSize: '14px' }}></span>
               {copy.mobileApp}
             </a>
           </div>
 
-          <div className="flex flex-col gap-2 text-sm">
+          <div className={mobileNavSectionClass}>
             <p className="pb-1 font-bold text-white text-base">{copy.payment}</p>
-            <div className="flex items-center gap-1 mt-2">
+            <div className="flex items-center gap-1 mt-1 max-md:justify-center md:justify-start">
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Logo_-_pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.png/1280px-Logo_-_pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.png"
                 alt="Pix — powered by Banco Central"
-                className="h-8 w-auto max-w-[140px] object-contain object-left"
+                className="h-7 w-auto max-w-[120px] object-contain max-md:object-center md:h-8 md:max-w-[140px] md:object-left"
                 loading="lazy"
                 referrerPolicy="no-referrer"
               />
@@ -106,14 +112,14 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
           </div>
         </div>
 
-        <div className="py-6 border-t border-white/10">
-          <h3 className="text-white font-bold text-center mb-3">{copy.headline}</h3>
-          <p className="text-sm text-center leading-relaxed max-w-3xl mx-auto mb-3" style={{ color: '#DCDDDE' }}>
+        <div className="py-4 border-t border-white/10 md:py-6">
+          <h3 className="text-white font-bold text-center mb-3 text-base md:text-lg">{copy.headline}</h3>
+          <p className="text-sm text-center leading-relaxed max-w-3xl mx-auto mb-3 max-md:px-1" style={{ color: '#DCDDDE' }}>
             {copy.summary}
           </p>
 
           {showMore && (
-            <div className="text-sm text-center leading-relaxed max-w-4xl mx-auto mb-3" style={{ color: '#DCDDDE' }}>
+            <div className="text-sm text-center leading-relaxed max-w-4xl mx-auto mb-3 max-md:px-1 max-md:text-left" style={{ color: '#DCDDDE' }}>
               <p className="mb-4 text-white font-bold">
                 {copy.expandedTitle1}
               </p>
@@ -159,7 +165,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
           <div className="text-center">
             <button
               onClick={() => setShowMore(!showMore)}
-              className="text-sm font-medium transition-colors duration-200 underline"
+              className="text-sm font-medium transition-colors duration-200 underline max-md:min-h-[44px] max-md:px-3"
               style={{ color: '#DCDDDE' }}
             >
               {showMore ? copy.showLess : copy.showMore}
@@ -167,9 +173,9 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
           </div>
         </div>
 
-        <div className="py-6 border-t border-white/10">
-          <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 931 170" fill="none" className="h-8 w-auto">
+        <div className="py-4 border-t border-white/10 md:py-6">
+          <div className="flex flex-wrap items-center justify-center gap-3 max-md:gap-4 md:gap-6 mb-4 md:mb-6 max-md:px-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 931 170" fill="none" className="h-6 w-auto max-w-[min(100%,240px)] sm:h-8 sm:max-w-none">
               <g clipPath="url(#clip0_330_49)">
                 <g clipPath="url(#clip1_330_49)">
                   <path d="M1 45.4H31.6C45.3 45.4 50.1 45.8 54.1 47.4C61.7 51 66.2 58.3 66.2 66.7C66.2 74.8 63.8 78.8 55.7 82.8C64.2 85.6 69.8 93.7 69 102.5C69 115.8 58.5 124.6 43.2 124.6H1V111.7H7V58.3H1V45.4ZM23.5 58.3V77.6H39.2C44.8 78 50.1 74 50.5 68.3C50.5 67.9 50.5 67.5 50.5 67.5C50.5 62.3 45.3 58.2 38 58.2H23.5V58.3ZM23.5 90.1V111.8H40.4C46.8 112.2 52.5 107.8 52.9 101.3C52.9 101.3 52.9 101.3 52.9 100.9C52.9 94.1 47.3 89.6 38.8 89.6L23.5 90.1Z" fill="white"></path>
@@ -201,7 +207,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
             <img 
               src="https://venuz.bet/_ipx/f_webp/assets/imgs/logo-EBAC.png" 
               alt="EBAC" 
-              className="h-8 w-auto"
+              className="h-7 w-auto sm:h-8"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
@@ -209,7 +215,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
             <img 
               src="https://venuz.bet/_ipx/f_webp/assets/imgs/gt_logo.png" 
               alt="GT Logo" 
-              className="h-8 w-auto"
+              className="h-7 w-auto sm:h-8"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
@@ -217,7 +223,7 @@ export default function Footer({ containerClassName = 'max-w-5xl mx-auto px-6' }
             <img 
               src="https://venuz.bet/_ipx/f_webp/assets/imgs/%2B18.png" 
               alt="18+" 
-              className="h-8 w-auto"
+              className="h-7 w-auto sm:h-8"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}

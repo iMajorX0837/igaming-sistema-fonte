@@ -13,6 +13,7 @@ import { AlertTriangle, BadgeCheck, Globe, Image as ImageIcon, Link2, Type } fro
 
 interface SiteBrandForm {
   logo_url: string;
+  favicon_url: string;
   nome_bet: string;
   site_titulo: string;
   site_dominio: string;
@@ -20,6 +21,7 @@ interface SiteBrandForm {
 
 const defaultForm: SiteBrandForm = {
   logo_url: '/assets/logo.png',
+  favicon_url: '/headline.png',
   nome_bet: 'RoyalBet',
   site_titulo: 'RoyalBet | Apostas Online com Saques Rápidos',
   site_dominio: 'royall.bet',
@@ -46,7 +48,7 @@ export default function SiteBrandPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from('site_config')
-        .select('header_logo_url, nome_bet, site_titulo, site_dominio, header_fundo')
+        .select('header_logo_url, site_favicon_url, nome_bet, site_titulo, site_dominio, header_fundo')
         .eq('id', 1)
         .maybeSingle();
 
@@ -62,6 +64,7 @@ export default function SiteBrandPage() {
 
         setForm({
           logo_url: nextLogo,
+          favicon_url: String(data.site_favicon_url || defaultForm.favicon_url).trim() || defaultForm.favicon_url,
           nome_bet: nextNome,
           site_titulo:
             String(data.site_titulo || defaultForm.site_titulo).trim() || defaultForm.site_titulo,
@@ -87,6 +90,8 @@ export default function SiteBrandPage() {
       showToast('Informe a URL da logo.', 'error');
       return;
     }
+
+    const faviconUrl = form.favicon_url.trim() || defaultForm.favicon_url;
 
     const nomeBet = form.nome_bet.trim();
     if (nomeBet.length < 2) {
@@ -115,6 +120,7 @@ export default function SiteBrandPage() {
       const { error } = await supabase.from('site_config').upsert({
         id: 1,
         header_logo_url: form.logo_url.trim(),
+        site_favicon_url: faviconUrl,
         nome_bet: nomeBet,
         site_titulo: siteTitulo,
         site_dominio: siteDominio,
@@ -149,7 +155,7 @@ export default function SiteBrandPage() {
       <PageHeader
         icon={BadgeCheck}
         title="Identidade do Site"
-        description="Configure logo, nome da bet e título exibidos no site, navegador e páginas legais."
+        description="Configure logo, favicon, nome da bet e título exibidos no site, navegador e páginas legais."
         actions={
           <Button onClick={saveConfig} loading={saving}>
             Salvar identidade
@@ -256,6 +262,37 @@ export default function SiteBrandPage() {
               </div>
             ) : null}
           </PagePanel>
+
+          <PagePanel>
+            <div className="flex items-center gap-2 mb-4">
+              <ImageIcon className="w-4 h-4 text-admin-muted" />
+              <h3 className="text-white font-semibold">Favicon</h3>
+            </div>
+
+            <Field
+              label="URL do favicon"
+              hint="Ícone exibido na aba do navegador. Use PNG, ICO ou SVG quadrado."
+              sizeHint={ADMIN_IMAGE_SIZES.siteFavicon}
+              value={form.favicon_url}
+              onChange={(v) => setForm({ ...form, favicon_url: v })}
+              placeholder="https://exemplo.com/favicon.png ou /headline.png"
+            />
+
+            {form.favicon_url.trim() ? (
+              <div className="mt-4 p-4 rounded-lg border border-admin-border bg-admin-panel">
+                <p className="text-gray-400 text-xs mb-3">Pré-visualização do favicon</p>
+                <img
+                  key={form.favicon_url}
+                  src={form.favicon_url}
+                  alt="Favicon"
+                  className="h-8 w-8 object-contain rounded"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            ) : null}
+          </PagePanel>
         </div>
 
         <div className="lg:col-span-2 space-y-5">
@@ -272,7 +309,18 @@ export default function SiteBrandPage() {
                   <span className="w-3 h-3 rounded-full bg-red-500/80 shrink-0" />
                   <span className="w-3 h-3 rounded-full bg-yellow-500/80 shrink-0" />
                   <span className="w-3 h-3 rounded-full bg-green-500/80 shrink-0" />
-                  <span className="ml-2 text-gray-300 text-xs truncate flex-1">
+                  {form.favicon_url.trim() ? (
+                    <img
+                      key={form.favicon_url}
+                      src={form.favicon_url}
+                      alt=""
+                      className="ml-1 h-4 w-4 object-contain shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  <span className="ml-1 text-gray-300 text-xs truncate flex-1">
                     {form.site_titulo.trim() || 'Título do site'}
                   </span>
                 </div>
@@ -314,6 +362,9 @@ export default function SiteBrandPage() {
                   </li>
                   <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
                     Jogos originais: <span className="text-white">{originaisLabel}</span>
+                  </li>
+                  <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
+                    Favicon da aba: <span className="text-white">{form.favicon_url.trim() || '—'}</span>
                   </li>
                   <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
                     Alt da logo: <span className="text-white">{form.nome_bet || '—'}</span>

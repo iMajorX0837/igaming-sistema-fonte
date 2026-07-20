@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { HOME_SECTION_GAMES_MAX } from '../lib/homeSectionGames';
 
@@ -19,17 +19,17 @@ interface GameSliderProps {
   useGreenButton?: boolean;
 }
 
-// Função para criar slug de URL (normalizar para URL-friendly)
+// Fun˜˜o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres não alfanuméricos por hífen
-    .replace(/^-+|-+$/g, ''); // Remove hífens do início e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n˜o alfanum˜ricos por h˜fen
+    .replace(/^-+|-+$/g, ''); // Remove h˜fens do in˜cio e fim
 };
 
-// Função para obter o slug do provider baseado no nome
+// Fun˜˜o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   // Mapear nomes conhecidos para slugs
   const providerMap: { [key: string]: string } = {
@@ -63,7 +63,7 @@ function isMobileViewport(): boolean {
 
 export default function GameSlider({ title, viewAllLink, games, useGreenButton = false }: GameSliderProps) {
   const navigate = useNavigate();
-  const visibleGames = games.slice(0, HOME_SECTION_GAMES_MAX);
+  const visibleGames = useMemo(() => games.slice(0, HOME_SECTION_GAMES_MAX), [games]);
   const { config: homeConfig } = useHomeConfig();
   const surfaceBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const hoverBg = homeConfig.fundo;
@@ -94,8 +94,10 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
   const checkScrollability = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      const nextLeft = scrollLeft > 0;
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 10;
+      setCanScrollLeft((prev) => (prev === nextLeft ? prev : nextLeft));
+      setCanScrollRight((prev) => (prev === nextRight ? prev : nextRight));
     }
   }, []);
 
@@ -108,7 +110,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
       const cw = container.clientWidth;
       const w = Math.max(72, Math.floor((cw - MOBILE_GAP_PX * 2) / 3));
       const h = Math.round((w * 220) / 160);
-      setMobileCard({ w, h });
+      setMobileCard((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
     };
 
     const onScrollOrResize = () => {
@@ -127,7 +129,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
       container.removeEventListener('scroll', checkScrollability);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [visibleGames, checkScrollability]);
+  }, [checkScrollability, narrow, visibleGames.length]);
 
   const getScrollStep = () => {
     const el = scrollContainerRef.current;
@@ -156,7 +158,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
     // Salvar a rota atual antes de navegar
     sessionStorage.setItem('previousPath', window.location.pathname);
     
-    // Criar URL dinâmica
+    // Criar URL din˜mica
     const providerSlug = getProviderSlug(game.provider);
     const gameSlug = createSlug(game.name);
     const gameUrl = `/${providerSlug}/${gameSlug}`;

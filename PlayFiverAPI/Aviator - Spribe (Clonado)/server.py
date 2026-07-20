@@ -23,9 +23,8 @@ from game_live import (
     _now_ms,
 )
 from rtp_config import (
-    get_crash_bounds,
+    generate_crash_entry,
     get_queue_size,
-    get_rtp_factor,
     refresh_runtime,
     runtime_snapshot,
 )
@@ -77,32 +76,34 @@ def _sync_rtp_config(force=False):
     return cfg
 
 
-def generate_crash_mul():
-    """Distribuição inversa padrão do Aviator com RTP dinâmico."""
-    cfg = _sync_rtp_config()
-    rtp_factor = float(cfg.get("rtp_factor") or get_rtp_factor())
-    min_mul, max_mul = get_crash_bounds()
-    r = random.random()
-    mul = int((rtp_factor / (1 - min(r, 0.99))) * 100)
-    return min(max(mul, min_mul), max_mul)
+def generate_crash_entry_local():
+    """Gera entrada usando config fresca do motor."""
+    cfg = _sync_rtp_config(force=True)
+    return generate_crash_entry(cfg)
 
 
-def _crash_entry(mul=None):
-    crash_mul = int(mul if mul is not None else generate_crash_mul())
-    return {"crashMul": crash_mul, "crashX": round(crash_mul / 100, 2)}
+def _crash_entry(mul=None, tier=None, cfg=None):
+    if mul is not None:
+        crash_mul = int(mul)
+        return {
+            "crashMul": crash_mul,
+            "crashX": round(crash_mul / 100, 2),
+            "colorTier": tier or "low",
+        }
+    return generate_crash_entry(cfg)
 
 
-def ensure_rtp_queue():
-    _sync_rtp_config()
+def ensure_rtp_queue(force=False):
+    cfg = _sync_rtp_config(force=force)
     target_size = get_queue_size()
     while len(_rtp_upcoming) < target_size:
-        _rtp_upcoming.append(_crash_entry())
+        _rtp_upcoming.append(_crash_entry(cfg=cfg))
 
 
 def invalidate_rtp_queue():
     with _rtp_lock:
         _rtp_upcoming.clear()
-        ensure_rtp_queue()
+        ensure_rtp_queue(force=True)
     return {"ok": True, "cleared": True}
 
 
@@ -278,9 +279,9 @@ def build_rtp_schedule(upcoming, max_items=30, past_limit=15):
 
 
 def get_rtp_state():
-    runtime = runtime_snapshot()
+    runtime = refresh_runtime(force=True)
     with _rtp_lock:
-        ensure_rtp_queue()
+        ensure_rtp_queue(force=False)
         upcoming = [dict(x) for x in _rtp_upcoming]
         payload = {
             "ok": True,
@@ -288,12 +289,14 @@ def get_rtp_state():
             "upcoming": upcoming,
             "count": len(_rtp_upcoming),
             "engine": {
-                "rtp_factor": runtime.get("rtp_factor"),
-                "effective_rtp": runtime.get("effective_rtp"),
-                "recovery_adjustment": runtime.get("recovery_adjustment"),
-                "rtp_real_pct": runtime.get("rtp_real_pct"),
-                "ggr_pct": runtime.get("ggr_pct"),
+                "modo_geracao": runtime.get("modo_geracao"),
+                "rtp_geral": runtime.get("rtp_geral"),
+                "min_crash": runtime.get("min_crash"),
+                "max_crash": runtime.get("max_crash"),
+                "min_crash_mul": runtime.get("min_crash_mul"),
+                "max_crash_mul": runtime.get("max_crash_mul"),
                 "config_version": runtime.get("config_version"),
+                "engine_version": runtime.get("engine_version"),
             },
         }
     payload["timeline"] = build_rtp_schedule(upcoming)

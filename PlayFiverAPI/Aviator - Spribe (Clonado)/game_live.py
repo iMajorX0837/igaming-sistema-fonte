@@ -245,18 +245,12 @@ class LiveGame:
             except Exception as exc:
                 print(f"[LIVE] RTP falhou: {exc}")
                 try:
-                    from rtp_config import get_crash_bounds, get_rtp_factor
+                    from rtp_config import generate_crash_entry
 
-                    r = random.random()
-                    rtp = get_rtp_factor()
-                    min_mul, max_mul = get_crash_bounds()
-                    self.crash_mul = min(
-                        max(int((rtp / (1 - min(r, 0.99))) * 100), min_mul),
-                        max_mul,
-                    )
+                    fallback = generate_crash_entry()
+                    self.crash_mul = int(fallback.get("crashMul") or 200)
                 except Exception:
-                    r = random.random()
-                    self.crash_mul = min(max(int((0.97 / (1 - min(r, 0.99))) * 100), 101), 50000)
+                    self.crash_mul = 200
             for _ in range(random.randint(8, 18)):
                 self.bot_bets.append(self._make_bot())
             self.round_started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

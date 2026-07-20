@@ -6,6 +6,7 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useVipProfile } from '../hooks/useVipProfile';
 import { formatBRL } from '../lib/vip';
+import { appPageContainerClass } from '../constants/homeLayout';
 
 const THRONE_IMAGE = 'https://royalbetsolutions.com/_ipx/_/assets/imgs/throne.webp';
 
@@ -15,6 +16,7 @@ export default function VipLevelsPage() {
   const { isAuthenticated } = useAuth();
   const { profile, niveis } = useVipProfile();
   const { config: homeConfig } = useHomeConfig();
+  const vipCardBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const boxesRef = useRef<HTMLDivElement>(null);
 
   const scrollBoxes = useCallback((direction: 'left' | 'right') => {
@@ -49,13 +51,13 @@ export default function VipLevelsPage() {
 
   return (
     <AppPageScaffold>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 md:py-12 space-y-10 md:space-y-14">
-            <div className="top-vip flex flex-col-reverse lg:flex-row items-center gap-8 lg:gap-12">
+          <div className={`${appPageContainerClass} py-6 md:py-12 space-y-8 md:space-y-14`}>
+            <div className="top-vip flex flex-col-reverse lg:flex-row items-center gap-6 md:gap-8 lg:gap-12">
               <div className="title flex-1 min-w-0 text-center lg:text-left">
-                <h1 className="text-white text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-4">
+                <h1 className="text-white text-xl sm:text-3xl md:text-4xl font-bold leading-tight mb-3 md:mb-4">
                   Assuma o trono que é seu por direito
                 </h1>
-                <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-6 max-w-xl mx-auto lg:mx-0">
+                <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-5 md:mb-6 max-w-xl mx-auto lg:mx-0">
                   Desperte seu potencial em um universo reservado para poucos, onde cada detalhe foi pensado
                   para oferecer exclusividade, conforto e prestígio. Tenha acesso a benefícios únicos,
                   atendimento personalizado e recompensas generosas, tudo isso sem compromissos, sem burocracia
@@ -63,42 +65,44 @@ export default function VipLevelsPage() {
                 </p>
                 <Link
                   to="/games"
-                  className="play-game btn-shadow inline-flex items-center justify-center h-11 px-8 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm tracking-wide transition-all duration-200 active:scale-[0.98] no-underline btn-brand-submit"
+                  className="play-game btn-shadow inline-flex items-center justify-center h-11 px-6 md:px-8 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm tracking-wide transition-all duration-200 active:scale-[0.98] no-underline btn-brand-submit"
                 >
                   JOGAR AGORA
                 </Link>
               </div>
 
-              <div className="img-banner flex shrink-0 items-center justify-center w-full lg:w-auto lg:max-w-[50%]">
+              <div className="img-banner flex shrink-0 items-center justify-center w-full max-w-xs sm:max-w-md lg:w-auto lg:max-w-[50%]">
                 <img
                   src={THRONE_IMAGE}
                   alt="VIP Levels"
                   draggable={false}
-                  className="w-full max-w-md lg:max-w-lg h-auto object-contain select-none"
+                  className="w-full h-auto object-contain select-none"
                 />
               </div>
             </div>
 
             {isAuthenticated && (
               <div
-                className="rounded-xl border border-white/10 p-5 md:p-6"
-                style={{ backgroundColor: '#181923' }}
+                className="rounded-xl border border-white/10 p-4 md:p-6"
+                style={{ backgroundColor: vipCardBg }}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
                   <img
                     src={profile.vip_imagem || ''}
                     alt={profile.vip_nome}
-                    className="w-16 h-16 rounded-full object-cover shrink-0"
+                    className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover shrink-0 mx-auto sm:mx-0"
                   />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 text-center sm:text-left">
                     <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">Seu nível atual</p>
-                    <h2 className="text-white text-xl font-bold" style={{ color: profile.vip_cor || undefined }}>
+                    <h2 className="text-white text-lg md:text-xl font-bold" style={{ color: profile.vip_cor || undefined }}>
                       {profile.vip_nome}
                     </h2>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-slate-400 text-sm mt-1 leading-relaxed">
                       Total depositado: <span className="text-white font-semibold">{formatBRL(profile.total_depositado)}</span>
                       {profile.cashback_pct > 0 && (
-                        <span className="ml-2">· Cashback: <span className="text-brand-light">{profile.cashback_pct}%</span></span>
+                        <span className="max-md:block md:ml-2">
+                          Cashback: <span className="text-brand-light">{profile.cashback_pct}%</span>
+                        </span>
                       )}
                     </p>
                   </div>
@@ -106,7 +110,7 @@ export default function VipLevelsPage() {
 
                 {profile.proximo_nome ? (
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400 mb-2">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:justify-between text-xs text-slate-400 mb-2">
                       <span>Progresso para {profile.proximo_nome}</span>
                       <span>Faltam {formatBRL(profile.falta_para_proximo)}</span>
                     </div>
@@ -118,28 +122,29 @@ export default function VipLevelsPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-brand-light text-sm font-semibold">Você atingiu o nível máximo — Diamante 3!</p>
+                  <p className="text-brand-light text-sm font-semibold text-center sm:text-left">Você atingiu o nível máximo — Diamante 3!</p>
                 )}
               </div>
             )}
 
             <div className="list-levels level">
-              <div className="title-level flex items-center justify-between gap-4 mb-5">
+              <div className="title-level flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-5">
                 <div className="title flex items-center gap-3 min-w-0">
                   <span
                     className="iconify i-ri:vip-crown-line shrink-0 text-brand-light"
                     data-icon="ri:vip-crown-line"
                     aria-hidden="true"
-                    style={{ fontSize: '36px' }}
+                    style={{ fontSize: '32px' }}
                   />
-                  <h2 className="text-white text-xl sm:text-2xl font-bold">Classificação VIP</h2>
+                  <h2 className="text-white text-lg sm:text-2xl font-bold">Classificação VIP</h2>
                 </div>
 
-                <div className="box-btn flex items-center gap-2 shrink-0">
+                <div className="box-btn flex items-center gap-2 shrink-0 self-end sm:self-auto">
                   <button
                     type="button"
                     onClick={() => scrollBoxes('left')}
-                    className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-[#181923] text-slate-300 hover:text-white hover:border-white/20 transition-colors"
+                    className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/20 transition-colors"
+                    style={{ backgroundColor: vipCardBg }}
                     aria-label="Níveis anteriores"
                   >
                     <span
@@ -152,7 +157,8 @@ export default function VipLevelsPage() {
                   <button
                     type="button"
                     onClick={() => scrollBoxes('right')}
-                    className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-[#181923] text-slate-300 hover:text-white hover:border-white/20 transition-colors"
+                    className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/20 transition-colors"
+                    style={{ backgroundColor: vipCardBg }}
                     aria-label="Próximos níveis"
                   >
                     <span
@@ -167,7 +173,7 @@ export default function VipLevelsPage() {
 
               <div
                 ref={boxesRef}
-                className="boxes-levels flex gap-3 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="boxes-levels flex gap-3 overflow-x-auto pb-2 scroll-smooth max-md:snap-x max-md:snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {displayLevels.map((level) => {
                   const isCurrent = isAuthenticated && profile.vip_nivel === level.nivel;
@@ -175,17 +181,17 @@ export default function VipLevelsPage() {
                   return (
                     <div
                       key={level.name}
-                      className={`box-level shrink-0 w-[140px] sm:w-[156px] rounded-xl border-2 p-3 flex flex-col items-center gap-3 transition-all ${
-                        isCurrent ? 'ring-2 ring-brand ring-offset-2 scale-105' : ''
+                      className={`box-level shrink-0 w-[132px] sm:w-[156px] max-md:snap-start rounded-xl border-2 p-3 flex flex-col items-center gap-3 transition-all ${
+                        isCurrent ? 'ring-2 ring-brand ring-offset-2 max-md:scale-100 md:scale-105' : ''
                       } ${!isUnlocked && isAuthenticated ? 'opacity-50' : ''}`}
                       style={{
                         borderColor: level.color,
-                        backgroundColor: '#181923',
+                        backgroundColor: vipCardBg,
                         ...(isCurrent ? { ['--tw-ring-offset-color' as string]: homeConfig.fundo } : {}),
                       }}
                     >
                       <div
-                        className="icon-vip flex h-20 w-20 items-center justify-center rounded-full"
+                        className="icon-vip flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full"
                         style={{
                           backgroundColor: `color-mix(in srgb, ${level.color} 15%, transparent)`,
                         }}
@@ -194,7 +200,7 @@ export default function VipLevelsPage() {
                           src={level.image}
                           alt={level.imageAlt}
                           draggable={false}
-                          className="h-14 w-14 object-contain select-none"
+                          className="h-12 w-12 sm:h-14 sm:w-14 object-contain select-none"
                         />
                       </div>
                       <div className="info-vip text-center w-full">
@@ -214,9 +220,11 @@ export default function VipLevelsPage() {
                 })}
               </div>
             </div>
+
+            <div className="max-md:min-h-[6vh] md:min-h-[10vh]" aria-hidden="true" />
           </div>
 
-          <Footer />
+          <Footer containerClassName="w-full" />
     </AppPageScaffold>
   );
 }

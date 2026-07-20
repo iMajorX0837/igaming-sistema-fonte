@@ -129,7 +129,7 @@ export function createWithdrawRouter({
           amount: valor,
           pixKey: saque.chave,
           pixKeyType: saque.key ?? mapPixKeyTypeToMisticPay(saque.key),
-          description: `Saque RoyalBet — ${saqueId}`,
+          description: `Saque — ${saqueId}`,
           projectWebhook,
         });
       }

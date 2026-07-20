@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
@@ -22,6 +22,104 @@ import { resolveGameByGameCode } from '../utils/resolveGameBySlug';
 import LoadingScreen from './LoadingScreen';
 import { appPageContainerClass } from '../constants/homeLayout';
 
+function WalletMobileField({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-slate-500 text-[11px] mb-0.5">{label}</p>
+      <div className="text-xs text-white break-words">{value}</div>
+    </div>
+  );
+}
+
+function WalletTransactionMobileCard({
+  activeTab,
+  item,
+  backgroundColor,
+  playingRodadaId,
+  onPlayRodada,
+}: {
+  activeTab: string;
+  item: Record<string, unknown>;
+  backgroundColor: string;
+  playingRodadaId: string | null;
+  onPlayRodada: (bonus: FreeBonusItem) => void;
+}) {
+  const statusBadge = (status: string, className = 'bg-brand/20 text-brand-light') => (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${className}`}>
+      {status}
+    </span>
+  );
+
+  return (
+    <div className="rounded-xl border border-white/10 p-3" style={{ backgroundColor }}>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+        {activeTab === 'transacoes' && (
+          <>
+            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
+            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+            <WalletMobileField label="Jogo" value={String(item.jogo ?? '—')} />
+            <WalletMobileField label="Aposta" value={String(item.aposta ?? '—')} />
+            <WalletMobileField label="Retorno" value={String(item.retorno ?? '—')} />
+            <WalletMobileField label="Status" value={statusBadge(String(item.status ?? '—'))} />
+            <WalletMobileField label="Bônus" value={String(item.bonus ?? '—')} />
+          </>
+        )}
+        {(activeTab === 'saques' || activeTab === 'depositos') && (
+          <>
+            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
+            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
+            <WalletMobileField
+              label="Status"
+              value={statusBadge(
+                String(item.status ?? '—'),
+                item.status === 'Aprovado'
+                  ? 'bg-brand/20 text-brand-light'
+                  : item.status === 'Rejeitado'
+                    ? 'bg-red-500/20 text-red-400'
+                    : 'bg-yellow-500/20 text-yellow-400',
+              )}
+            />
+          </>
+        )}
+        {activeTab === 'cupons' && (
+          <>
+            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
+            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+            <WalletMobileField label="Cupom" value={String(item.cupom ?? '—')} />
+            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
+            <WalletMobileField label="Status" value={statusBadge(String(item.status ?? '—'))} />
+            <WalletMobileField label="Bônus" value={String(item.bonus ?? '—')} />
+          </>
+        )}
+        {activeTab === 'rodadas' && (
+          <>
+            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
+            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+            <WalletMobileField label="Jogo" value={String(item.jogo ?? '—')} />
+            <WalletMobileField label="Restantes" value={String(item.restantes ?? '—')} />
+            <WalletMobileField label="Total" value={String(item.total ?? '—')} />
+            <WalletMobileField
+              label="Status"
+              value={statusBadge(String(item.status ?? '—'), getFreeBonusStatusClass(String(item.statusApi ?? '')))}
+            />
+          </>
+        )}
+      </div>
+      {activeTab === 'rodadas' && String(item.statusApi ?? '').toLowerCase() === 'pending' && (
+        <button
+          type="button"
+          onClick={() => onPlayRodada(item.raw as FreeBonusItem)}
+          disabled={playingRodadaId === String(item.id)}
+          className="mt-3 h-9 w-full rounded-lg bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-xs font-bold text-white transition-all"
+        >
+          {playingRodadaId === String(item.id) ? 'Abrindo...' : 'Jogar'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function WalletPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
@@ -29,6 +127,7 @@ export default function WalletPage() {
   const { config: plataformaConfig, refresh: refreshPlataformaConfig } = usePlataformaConfig();
   const { config: homeConfig } = useHomeConfig();
   const walletCardBg = `color-mix(in srgb, ${homeConfig.fundo} 90%, white)`;
+  const walletRowAltBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const [activeTab, setActiveTab] = useState('transacoes');
   const [currentPage, setCurrentPage] = useState(1);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
@@ -445,7 +544,7 @@ export default function WalletPage() {
     />
     <AppPageScaffold>
       <div className={`flex flex-col min-h-full ${appPageContainerClass}`}>
-        <div className="flex-1 py-4 sm:py-6">
+        <div className="flex-1 py-4 sm:py-6 max-md:pb-2">
             <BackButton onClick={() => navigate('/')} className="md:hidden mb-4 -mt-1" />
             <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
               <span className="iconify i-solar:wallet-bold-duotone shrink-0" aria-hidden="true" style={{ fontSize: '28px' }}></span>
@@ -836,7 +935,20 @@ export default function WalletPage() {
                     <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma rodada grátis encontrada</p>
                   </div>
                 ) : (
-                  <table className="w-full">
+                  <>
+                  <div className="space-y-2 p-1 md:hidden">
+                    {currentTransactions.map((item: Record<string, unknown>, index: number) => (
+                      <WalletTransactionMobileCard
+                        key={`${String(item.id ?? index)}-${index}`}
+                        activeTab={activeTab}
+                        item={item}
+                        backgroundColor={index % 2 === 0 ? homeConfig.fundo : walletRowAltBg}
+                        playingRodadaId={playingRodadaId}
+                        onPlayRodada={handleJogarRodadas}
+                      />
+                    ))}
+                  </div>
+                  <table className="hidden md:table w-full">
                     <thead>
                       <tr className="border-b border-slate-700/50 bg-slate-800/30">
                         {activeTab === 'transacoes' ? (
@@ -972,6 +1084,7 @@ export default function WalletPage() {
                       ))}
                     </tbody>
                   </table>
+                  </>
                 )}
               </div>
 
@@ -1034,7 +1147,7 @@ export default function WalletPage() {
               )}
             </div>
 
-            <div className="min-h-[20vh]" />
+            <div className="max-md:min-h-[6vh] md:min-h-[20vh]" />
         </div>
 
         <Footer containerClassName="w-full" />

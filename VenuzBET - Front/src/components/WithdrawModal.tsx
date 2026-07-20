@@ -15,8 +15,10 @@ const pixOptions = [
   { id: 'email', label: 'Email', icon: 'email' },
   { id: 'cpf', label: 'CPF', icon: 'cpf' },
   { id: 'phone', label: 'Telefone', icon: 'phone' },
-  { id: 'random', label: 'Chave AleatÛria', icon: 'random' },
+  { id: 'random', label: 'Chave Aleat√≥ria', icon: 'random' },
 ];
+
+const MODAL_ANIM_MS = 320;
 
 export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   const { isAuthenticated, user } = useAuth();
@@ -35,10 +37,20 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   const [notification, setNotification] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [rolloverPendente, setRolloverPendente] = useState(0);
+  const [shouldMount, setShouldMount] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const prevIsOpenRef = useRef<boolean>(false);
 
-  // FunÁ„o para buscar saldo do usu·rio
+  const resetModalUiState = useCallback(() => {
+    setIsDropdownOpen(false);
+    setSearchTerm('');
+    setError(null);
+    setSuccess(false);
+    setIsSubmitting(false);
+  }, []);
+
+  // Fun√ß√£o para buscar saldo do usu√°rio
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
       try {
@@ -94,12 +106,12 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     }
   }, [isAuthenticated, user]);
 
-  // Buscar saldo quando o modal abrir e o usu·rio estiver autenticado
+  // Buscar saldo quando o modal abrir e o usu√°rio estiver autenticado
   useEffect(() => {
     if (isOpen) {
       fetchSaldo();
       void fetchRollover();
-      // Resetar estados apenas quando o modal for aberto apÛs estar fechado
+      // Resetar estados apenas quando o modal for aberto ap√≥s estar fechado
       if (!prevIsOpenRef.current) {
         setError(null);
         setSuccess(false);
@@ -110,6 +122,25 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       prevIsOpenRef.current = false;
     }
   }, [isOpen, fetchSaldo, fetchRollover, minWithdraw]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldMount(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (!shouldMount) return;
+
+    setIsClosing(true);
+    const timer = window.setTimeout(() => {
+      setShouldMount(false);
+      setIsClosing(false);
+      resetModalUiState();
+    }, MODAL_ANIM_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isOpen, shouldMount, resetModalUiState]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -159,7 +190,14 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!shouldMount) return null;
+
+  const handleClose = () => {
+    onClose();
+  };
+
+  const backdropAnimation = isClosing ? 'animate-modal-backdrop-out' : 'animate-modal-backdrop-in';
+  const panelAnimation = isClosing ? 'animate-modal-panel-out' : 'animate-modal-panel-in';
 
   const notify = (message: string) => {
     setNotification(message);
@@ -195,7 +233,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     setSuccess(false);
 
     if (!isAuthenticated || !user) {
-      notify('VocÍ precisa estar autenticado para realizar um saque');
+      notify('Voc√™ precisa estar autenticado para realizar um saque');
       return;
     }
 
@@ -207,17 +245,17 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     const valorSaque = parseFloat(String(amount).trim().replace(',', '.'));
 
     if (!Number.isFinite(valorSaque) || valorSaque <= 0) {
-      notify('Por favor, insira um valor v·lido');
+      notify('Por favor, insira um valor v√°lido');
       return;
     }
 
     if (valorSaque < minWithdraw) {
-      notify(`O valor mÌnimo para saque È R$ ${minWithdraw},00.`);
+      notify(`O valor m√≠nimo para saque √© R$ ${minWithdraw},00.`);
       return;
     }
 
     if (valorSaque > maxWithdraw) {
-      notify(`O valor m·ximo para saque È R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+      notify(`O valor m√°ximo para saque √© R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
       return;
     }
 
@@ -253,17 +291,17 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       }
 
       if (!usuarioData) {
-        throw new Error('Usu·rio n„o encontrado');
+        throw new Error('Usu√°rio n√£o encontrado');
       }
 
       const saldoAtual = parseFloat(usuarioData.saldo) || 0;
 
       if (valorSaque < minWithdraw) {
-        throw new Error(`O valor mÌnimo para saque È R$ ${minWithdraw},00.`);
+        throw new Error(`O valor m√≠nimo para saque √© R$ ${minWithdraw},00.`);
       }
 
       if (valorSaque > maxWithdraw) {
-        throw new Error(`O valor m·ximo para saque È R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+        throw new Error(`O valor m√°ximo para saque √© R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
       }
 
       // Validar saldo novamente com o valor atual do banco
@@ -271,7 +309,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         throw new Error('Saldo insuficiente para realizar este saque');
       }
 
-      // Validar limite di·rio de saques
+      // Validar limite di√°rio de saques
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
 
@@ -282,12 +320,12 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         .gte('data_hora', startOfDay.toISOString());
 
       if (countError) {
-        throw new Error(countError.message || 'Erro ao verificar limite di·rio de saques');
+        throw new Error(countError.message || 'Erro ao verificar limite di√°rio de saques');
       }
 
       if ((saquesHoje ?? 0) >= dailyWithdrawLimit) {
         throw new Error(
-          `Limite di·rio de saques atingido. M·ximo de ${dailyWithdrawLimit} saque(s) por dia.`
+          `Limite di√°rio de saques atingido. M√°ximo de ${dailyWithdrawLimit} saque(s) por dia.`
         );
       }
 
@@ -297,7 +335,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
           'Email': 'email',
           'CPF': 'cpf',
           'Telefone': 'telefone',
-          'Chave AleatÛria': 'chave aleatÛria'
+          'Chave Aleat√≥ria': 'chave aleat√≥ria'
         };
         return typeMap[type] || 'email';
       };
@@ -317,13 +355,13 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
       if (saqueError) {
         const msg = saqueError.message || '';
-        if (msg.includes('Limite di·rio de saques') || msg.includes('Rollover pendente')) {
+        if (msg.includes('Limite di√°rio de saques') || msg.includes('Rollover pendente')) {
           throw new Error(msg);
         }
-        throw new Error(msg || 'Erro ao criar solicitaÁ„o de saque');
+        throw new Error(msg || 'Erro ao criar solicita√ß√£o de saque');
       }
 
-      // Atualizar saldo do usu·rio usando funÁ„o RPC (bypassa RLS)
+      // Atualizar saldo do usu√°rio usando fun√ß√£o RPC (bypassa RLS)
       const { data: rpcResult, error: saldoError } = await supabase
         .rpc('subtrair_saldo_saque', {
           p_usuario_id: user.id,
@@ -341,10 +379,10 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         throw new Error(saldoError.message || 'Erro ao atualizar saldo');
       }
 
-      // Verificar se a funÁ„o RPC retornou sucesso
+      // Verificar se a fun√ß√£o RPC retornou sucesso
       if (!rpcResult || !rpcResult.success) {
-        console.error('FunÁ„o RPC n„o retornou sucesso:', rpcResult);
-        // Se n„o retornou sucesso, tentar deletar o saque criado
+        console.error('Fun√ß√£o RPC n√£o retornou sucesso:', rpcResult);
+        // Se n√£o retornou sucesso, tentar deletar o saque criado
         await supabase
           .from('saques')
           .delete()
@@ -357,15 +395,15 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
       setSuccess(true);
       
-      // Atualizar o saldo local com o valor retornado da funÁ„o RPC
+      // Atualizar o saldo local com o valor retornado da fun√ß√£o RPC
       const saldoAtualizado = parseFloat(rpcResult.saldo_atual) || (saldoAtual - valorSaque);
       setAvailableBalance(saldoAtualizado);
       
-      // Limpar formul·rio
+      // Limpar formul√°rio
       setAmount('100');
       setPixKey('contato.brent@gmail.com');
       
-      // Fechar modal apÛs 2 segundos
+      // Fechar modal ap√≥s 2 segundos
       setTimeout(() => {
         onClose();
         setSuccess(false);
@@ -387,20 +425,20 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       onClose={() => setNotification(null)}
       message={notification ?? ''}
     />
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-sm bg-[#121319] rounded-xl shadow-2xl">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 ${backdropAnimation}`}>
+      <div className={`relative flex w-full max-w-sm max-h-[90vh] flex-col overflow-hidden rounded-xl shadow-2xl bg-[#121319] ${panelAnimation}`}>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-3 right-3 z-10 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center transition-all duration-200 border border-slate-600 hover:border-slate-500"
         >
           <X className="w-4 h-4 text-slate-300 hover:text-white transition-colors" />
         </button>
 
-        <div className="relative flex w-full justify-center items-center py-6 bg-[#121319] rounded-t-xl">
+        <div className="relative flex w-full shrink-0 justify-center items-center py-6 bg-[#121319] rounded-t-xl">
           <SiteLogo className="h-10 w-auto max-w-[min(100%,200px)] object-contain" />
         </div>
 
-        <div className="px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <h2 className="text-white font-bold text-lg mb-0.5">Saques</h2>
@@ -449,7 +487,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
               <span className="text-slate-300">
-                DisponÌvel para saque: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
+                Dispon√≠vel para saque: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
               </span>
             </div>
 
@@ -475,7 +513,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             {success && (
               <div className="p-3 rounded-lg bg-brand/20 border border-brand/50">
                 <p className="text-brand-light text-xs font-medium">
-                  Saque solicitado com sucesso! O valor ser· processado em breve.
+                  Saque solicitado com sucesso! O valor ser√° processado em breve.
                 </p>
               </div>
             )}
@@ -563,7 +601,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             </div>
 
             <div className="text-yellow-400 text-[10px] leading-tight">
-              O PIX cadastrado deve ser prÛprio (CPF). N„o ser„o pagos prÍmios em PIX de outras titularidades.
+              O PIX cadastrado deve ser pr√≥prio (CPF). N√£o ser√£o pagos pr√™mios em PIX de outras titularidades.
             </div>
 
             <button

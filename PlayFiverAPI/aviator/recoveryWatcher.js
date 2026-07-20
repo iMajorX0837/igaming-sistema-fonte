@@ -1,4 +1,4 @@
-/** Monitora GGR/RTP e regenera fila de velas quando o motor muda. */
+/** Monitora versão da config e regenera fila de velas quando muda. */
 
 export function startAviatorRecoveryWatcher({
   aviatorConfig,
@@ -16,14 +16,14 @@ export function startAviatorRecoveryWatcher({
       if (lastVersion !== null && version !== lastVersion) {
         await invalidateQueue();
         console.log(
-          `[AVIATOR RECOVERY] Motor mudou (${engine.recovery_mode || 'balanced'}) — fila regenerada · RTP ${(
-            Number(engine.effective_rtp || 0) * 100
+          `[AVIATOR CONFIG] Config alterada — fila regenerada · RTP geral ${(
+            Number(engine.rtp_geral || 0) * 100
           ).toFixed(2)}%`
         );
       }
       lastVersion = version;
     } catch (err) {
-      console.warn('[AVIATOR RECOVERY]', err?.message || err);
+      console.warn('[AVIATOR CONFIG]', err?.message || err);
     }
   };
 

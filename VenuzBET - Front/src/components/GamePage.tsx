@@ -7,11 +7,13 @@ import RegisterModal from './RegisterModal';
 import DepositModal from './DepositModal';
 import LoadingScreen from './LoadingScreen';
 import BackButton from './BackButton';
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { X } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, type ReactNode, type RefObject } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useListenOpenMobileMenu } from '../hooks/useListenOpenMobileMenu';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useSiteBrand } from '../hooks/useSiteBrand';
 import { getSidebarInitiallyOpen } from '../utils/sidebarInitialOpen';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { isLiveProviderName, isSportGameCode } from '../api/playfiversCache';
@@ -118,7 +120,7 @@ function FullscreenExitButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="absolute top-3 right-3 z-30 flex items-center justify-center rounded-lg bg-black/55 p-2 text-white opacity-90 transition-opacity hover:opacity-100 hover:bg-black/70"
+      className="absolute top-3 right-3 z-30 flex items-center justify-center rounded-lg bg-black/55 p-2 text-white opacity-90 transition-opacity hover:opacity-100 hover:bg-black/70 max-md:hidden"
       aria-label="Sair da tela cheia"
       title="Sair da tela cheia"
     >
@@ -129,6 +131,75 @@ function FullscreenExitButton({ onClick }: { onClick: () => void }) {
         style={{ fontSize: '28px' }}
       />
     </button>
+  );
+}
+
+function MobileGameTopBar({
+  gameName,
+  gameProvider,
+  onClose,
+}: {
+  gameName: string;
+  gameProvider: string;
+  onClose: () => void;
+}) {
+  const { config: homeConfig } = useHomeConfig();
+
+  return (
+    <div
+      className="shrink-0 border-b border-white/10 px-3 pb-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]"
+      style={{ backgroundColor: homeConfig.fundo }}
+    >
+      <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="min-w-0 flex-1 flex flex-col gap-0">
+          <p
+            className="truncate text-base font-bold leading-tight text-white"
+            style={{ fontFamily: 'Montserrat, sans-serif' }}
+          >
+            {gameName}
+          </p>
+          <p
+            className="truncate text-xs font-normal leading-tight text-slate-400"
+            style={{ fontFamily: 'Montserrat, sans-serif' }}
+          >
+            {gameProvider}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="-mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Fechar jogo"
+          title="Fechar jogo"
+        >
+          <X className="h-5 w-5" strokeWidth={2.25} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MobileGamePlayerFrame({
+  playerStageRef,
+  children,
+  onExitFullscreen,
+  showExitFullscreen,
+}: {
+  playerStageRef: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+  onExitFullscreen: () => void;
+  showExitFullscreen: boolean;
+}) {
+  return (
+    <div className="relative flex min-h-0 flex-1 w-full flex-col overflow-hidden">
+      <div
+        ref={playerStageRef}
+        className="game-player-stage absolute inset-0 overflow-hidden bg-black"
+      >
+        {children}
+        {showExitFullscreen && <FullscreenExitButton onClick={onExitFullscreen} />}
+      </div>
+    </div>
   );
 }
 
@@ -347,10 +418,14 @@ export default function GamePage({
   const [isSidebarOpen, setIsSidebarOpen] = useState(getSidebarInitiallyOpen);
   useListenOpenMobileMenu(setIsSidebarOpen);
   const { config: homeConfig } = useHomeConfig();
+  const { nomeBet, siteTitulo } = useSiteBrand();
   const { isAuthenticated, user } = useAuth();
   const prevGameCodeRef = useRef(gameCode);
   const playerStageRef = useRef<HTMLDivElement>(null);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  );
   const [isLoading, setIsLoading] = useState(() => {
     if (!gameCode || !sessionStorage.getItem(`game_url_${gameCode}`)) {
       return Boolean(gameCode);
@@ -537,6 +612,15 @@ export default function GamePage({
   }, [isAuthenticated, gameCode]);
 
   useEffect(() => {
+    const gamePageTitle = `${gameName} - ${gameProvider} | ${nomeBet}`;
+    document.title = gamePageTitle;
+
+    return () => {
+      document.title = siteTitulo;
+    };
+  }, [gameName, gameProvider, nomeBet, siteTitulo]);
+
+  useEffect(() => {
     // Garante que o Iconify escaneia os ícones após renderizar
     const timer = setTimeout(() => {
       if ((window as any).Iconify) {
@@ -545,6 +629,14 @@ export default function GamePage({
     }, 100);
     return () => clearTimeout(timer);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const syncMobile = () => setIsMobile(mq.matches);
+    syncMobile();
+    mq.addEventListener('change', syncMobile);
+    return () => mq.removeEventListener('change', syncMobile);
+  }, []);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -570,30 +662,69 @@ export default function GamePage({
     }
   }, []);
 
+  const effectiveFullscreen = fullscreen || isMobile;
+
   const gameInfoBarProps = {
     gameName,
     gameProvider,
     backgroundColor: homeConfig.fundo,
     onToggleFullscreen: togglePlayerFullscreen,
-    isFullscreen: isPlayerFullscreen,
+    isFullscreen: isPlayerFullscreen || isMobile,
   };
+
+  const playerShellHeightClass = effectiveFullscreen
+    ? isMobile
+      ? 'h-full min-h-0'
+      : GAME_PLAYER_HEIGHT_FULLSCREEN
+    : GAME_PLAYER_HEIGHT_STANDARD;
+
+  const fullscreenPlayerWrapperClass = isMobile
+    ? 'w-full flex-1 min-h-0 flex flex-col'
+    : 'w-full shrink-0';
+
+  const fullscreenShellClass = isMobile
+    ? 'w-full flex-1 min-h-0 max-md:rounded-none max-md:border-0 max-md:shadow-none'
+    : `w-full shrink-0 ${playerShellHeightClass}`;
+
+  const mobileGameShell = (content: ReactNode) => (
+    <div
+      className="fixed inset-0 z-[100] flex h-[100dvh] w-full flex-col overflow-hidden"
+      style={{ backgroundColor: homeConfig.fundo }}
+    >
+      <MobileGameTopBar
+        gameName={gameName}
+        gameProvider={gameProvider}
+        onClose={onBack}
+      />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{content}</div>
+    </div>
+  );
 
   const showInsufficientBalance = saldoLoaded && saldo <= 0 && !dismissedDepositPrompt;
 
   const handleDepositFromGame = () => setIsDepositOpen(true);
   const handlePlayWithoutDeposit = () => setDismissedDepositPrompt(true);
 
-  const playerShellHeightClass = fullscreen
-    ? GAME_PLAYER_HEIGHT_FULLSCREEN
-    : GAME_PLAYER_HEIGHT_STANDARD;
-
   const gameBody = (
-    <div className="flex flex-col w-full">
+    <div className={`flex flex-col w-full ${isMobile ? 'flex-1 min-h-0' : ''}`}>
           {!isAuthenticated ? (
-            <div className="flex flex-col w-full">
-              {fullscreen ? (
-                <div className="w-full shrink-0">
-                  <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
+            <div className={`flex flex-col w-full ${isMobile ? 'flex-1 min-h-0' : ''}`}>
+              {effectiveFullscreen ? (
+                isMobile ? (
+                  <MobileGamePlayerFrame
+                    playerStageRef={playerStageRef}
+                    onExitFullscreen={togglePlayerFullscreen}
+                    showExitFullscreen={isPlayerFullscreen}
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${gameImage})` }}
+                    />
+                    <LoginRequiredPrompt onLogin={() => setIsLoginOpen(true)} />
+                  </MobileGamePlayerFrame>
+                ) : (
+                <div className={fullscreenPlayerWrapperClass}>
+                  <GamePlayerShell className={fullscreenShellClass}>
                     <div
                       ref={playerStageRef}
                       className={`game-player-stage ${gamePlayerStageClass} bg-black`}
@@ -610,6 +741,7 @@ export default function GamePage({
                     <GameInformationBar {...gameInfoBarProps} />
                   </GamePlayerShell>
                 </div>
+                )
               ) : (
                 <div className={`shrink-0 ${appPageContainerClass} pt-2 sm:pt-2.5 md:pt-3 pb-2 sm:pb-3 md:pb-6`}>
                   <div className="w-full flex flex-col min-w-0 gap-2 md:gap-3">
@@ -637,10 +769,10 @@ export default function GamePage({
                   </div>
                 </div>
               )}
-              <Footer containerClassName={appPageContainerClass} />
+              {!isMobile && <Footer containerClassName={appPageContainerClass} />}
             </div>
           ) : (
-            <div className="flex flex-col w-full">
+            <div className={`flex flex-col w-full ${isMobile ? 'flex-1 min-h-0' : ''}`}>
               {error && !gameUrl && (
                 <div className="min-h-full flex flex-col items-center justify-center gap-4 md:gap-8 bg-gradient-to-b from-slate-950/20 via-slate-950/50 to-slate-950/80 px-4">
                   <div className="w-20 h-20 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border-2 border-red-500/40 flex items-center justify-center shadow-2xl backdrop-blur-sm">
@@ -665,9 +797,38 @@ export default function GamePage({
 
               {!error && (gameUrl || isLoading) && (
                 <>
-                  {fullscreen ? (
-                    <div className="w-full shrink-0">
-                      <GamePlayerShell className={`w-full shrink-0 ${playerShellHeightClass}`}>
+                  {effectiveFullscreen ? (
+                    isMobile ? (
+                      <MobileGamePlayerFrame
+                        playerStageRef={playerStageRef}
+                        onExitFullscreen={togglePlayerFullscreen}
+                        showExitFullscreen={isPlayerFullscreen}
+                      >
+                        {gameUrl ? (
+                          <GameIframe
+                            gameUrl={gameUrl}
+                            gameName={gameName}
+                            showInsufficientBalance={showInsufficientBalance}
+                            onDeposit={handleDepositFromGame}
+                            onPlay={handlePlayWithoutDeposit}
+                            iframeClassName="absolute inset-0 w-full h-full border-0 block"
+                            containerClassName="absolute inset-0 w-full h-full"
+                          />
+                        ) : (
+                          <GameLoadingPlaceholder
+                            gameImage={gameImage}
+                            className="absolute inset-0 w-full h-full"
+                          />
+                        )}
+                        {isLoading && (
+                          <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/45 backdrop-blur-[1px] transition-opacity duration-300">
+                            <LoadingScreen variant="inline" showText={false} />
+                          </div>
+                        )}
+                      </MobileGamePlayerFrame>
+                    ) : (
+                    <div className={fullscreenPlayerWrapperClass}>
+                      <GamePlayerShell className={fullscreenShellClass}>
                         <div
                           ref={playerStageRef}
                           className={`game-player-stage ${gamePlayerStageClass} bg-black`}
@@ -700,6 +861,7 @@ export default function GamePage({
                         <GameInformationBar {...gameInfoBarProps} />
                       </GamePlayerShell>
                     </div>
+                    )
                   ) : (
                 <div className="w-full shrink-0">
                   <div className={`${appPageContainerClass} pt-2 sm:pt-2.5 md:pt-3 pb-2 sm:pb-3 md:pb-6`}>
@@ -765,7 +927,7 @@ export default function GamePage({
                 </div>
               )}
 
-              <Footer containerClassName={appPageContainerClass} />
+              {!isMobile && <Footer containerClassName={appPageContainerClass} />}
             </div>
           )}
     </div>
@@ -802,6 +964,15 @@ export default function GamePage({
   );
 
   if (embedded) {
+    if (isMobile) {
+      return mobileGameShell(
+        <>
+          {gameBody}
+          {authModals}
+        </>,
+      );
+    }
+
     return (
       <div
         className="flex flex-1 min-h-0 flex-col animate-page-enter overflow-y-auto"
@@ -810,6 +981,15 @@ export default function GamePage({
         {gameBody}
         {authModals}
       </div>
+    );
+  }
+
+  if (isMobile) {
+    return mobileGameShell(
+      <>
+        {gameBody}
+        {authModals}
+      </>,
     );
   }
 

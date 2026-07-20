@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
@@ -8,9 +8,6 @@ import StatCard from '../components/ui/StatCard';
 import { fetchAviatorRtpPreview, invalidateAviatorQueue, type AviatorScheduleEntry } from '../lib/aviatorEngineApi';
 import {
   Activity,
-  Check,
-  ChevronDown,
-  ChevronUp,
   Clock,
   History,
   ListOrdered,
@@ -18,25 +15,27 @@ import {
   Radio,
   RefreshCw,
   Save,
-  Shield,
   TrendingDown,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
 
+type ModoGeracao = 'rtp_geral' | 'velas' | 'crash';
+
 interface AviatorConfig {
-  rtp_base: number;
-  rtp_min: number;
-  rtp_max: number;
-  recovery_enabled: boolean;
-  recovery_window_hours: number;
-  ggr_target_pct: number;
-  recovery_strength: number;
-  recovery_max_adjustment: number;
-  min_wagered_for_recovery: number;
+  modo_geracao: ModoGeracao;
+  rtp_geral: number;
+  pct_vela_azul: number;
+  pct_vela_roxa: number;
+  pct_vela_rosa: number;
+  geracao_min_crash: number;
+  geracao_max_crash: number;
   min_crash: number;
   max_crash: number;
   queue_size: number;
+  rtp_limit_min_pct?: number;
+  rtp_limit_max_pct?: number;
+  crash_technical_max?: number;
   updated_at?: string;
 }
 
@@ -51,95 +50,58 @@ interface AviatorStats {
 }
 
 interface ConfigForm {
-  rtp_base_pct: string;
-  rtp_min_pct: string;
-  rtp_max_pct: string;
-  recovery_enabled: boolean;
-  recovery_window_hours: string;
-  ggr_target_pct: string;
-  recovery_strength_pct: string;
-  recovery_max_adjustment_pct: string;
-  min_wagered_for_recovery: string;
+  modo_geracao: ModoGeracao;
+  rtp_geral_pct: string;
+  pct_vela_azul: string;
+  pct_vela_roxa: string;
+  pct_vela_rosa: string;
+  geracao_min_crash: string;
+  geracao_max_crash: string;
   min_crash: string;
   max_crash: string;
   queue_size: string;
 }
 
-type PresetKey = 'conservador' | 'equilibrado' | 'generoso';
-
 const defaultForm: ConfigForm = {
-  rtp_base_pct: '97',
-  rtp_min_pct: '90',
-  rtp_max_pct: '99',
-  recovery_enabled: true,
-  recovery_window_hours: '24',
-  ggr_target_pct: '3',
-  recovery_strength_pct: '25',
-  recovery_max_adjustment_pct: '2',
-  min_wagered_for_recovery: '100',
+  modo_geracao: 'velas',
+  rtp_geral_pct: '96',
+  pct_vela_azul: '52',
+  pct_vela_roxa: '38',
+  pct_vela_rosa: '10',
+  geracao_min_crash: '1.01',
+  geracao_max_crash: '500',
   min_crash: '1.01',
   max_crash: '500',
   queue_size: '50',
 };
 
-const PRESETS: Record<
-  PresetKey,
-  { label: string; desc: string; rtp: string; ggr: string; recovery: boolean }
-> = {
-  conservador: {
-    label: 'Conservador',
-    desc: 'Casa ganha mais · RTP 95%',
-    rtp: '95',
-    ggr: '5',
-    recovery: true,
-  },
-  equilibrado: {
-    label: 'Equilibrado',
-    desc: 'Padrão de mercado · RTP 97%',
-    rtp: '97',
-    ggr: '3',
-    recovery: true,
-  },
-  generoso: {
-    label: 'Generoso',
-    desc: 'Jogador ganha mais · RTP 98%',
-    rtp: '98',
-    ggr: '2',
-    recovery: true,
-  },
+const MODO_LABELS: Record<ModoGeracao, string> = {
+  rtp_geral: 'RTP geral',
+  velas: 'Porcentagens das velas',
+  crash: 'Configuração manual do crash',
 };
 
-function detectActivePreset(form: ConfigForm): PresetKey | null {
-  const rtp = Number(String(form.rtp_base_pct).replace(',', '.'));
-  const ggr = Number(String(form.ggr_target_pct).replace(',', '.'));
-  if (!Number.isFinite(rtp) || !Number.isFinite(ggr)) return null;
-
-  for (const key of Object.keys(PRESETS) as PresetKey[]) {
-    const preset = PRESETS[key];
-    if (rtp === Number(preset.rtp) && ggr === Number(preset.ggr) && form.recovery_enabled === preset.recovery) {
-      return key;
-    }
-  }
-  return null;
+function parseModo(raw: unknown): ModoGeracao {
+  if (raw === 'rtp_geral' || raw === 'velas' || raw === 'crash') return raw;
+  return 'velas';
 }
 
-const WINDOW_OPTIONS = [
-  { value: '12', label: '12 horas' },
-  { value: '24', label: '24 horas (1 dia)' },
-  { value: '48', label: '48 horas (2 dias)' },
-  { value: '72', label: '72 horas (3 dias)' },
-];
+function parseDecimal(raw: string): number | null {
+  const n = Number(raw.replace(',', '.').trim());
+  if (!Number.isFinite(n)) return null;
+  return n;
+}
+
+function parsePctField(raw: string, { min = 0, max = 100 } = {}): number | null {
+  const n = parseDecimal(raw);
+  if (n === null || n < min || n > max) return null;
+  return Math.round(n * 100) / 100;
+}
 
 function pctToFactor(raw: string): number | null {
-  const n = Number(raw.replace(',', '.').trim());
-  if (!Number.isFinite(n) || n <= 0 || n >= 100) return null;
+  const n = parsePctField(raw, { min: 0.01, max: 99.99 });
+  if (n === null) return null;
   return n / 100;
-}
-
-function deriveRtpLimits(basePct: number) {
-  const min = Math.max(85, Math.round(basePct - 7));
-  const max = Math.min(99, Math.round(basePct + 2));
-  return { min: String(min), max: String(Math.max(max, min + 1)) };
 }
 
 function formatMoney(value: number) {
@@ -170,11 +132,10 @@ function secondsUntilCrash(crashAtMs: number, clockOffset: number) {
   return Math.max(0, Math.floor((crashAtMs - now) / 1000));
 }
 
-/** Cores oficiais das velas do Aviator (Spribe). */
 const AVIATOR_VELA_COLORS = {
-  low: '#34B4FF', // < 2x
-  mid: '#913EF8', // 2x – 9.99x
-  high: '#C017B4', // ≥ 10x
+  low: '#34B4FF',
+  mid: '#913EF8',
+  high: '#C017B4',
 } as const;
 
 type CrashTier = keyof typeof AVIATOR_VELA_COLORS;
@@ -237,57 +198,159 @@ function summarizeUpcoming(rounds: AviatorScheduleEntry[]) {
   return { avg, low, mid, high, total: rounds.length };
 }
 
+function crashUniformHint(minCrash: number, maxCrash: number): string | null {
+  if (!Number.isFinite(minCrash) || !Number.isFinite(maxCrash) || maxCrash <= minCrash) return null;
+  const span = maxCrash - minCrash;
+  const blueEnd = Math.min(2, maxCrash);
+  const bluePct = blueEnd > minCrash ? ((blueEnd - minCrash) / span) * 100 : 0;
+  const purpleStart = Math.max(2, minCrash);
+  const purpleEnd = Math.min(10, maxCrash);
+  const purplePct = purpleEnd > purpleStart ? ((purpleEnd - purpleStart) / span) * 100 : 0;
+  const pinkPct = Math.max(0, 100 - bluePct - purplePct);
+  return `Geração uniforme entre ${minCrash.toFixed(2)}x e ${maxCrash.toFixed(2)}x. Aproximadamente ${pinkPct.toFixed(0)}% serão rosa (≥10x), ${purplePct.toFixed(1)}% roxa e ${bluePct.toFixed(1)}% azul.`;
+}
+
+function validateFormForModo(
+  form: ConfigForm,
+  limits: { rtpMin: number; rtpMax: number; crashMax: number },
+  modo: ModoGeracao
+): string | null {
+  let rtpGeral: number | null = parseDecimal(form.rtp_geral_pct);
+  if (rtpGeral !== null) rtpGeral = rtpGeral / 100;
+
+  const pctAzul = parsePctField(form.pct_vela_azul);
+  const pctRoxa = parsePctField(form.pct_vela_roxa);
+  const pctRosa = parsePctField(form.pct_vela_rosa);
+  const geracaoMin = parseDecimal(form.geracao_min_crash);
+  const geracaoMax = parseDecimal(form.geracao_max_crash);
+  const minCrash = parseDecimal(form.min_crash);
+  const maxCrash = parseDecimal(form.max_crash);
+  const queueSize = Number(form.queue_size);
+
+  if (modo === 'rtp_geral') {
+    if (rtpGeral === null || rtpGeral <= 0 || rtpGeral >= 1) {
+      return `RTP geral deve estar entre ${limits.rtpMin}% e ${limits.rtpMax}%.`;
+    }
+    const rtpPct = rtpGeral * 100;
+    if (rtpPct < limits.rtpMin || rtpPct > limits.rtpMax) {
+      return `RTP geral deve estar entre ${limits.rtpMin}% e ${limits.rtpMax}%.`;
+    }
+  }
+
+  if (modo === 'velas') {
+    if (pctAzul === null || pctRoxa === null || pctRosa === null) {
+      return 'Porcentagens de cor inválidas.';
+    }
+    const sum = Math.round((pctAzul + pctRoxa + pctRosa) * 100) / 100;
+    if (sum !== 100) {
+      return 'A soma das porcentagens das velas deve ser exatamente 100%.';
+    }
+  }
+
+  if (modo === 'rtp_geral' || modo === 'velas') {
+    if (
+      geracaoMin === null ||
+      geracaoMax === null ||
+      geracaoMin < 1 ||
+      geracaoMax > limits.crashMax ||
+      geracaoMin > geracaoMax
+    ) {
+      return `Limite mínimo ≥ 1,00x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
+    }
+  }
+
+  if (modo === 'crash') {
+    if (minCrash === null || maxCrash === null || minCrash < 1 || maxCrash > limits.crashMax || minCrash > maxCrash) {
+      return `Crash mínimo ≥ 1,00x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
+    }
+  }
+
+  if (!Number.isFinite(queueSize) || queueSize < 10 || queueSize > 200) {
+    return 'Fila deve ter entre 10 e 200 rodadas.';
+  }
+
+  return null;
+}
+
+function buildSavePayload(form: ConfigForm, modo: ModoGeracao) {
+  let rtpGeral: number | null = parseDecimal(form.rtp_geral_pct);
+  if (rtpGeral !== null) rtpGeral = rtpGeral / 100;
+
+  const pctAzul = parsePctField(form.pct_vela_azul);
+  const pctRoxa = parsePctField(form.pct_vela_roxa);
+  const pctRosa = parsePctField(form.pct_vela_rosa);
+  const geracaoMin = parseDecimal(form.geracao_min_crash);
+  const geracaoMax = parseDecimal(form.geracao_max_crash);
+  const minCrash = parseDecimal(form.min_crash);
+  const maxCrash = parseDecimal(form.max_crash);
+  const queueSize = Number(form.queue_size);
+
+  return {
+    p_modo_geracao: modo,
+    p_rtp_geral: rtpGeral ?? pctToFactor(form.rtp_geral_pct) ?? 0.96,
+    p_pct_vela_azul: pctAzul ?? parsePctField(form.pct_vela_azul) ?? 52,
+    p_pct_vela_roxa: pctRoxa ?? parsePctField(form.pct_vela_roxa) ?? 38,
+    p_pct_vela_rosa: pctRosa ?? parsePctField(form.pct_vela_rosa) ?? 10,
+    p_geracao_min_crash: geracaoMin ?? parseDecimal(form.geracao_min_crash) ?? 1.01,
+    p_geracao_max_crash: geracaoMax ?? parseDecimal(form.geracao_max_crash) ?? 500,
+    p_min_crash: minCrash ?? parseDecimal(form.min_crash) ?? 1.01,
+    p_max_crash: maxCrash ?? parseDecimal(form.max_crash) ?? 500,
+    p_queue_size: queueSize,
+  };
+}
+
 export default function AviatorRtpPage() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [switchingModo, setSwitchingModo] = useState(false);
   const [refreshingPreview, setRefreshingPreview] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [motorRefreshing, setMotorRefreshing] = useState(false);
   const [form, setForm] = useState<ConfigForm>(defaultForm);
+  const [limits, setLimits] = useState({ rtpMin: 85, rtpMax: 99.99, crashMax: 1000 });
   const [stats, setStats] = useState<AviatorStats | null>(null);
-  const [engine, setEngine] = useState<Record<string, unknown> | null>(null);
   const [liveRound, setLiveRound] = useState<AviatorScheduleEntry | null>(null);
   const [upcomingRounds, setUpcomingRounds] = useState<AviatorScheduleEntry[]>([]);
   const [pastRounds, setPastRounds] = useState<AviatorScheduleEntry[]>([]);
   const [clockOffset, setClockOffset] = useState(0);
   const [, setTick] = useState(0);
+  const [engineMotor, setEngineMotor] = useState<{
+    modo_geracao?: string;
+    min_crash?: number;
+    max_crash?: number;
+  } | null>(null);
 
   const applyConfigToForm = (config: AviatorConfig) => {
     setForm({
-      rtp_base_pct: String(Number(config.rtp_base) * 100),
-      rtp_min_pct: String(Number(config.rtp_min) * 100),
-      rtp_max_pct: String(Number(config.rtp_max) * 100),
-      recovery_enabled: config.recovery_enabled,
-      recovery_window_hours: String(config.recovery_window_hours),
-      ggr_target_pct: String(config.ggr_target_pct),
-      recovery_strength_pct: String(Number(config.recovery_strength) * 100),
-      recovery_max_adjustment_pct: String(Number(config.recovery_max_adjustment) * 100),
-      min_wagered_for_recovery: String(config.min_wagered_for_recovery),
+      modo_geracao: parseModo(config.modo_geracao),
+      rtp_geral_pct: String(Number(config.rtp_geral) * 100),
+      pct_vela_azul: String(config.pct_vela_azul),
+      pct_vela_roxa: String(config.pct_vela_roxa),
+      pct_vela_rosa: String(config.pct_vela_rosa),
+      geracao_min_crash: String(config.geracao_min_crash ?? config.min_crash ?? 1.01),
+      geracao_max_crash: String(config.geracao_max_crash ?? config.max_crash ?? 500),
       min_crash: String(config.min_crash),
       max_crash: String(config.max_crash),
       queue_size: String(config.queue_size),
     });
+    setLimits({
+      rtpMin: Number(config.rtp_limit_min_pct ?? 85),
+      rtpMax: Number(config.rtp_limit_max_pct ?? 99.99),
+      crashMax: Number(config.crash_technical_max ?? 1000),
+    });
   };
 
-  const applyPreset = (key: PresetKey) => {
-    const preset = PRESETS[key];
-    const base = Number(preset.rtp);
-    const limits = deriveRtpLimits(base);
-    setForm((prev) => ({
-      ...prev,
-      rtp_base_pct: preset.rtp,
-      rtp_min_pct: limits.min,
-      rtp_max_pct: limits.max,
-      ggr_target_pct: preset.ggr,
-      recovery_enabled: preset.recovery,
-    }));
-  };
-
-  const loadPreview = useCallback(async () => {
+  const refreshMotorPreview = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setRefreshingPreview(true);
+      if (!silent) setMotorRefreshing(true);
       const preview = await fetchAviatorRtpPreview();
-      if (preview.engine) setEngine(preview.engine);
+      const nodeEngine = preview.engine as { modo_geracao?: string; min_crash?: number; max_crash?: number };
+      const pyEngine = (preview.queue as { engine?: { modo_geracao?: string; min_crash?: number; max_crash?: number } })?.engine;
+      setEngineMotor({
+        modo_geracao: String(nodeEngine?.modo_geracao ?? pyEngine?.modo_geracao ?? ''),
+        min_crash: Number(nodeEngine?.min_crash ?? pyEngine?.min_crash ?? 0) || undefined,
+        max_crash: Number(nodeEngine?.max_crash ?? pyEngine?.max_crash ?? 0) || undefined,
+      });
       const timeline = preview.queue?.timeline;
       if (timeline) {
         if (timeline.server_time_ms) {
@@ -304,32 +367,21 @@ export default function AviatorRtpPage() {
     } catch (err) {
       console.warn('[Aviator RTP] Preview indisponível:', err);
     } finally {
-      setRefreshingPreview(false);
+      if (!silent) setMotorRefreshing(false);
     }
   }, []);
 
-  const loadStats = useCallback(async () => {
-    const { data, error } = await supabase.rpc('obter_aviator_config_admin');
-    if (error) return;
+  useEffect(() => {
+    let cancelled = false;
 
-    const result = data as {
-      ok: boolean;
-      config?: AviatorConfig;
-      stats?: AviatorStats;
-    };
-
-    if (result?.ok && result.stats) {
-      setStats(result.stats);
-    }
-  }, []);
-
-  const loadConfig = useCallback(
-    async ({ initial = false }: { initial?: boolean } = {}) => {
+    void (async () => {
       try {
-        if (initial) setLoading(true);
+        setLoading(true);
         const { data, error } = await supabase.rpc('obter_aviator_config_admin');
+        if (cancelled) return;
+
         if (error) {
-          if (initial) showToast('Execute aviator_config.sql no Supabase.', 'error');
+          showToast('Execute patch_aviator_modo_geracao.sql no Supabase.', 'error');
           return;
         }
 
@@ -340,31 +392,39 @@ export default function AviatorRtpPage() {
         };
 
         if (result?.ok && result.config) {
-          if (initial) applyConfigToForm(result.config);
+          applyConfigToForm(result.config);
           setStats(result.stats || null);
         }
 
-        await loadPreview();
+        await refreshMotorPreview({ silent: true });
       } finally {
-        if (initial) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    },
-    [loadPreview, showToast]
-  );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Carga inicial única — não reexecutar quando callbacks do contexto mudarem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshData = useCallback(async () => {
     try {
       setRefreshingPreview(true);
-      await loadStats();
-      await loadPreview();
+      const { data } = await supabase.rpc('obter_aviator_config_admin');
+      const result = data as { config?: AviatorConfig; stats?: AviatorStats };
+      if (result?.config) applyConfigToForm(result.config);
+      if (result?.stats) setStats(result.stats);
+      await refreshMotorPreview({ silent: true });
     } finally {
       setRefreshingPreview(false);
     }
-  }, [loadPreview, loadStats]);
+  }, [refreshMotorPreview]);
 
-  useEffect(() => {
-    void loadConfig({ initial: true });
-  }, [loadConfig]);
+  const refreshMotorOnly = useCallback(async () => {
+    await refreshMotorPreview();
+  }, [refreshMotorPreview]);
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((t) => t + 1), 1000);
@@ -373,97 +433,125 @@ export default function AviatorRtpPage() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      void loadPreview();
+      void refreshMotorPreview({ silent: true });
     }, 10000);
     return () => window.clearInterval(id);
-  }, [loadPreview]);
+  }, [refreshMotorPreview]);
 
-  const handleSave = async () => {
-    const rtpBase = pctToFactor(form.rtp_base_pct);
-    const rtpMin = pctToFactor(form.rtp_min_pct);
-    const rtpMax = pctToFactor(form.rtp_max_pct);
-    if (rtpBase === null || rtpMin === null || rtpMax === null) {
-      showToast('RTP deve estar entre 1% e 99%.', 'error');
-      return;
-    }
+  const colorSum = useMemo(() => {
+    const azul = parsePctField(form.pct_vela_azul) ?? 0;
+    const roxa = parsePctField(form.pct_vela_roxa) ?? 0;
+    const rosa = parsePctField(form.pct_vela_rosa) ?? 0;
+    return Math.round((azul + roxa + rosa) * 100) / 100;
+  }, [form.pct_vela_azul, form.pct_vela_roxa, form.pct_vela_rosa]);
 
-    const recoveryWindow = Number(form.recovery_window_hours);
-    const ggrTarget = Number(form.ggr_target_pct.replace(',', '.'));
-    const recoveryStrength = Number(form.recovery_strength_pct.replace(',', '.')) / 100;
-    const recoveryMaxAdj = Number(form.recovery_max_adjustment_pct.replace(',', '.')) / 100;
-    const minWagered = Number(form.min_wagered_for_recovery.replace(',', '.'));
-    const minCrash = Number(form.min_crash.replace(',', '.'));
-    const maxCrash = Number(form.max_crash.replace(',', '.'));
-    const queueSize = Number(form.queue_size);
+  const colorSumInvalid = form.modo_geracao === 'velas' && colorSum !== 100;
 
-    if (!Number.isFinite(recoveryWindow) || recoveryWindow < 1) {
-      showToast('Período de análise inválido.', 'error');
-      return;
-    }
+  const persistConfig = useCallback(
+    async (nextForm: ConfigForm, { modeSwitchOnly = false }: { modeSwitchOnly?: boolean } = {}) => {
+      const validationError = validateFormForModo(nextForm, limits, nextForm.modo_geracao);
+      if (validationError) {
+        showToast(validationError, 'error');
+        return false;
+      }
 
-    if (!Number.isFinite(ggrTarget) || ggrTarget < 0 || ggrTarget > 100) {
-      showToast('Meta de lucro deve estar entre 0% e 100%.', 'error');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { data, error } = await supabase.rpc('atualizar_aviator_config_admin', {
-        p_rtp_base: rtpBase,
-        p_rtp_min: rtpMin,
-        p_rtp_max: rtpMax,
-        p_recovery_enabled: form.recovery_enabled,
-        p_recovery_window_hours: recoveryWindow,
-        p_ggr_target_pct: ggrTarget,
-        p_recovery_strength: recoveryStrength,
-        p_recovery_max_adjustment: recoveryMaxAdj,
-        p_min_wagered_for_recovery: minWagered,
-        p_min_crash: minCrash,
-        p_max_crash: maxCrash,
-        p_queue_size: queueSize,
-      });
+      const { data, error } = await supabase.rpc(
+        'atualizar_aviator_config_admin',
+        buildSavePayload(nextForm, nextForm.modo_geracao)
+      );
 
       if (error) {
         showToast('Erro ao salvar configurações.', 'error');
-        return;
+        return false;
       }
 
       const result = data as { ok: boolean; error?: string; stats?: AviatorStats; config?: AviatorConfig };
       if (!result?.ok) {
         showToast(result?.error || 'Erro ao salvar.', 'error');
-        return;
+        return false;
       }
 
-      if (result.config) applyConfigToForm(result.config);
-      if (result.stats) setStats(result.stats);
+      if (result.config) {
+        if (modeSwitchOnly) {
+          setForm((prev) => ({
+            ...prev,
+            modo_geracao: parseModo(result.config!.modo_geracao),
+          }));
+        } else {
+          applyConfigToForm(result.config);
+        }
+      }
+      if (!modeSwitchOnly && result.stats) setStats(result.stats);
 
       try {
         await invalidateAviatorQueue();
       } catch (err) {
         console.warn(err);
         showToast('Config salva, mas fila não atualizou. Reinicie a API se necessário.', 'error');
+        return false;
+      }
+
+      return true;
+    },
+    [limits, showToast]
+  );
+
+  const handleChangeModo = useCallback(
+    async (modo: ModoGeracao) => {
+      if (modo === form.modo_geracao || saving || switchingModo) return;
+
+      const validationError = validateFormForModo(form, limits, modo);
+      if (validationError) {
+        showToast(validationError, 'error');
         return;
       }
 
-      showToast('Configurações salvas e aplicadas!', 'success');
-      await loadPreview();
+      const previousModo = form.modo_geracao;
+      setSwitchingModo(true);
+      setForm((prev) => ({ ...prev, modo_geracao: modo }));
+      try {
+        const ok = await persistConfig({ ...form, modo_geracao: modo }, { modeSwitchOnly: true });
+        if (ok) {
+          showToast(`${MODO_LABELS[modo]} ativado.`, 'success');
+          await refreshMotorPreview();
+        } else {
+          setForm((prev) => ({ ...prev, modo_geracao: previousModo }));
+        }
+      } finally {
+        setSwitchingModo(false);
+      }
+    },
+    [form, limits, persistConfig, refreshMotorPreview, saving, showToast, switchingModo]
+  );
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const ok = await persistConfig(form);
+      if (ok) {
+        showToast('Configurações salvas e aplicadas!', 'success');
+        await refreshMotorPreview();
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const rtpBaseNum = Number(form.rtp_base_pct) || 0;
-  const houseEdgeHint = Math.max(0, 100 - rtpBaseNum);
-  const effectiveRtp = Number(engine?.effective_rtp ?? engine?.rtp_factor ?? 0) * 100;
-  const rtpBaseEngine = Number(engine?.rtp_base ?? 0) * 100;
-  const recoveryMode = String(engine?.recovery_mode ?? 'balanced');
-  const recoveryAdjustment = Number(engine?.recovery_adjustment ?? 0) * 100;
+  const rtpGeralNum = Number(form.rtp_geral_pct.replace(',', '.')) || 0;
+  const houseEdgeHint = Math.max(0, Math.round((100 - rtpGeralNum) * 100) / 100);
   const houseGgr = Number(stats?.ggr ?? 0);
   const houseProfit = houseGgr >= 0;
-  const ggrTargetPct = Number(form.ggr_target_pct) || 0;
-  const activePreset = detectActivePreset(form);
   const upcomingPreview = upcomingRounds.slice(0, 12);
   const upcomingStats = summarizeUpcoming(upcomingPreview);
+  const engineModo = parseModo(engineMotor?.modo_geracao);
+  const engineModoMismatch = engineMotor?.modo_geracao && engineModo !== form.modo_geracao;
+  const crashHint = useMemo(() => {
+    if (form.modo_geracao !== 'crash') return null;
+    const min = parseDecimal(form.min_crash);
+    const max = parseDecimal(form.max_crash);
+    if (min === null || max === null) return null;
+    return crashUniformHint(min, max);
+  }, [form.modo_geracao, form.min_crash, form.max_crash]);
 
   if (loading) {
     return <LoadingState message="Carregando Aviator..." className="w-full" />;
@@ -474,7 +562,7 @@ export default function AviatorRtpPage() {
       <PageHeader
         icon={Plane}
         title="Aviator — Configuração da Casa"
-        description="Defina quanto o jogador recebe de volta e acompanhe se você está lucrando."
+        description="Configure RTP de referência, distribuição de cores e intervalo de crash."
         actions={
           <button
             type="button"
@@ -493,7 +581,7 @@ export default function AviatorRtpPage() {
           <StatCard
             label={houseProfit ? 'Seu lucro' : 'Sua perda'}
             value={formatMoney(Math.abs(houseGgr))}
-            sub={`Últimas ${stats.window_hours}h · meta ${formatPct(ggrTargetPct)} da casa`}
+            sub={`Últimas ${stats.window_hours}h`}
             icon={houseProfit ? TrendingUp : TrendingDown}
             tone={houseProfit ? 'good' : 'warn'}
           />
@@ -512,13 +600,9 @@ export default function AviatorRtpPage() {
           <StatCard
             label="Retorno real (RTP)"
             value={formatPct(stats.rtp_real_pct)}
-            sub={
-              effectiveRtp
-                ? `Configurado: ${formatPct(rtpBaseNum)} · Motor agora: ${formatPct(effectiveRtp)}`
-                : `Configurado: ${formatPct(rtpBaseNum)}`
-            }
+            sub={`Referência configurada: ${formatPct(rtpGeralNum)}`}
             icon={Plane}
-            tone={stats.rtp_real_pct > rtpBaseNum + 2 ? 'warn' : 'neutral'}
+            tone={Math.abs(stats.rtp_real_pct - rtpGeralNum) > 5 ? 'warn' : 'neutral'}
           />
         </div>
       )}
@@ -526,229 +610,147 @@ export default function AviatorRtpPage() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         <div className="xl:col-span-7 space-y-6">
           <PagePanel className="border-admin-accent/20 bg-admin-accent/[0.04]">
-            <h2 className="text-white font-semibold mb-2">Entenda em 30 segundos</h2>
-            <ul className="text-sm text-gray-400 space-y-2 list-disc pl-5">
-              <li>
-                <strong className="text-gray-200">RTP</strong> = quanto volta para o jogador. RTP 97% → de cada R$
-                100 apostados, ~R$ 97 voltam em prêmios e ~R$ 3 ficam com você.
-              </li>
-              <li>
-                <strong className="text-gray-200">Proteção automática</strong> = se os jogadores ganharem demais no
-                período, o jogo ajusta levemente para proteger seu lucro (sem você precisar mexer manualmente).
-              </li>
-            </ul>
+            <p className="text-sm text-gray-400">
+              Apenas <strong className="text-white">um modo</strong> pode ficar ativo. O modo ativo controla como
+              as próximas velas são geradas no preview e no jogo.
+            </p>
           </PagePanel>
 
-          <PagePanel>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-              <h2 className="text-white text-lg font-semibold">Perfis rápidos</h2>
-              <span
-                className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
-                  activePreset
-                    ? 'border-admin-accent/40 bg-admin-accent/10 text-admin-accent'
-                    : 'border-admin-border bg-black/20 text-gray-400'
-                }`}
-              >
-                {activePreset ? `Ativo: ${PRESETS[activePreset].label}` : 'Ativo: Personalizado'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Clique em um perfil e depois em Salvar. Você pode ajustar depois.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(Object.keys(PRESETS) as PresetKey[]).map((key) => {
-                const preset = PRESETS[key];
-                const selected = activePreset === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => applyPreset(key)}
-                    aria-pressed={selected}
-                    className={`relative text-left rounded-xl border px-4 py-3 transition-colors ${
-                      selected
-                        ? 'border-admin-accent bg-admin-accent/10 ring-1 ring-admin-accent/30'
-                        : 'border-admin-border bg-admin-panel hover:border-admin-accent/30'
-                    }`}
-                  >
-                    {selected && (
-                      <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-admin-accent">
-                        <Check className="w-3 h-3" />
-                        Ativo
-                      </span>
-                    )}
-                    <p className={`font-medium pr-14 ${selected ? 'text-admin-accent' : 'text-white'}`}>
-                      {preset.label}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">{preset.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </PagePanel>
-
-          <PagePanel>
-            <h2 className="text-white text-lg font-semibold mb-4">Suas configurações</h2>
-            <div className="space-y-6">
-              <Field
-                label="Retorno ao jogador — RTP (%)"
-                hint="Quanto, em média, o jogo devolve aos jogadores."
-                example={`Com ${rtpBaseNum || '—'}%, sua margem teórica é ~${houseEdgeHint}% por aposta.`}
-                value={form.rtp_base_pct}
-                onChange={(v) => {
-                  const base = Number(v.replace(',', '.'));
-                  if (Number.isFinite(base) && base > 0 && base < 100) {
-                    const limits = deriveRtpLimits(base);
-                    setForm((prev) => ({
-                      ...prev,
-                      rtp_base_pct: v,
-                      rtp_min_pct: limits.min,
-                      rtp_max_pct: limits.max,
-                    }));
-                  } else {
-                    setForm((prev) => ({ ...prev, rtp_base_pct: v }));
-                  }
-                }}
-              />
-
-              <div className="rounded-xl border border-admin-border bg-black/20 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 text-white font-medium">
-                      <Shield className="w-4 h-4 text-admin-accent" />
-                      Proteção automática da casa
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Recomendado deixar ligado. O sistema corrige sozinho quando os jogadores estão ganhando acima do
-                      normal.
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={form.recovery_enabled}
-                      onChange={(e) => {
-                        setForm({ ...form, recovery_enabled: e.target.checked });
-                      }}
-                      className="rounded border-admin-border-strong"
-                    />
-                    {form.recovery_enabled ? 'Ligada' : 'Desligada'}
-                  </label>
-                </div>
-
-                {form.recovery_enabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-admin-border">
-                    <Field
-                      label="Meta de lucro da casa (%)"
-                      hint="Quanto você quer ficar das apostas no período."
-                      example="3% = de R$ 1.000 apostados, R$ 30 de lucro alvo."
-                      value={form.ggr_target_pct}
-                      onChange={(v) => {
-                        setForm({ ...form, ggr_target_pct: v });
-                      }}
-                    />
-                    <SelectField
-                      label="Analisar resultados de"
-                      hint="Período usado para calcular se está ganhando ou perdendo."
-                      value={form.recovery_window_hours}
-                      options={WINDOW_OPTIONS}
-                      onChange={(v) => {
-                        setForm({ ...form, recovery_window_hours: v });
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </PagePanel>
-
-          <PagePanel>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <div>
-                <h2 className="text-white text-lg font-semibold">Configurações avançadas</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Só mexa aqui se souber o que está fazendo.</p>
-              </div>
-              {showAdvanced ? (
-                <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" />
-              ) : (
-                <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />
-              )}
-            </button>
-
-            {showAdvanced && (
-              <div className="mt-5 pt-5 border-t border-admin-border space-y-6">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-300 mb-3">Limites de RTP (proteção automática)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field
-                      label="RTP mínimo (%)"
-                      hint="O jogo nunca fica mais seco que isso."
-                      value={form.rtp_min_pct}
-                      onChange={(v) => setForm({ ...form, rtp_min_pct: v })}
-                    />
-                    <Field
-                      label="RTP máximo (%)"
-                      hint="O jogo nunca paga além disso no recovery."
-                      value={form.rtp_max_pct}
-                      onChange={(v) => setForm({ ...form, rtp_max_pct: v })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-300 mb-3">Força da proteção</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field
-                      label="Intensidade (%)"
-                      hint="Quão rápido o sistema corrige quando você está perdendo."
-                      value={form.recovery_strength_pct}
-                      onChange={(v) => setForm({ ...form, recovery_strength_pct: v })}
-                    />
-                    <Field
-                      label="Ajuste máximo (%)"
-                      hint="Limite de quanto o RTP pode mudar."
-                      value={form.recovery_max_adjustment_pct}
-                      onChange={(v) => setForm({ ...form, recovery_max_adjustment_pct: v })}
-                    />
-                    <Field
-                      label="Volume mínimo (R$)"
-                      hint="Proteção só ativa após esse volume apostado."
-                      value={form.min_wagered_for_recovery}
-                      onChange={(v) => setForm({ ...form, min_wagered_for_recovery: v })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-300 mb-3">Limites das velas</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Field
-                      label="Crash mínimo (x)"
-                      value={form.min_crash}
-                      onChange={(v) => setForm({ ...form, min_crash: v })}
-                    />
-                    <Field
-                      label="Crash máximo (x)"
-                      value={form.max_crash}
-                      onChange={(v) => setForm({ ...form, max_crash: v })}
-                    />
-                    <Field
-                      label="Fila de velas"
-                      hint="Rodadas pré-geradas na memória."
-                      value={form.queue_size}
-                      onChange={(v) => setForm({ ...form, queue_size: v })}
-                    />
-                  </div>
-                </div>
-              </div>
+          <ConfigSection
+            title="RTP geral"
+            active={form.modo_geracao === 'rtp_geral'}
+            disabled={saving || switchingModo}
+            onToggle={() => void handleChangeModo('rtp_geral')}
+          >
+            <Field
+              label="RTP geral (%)"
+              hint="Distribuição estatística inversa baseada no RTP configurado."
+              example={`Margem teórica da casa: ${formatPct(houseEdgeHint)}`}
+              value={form.rtp_geral_pct}
+              disabled={form.modo_geracao !== 'rtp_geral'}
+              onChange={(v) => setForm((prev) => ({ ...prev, rtp_geral_pct: v }))}
+            />
+            <GenerationBoundsFields
+              minCrash={form.geracao_min_crash}
+              maxCrash={form.geracao_max_crash}
+              crashMax={limits.crashMax}
+              disabled={form.modo_geracao !== 'rtp_geral'}
+              onMinChange={(v) => setForm((prev) => ({ ...prev, geracao_min_crash: v }))}
+              onMaxChange={(v) => setForm((prev) => ({ ...prev, geracao_max_crash: v }))}
+            />
+            {form.modo_geracao === 'rtp_geral' && (
+              <p className="mt-2 text-xs text-gray-500">
+                A geração continua aleatória pelo RTP, mas nenhuma vela ficará fora desse intervalo. Isso é
+                independente do modo criativos.
+              </p>
             )}
+            {form.modo_geracao === 'rtp_geral' && (
+              <p className="mt-1 text-xs text-gray-500">
+                Após alterar os limites, clique em <strong className="text-gray-300">Salvar e aplicar</strong> para
+                regenerar a fila.
+              </p>
+            )}
+          </ConfigSection>
+
+          <ConfigSection
+            title="Porcentagens das velas"
+            active={form.modo_geracao === 'velas'}
+            disabled={saving || switchingModo}
+            onToggle={() => void handleChangeModo('velas')}
+          >
+            <p className="text-sm text-gray-500 mb-4">A soma deve ser exatamente 100%.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field
+                label="Porcentagem da vela azul (%)"
+                value={form.pct_vela_azul}
+                disabled={form.modo_geracao !== 'velas'}
+                onChange={(v) => setForm((prev) => ({ ...prev, pct_vela_azul: v }))}
+              />
+              <Field
+                label="Porcentagem da vela roxa (%)"
+                value={form.pct_vela_roxa}
+                disabled={form.modo_geracao !== 'velas'}
+                onChange={(v) => setForm((prev) => ({ ...prev, pct_vela_roxa: v }))}
+              />
+              <Field
+                label="Porcentagem da vela rosa (%)"
+                value={form.pct_vela_rosa}
+                disabled={form.modo_geracao !== 'velas'}
+                onChange={(v) => setForm((prev) => ({ ...prev, pct_vela_rosa: v }))}
+              />
+            </div>
+            {form.modo_geracao === 'velas' && (
+              <p className={`mt-3 text-sm ${colorSumInvalid ? 'text-rose-400' : 'text-gray-500'}`}>
+                Total: {colorSum.toFixed(2)}%
+                {colorSumInvalid && ' — A soma das porcentagens das velas deve ser exatamente 100%.'}
+              </p>
+            )}
+            <GenerationBoundsFields
+              minCrash={form.geracao_min_crash}
+              maxCrash={form.geracao_max_crash}
+              crashMax={limits.crashMax}
+              disabled={form.modo_geracao !== 'velas'}
+              onMinChange={(v) => setForm((prev) => ({ ...prev, geracao_min_crash: v }))}
+              onMaxChange={(v) => setForm((prev) => ({ ...prev, geracao_max_crash: v }))}
+            />
+            {form.modo_geracao === 'velas' && (
+              <p className="mt-2 text-xs text-gray-500">
+                As cores são sorteadas pelas porcentagens, mas o multiplicador final respeita esse intervalo.
+                Independente do modo criativos.
+              </p>
+            )}
+            {form.modo_geracao === 'velas' && (
+              <p className="mt-1 text-xs text-gray-500">
+                Após alterar os limites, clique em <strong className="text-gray-300">Salvar e aplicar</strong> para
+                regenerar a fila.
+              </p>
+            )}
+          </ConfigSection>
+
+          <ConfigSection
+            title="Configuração manual do crash"
+            titleExtra={
+              <span className="inline-flex items-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-200">
+                Recomendado para criativos
+              </span>
+            }
+            active={form.modo_geracao === 'crash'}
+            disabled={saving || switchingModo}
+            onToggle={() => void handleChangeModo('crash')}
+          >
+            <p className="text-sm text-gray-500 mb-4">
+              Geração uniforme entre mínimo e máximo — ideal para criativos e anúncios.
+            </p>
+            <CrashBoundsFields
+              minCrash={form.min_crash}
+              maxCrash={form.max_crash}
+              crashMax={limits.crashMax}
+              disabled={form.modo_geracao !== 'crash'}
+              onMinChange={(v) => setForm((prev) => ({ ...prev, min_crash: v }))}
+              onMaxChange={(v) => setForm((prev) => ({ ...prev, max_crash: v }))}
+            />
+            {form.modo_geracao === 'crash' && crashHint && (
+              <p className="mt-4 text-sm text-gray-500">{crashHint}</p>
+            )}
+            {form.modo_geracao === 'crash' && (
+              <p className="mt-2 text-xs text-gray-500">
+                Após alterar mínimo/máximo, clique em <strong className="text-gray-300">Salvar e aplicar</strong> para regenerar a fila.
+              </p>
+            )}
+          </ConfigSection>
+
+          <PagePanel>
+            <Field
+              label="Fila de velas (rodadas pré-geradas)"
+              hint="Entre 10 e 200. Alterações só afetam rodadas futuras."
+              value={form.queue_size}
+              onChange={(v) => setForm((prev) => ({ ...prev, queue_size: v }))}
+            />
           </PagePanel>
 
           <button
             onClick={() => void handleSave()}
-            disabled={saving}
+            disabled={saving || switchingModo || (form.modo_geracao === 'velas' && colorSumInvalid)}
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-admin-accent hover:bg-admin-accent-hover text-[#0d0e10] text-sm font-medium disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
@@ -764,24 +766,37 @@ export default function AviatorRtpPage() {
             </div>
             <button
               type="button"
-              onClick={() => void refreshData()}
-              disabled={refreshingPreview}
+              onClick={() => void refreshMotorOnly()}
+              disabled={motorRefreshing || switchingModo}
               className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-50"
               title="Atualizar agora"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshingPreview ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${motorRefreshing || switchingModo ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          <div className="xl:overflow-y-auto xl:flex-1 xl:min-h-0 space-y-4 mt-3">
-            {engine && (
-              <RecoveryModeBanner
-                mode={recoveryMode}
-                effectiveRtp={effectiveRtp}
-                baseRtp={rtpBaseEngine || rtpBaseNum}
-                adjustmentPct={recoveryAdjustment}
-              />
-            )}
+          <div
+            className={`xl:overflow-y-auto xl:flex-1 xl:min-h-0 space-y-4 mt-3 transition-opacity ${
+              motorRefreshing || switchingModo ? 'opacity-70' : ''
+            }`}
+          >
+            <div className="rounded-xl border border-admin-accent/30 bg-admin-accent/10 px-3 py-2.5 text-xs text-admin-accent space-y-1">
+              <p>
+                <span className="font-semibold uppercase tracking-wide">Modo ativo:</span>{' '}
+                {MODO_LABELS[form.modo_geracao]}
+              </p>
+              {engineMotor?.min_crash != null && engineMotor?.max_crash != null && (
+                <p>
+                  <span className="font-semibold uppercase tracking-wide">Intervalo do motor:</span>{' '}
+                  {Number(engineMotor.min_crash).toFixed(2)}x – {Number(engineMotor.max_crash).toFixed(2)}x
+                </p>
+              )}
+              {engineModoMismatch && (
+                <p className="text-amber-300">
+                  Motor ainda em &quot;{MODO_LABELS[engineModo]}&quot; — aguarde ou clique em Salvar e aplicar.
+                </p>
+              )}
+            </div>
 
             <section className="rounded-xl border border-admin-accent/25 bg-admin-accent/[0.06] overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-admin-accent/15 bg-admin-accent/[0.04]">
@@ -801,9 +816,7 @@ export default function AviatorRtpPage() {
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25">
                 <div className="flex items-center gap-2">
                   <ListOrdered className="w-3.5 h-3.5 text-gray-400" />
-                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
-                    Próximas velas
-                  </h3>
+                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Próximas velas</h3>
                 </div>
                 {upcomingRounds.length > 0 && (
                   <span className="text-[10px] text-gray-500 tabular-nums">{upcomingRounds.length} na fila</span>
@@ -821,7 +834,7 @@ export default function AviatorRtpPage() {
                         <tr className="text-gray-500 border-b border-admin-border/80">
                           <th className="py-2 pl-3 pr-1 text-left font-medium w-8">#</th>
                           <th className="py-2 px-1 text-left font-medium">Rodada</th>
-                          <th className="py-2 px-1 text-left font-medium min-w-[88px]">Intensidade</th>
+                          <th className="py-2 px-1 text-left font-medium min-w-[88px]">Cor visual</th>
                           <th className="py-2 px-1 text-right font-medium">Crash</th>
                           <th className="py-2 px-1 text-right font-medium hidden sm:table-cell">Início</th>
                           <th className="py-2 pr-3 pl-1 text-right font-medium">Falta</th>
@@ -847,9 +860,7 @@ export default function AviatorRtpPage() {
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25">
                 <div className="flex items-center gap-2">
                   <History className="w-3.5 h-3.5 text-gray-400" />
-                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
-                    Velas recentes
-                  </h3>
+                  <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Velas recentes</h3>
                 </div>
                 {pastRounds.length > 0 && (
                   <span className="text-[10px] text-gray-500 tabular-nums">{pastRounds.length} registradas</span>
@@ -881,58 +892,6 @@ export default function AviatorRtpPage() {
           </div>
         </PagePanel>
       </div>
-    </div>
-  );
-}
-
-function RecoveryModeBanner({
-  mode,
-  effectiveRtp,
-  baseRtp,
-  adjustmentPct,
-}: {
-  mode: string;
-  effectiveRtp: number;
-  baseRtp: number;
-  adjustmentPct: number;
-}) {
-  const config = {
-    recovering: {
-      label: 'Recuperando perdas',
-      desc: 'Casa perdendo — motor mais seco, velas tendem a ser baixas.',
-      className: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
-    },
-    generous: {
-      label: 'Soltando prêmios',
-      desc: 'Casa lucrando — motor sobe RTP e gera velas mais altas na fila.',
-      className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-    },
-    balanced: {
-      label: 'Equilibrado',
-      desc: 'Motor no RTP base configurado.',
-      className: 'border-admin-border bg-black/20 text-gray-300',
-    },
-  }[mode] ?? {
-    label: 'Equilibrado',
-    desc: 'Motor no RTP base configurado.',
-    className: 'border-admin-border bg-black/20 text-gray-300',
-  };
-
-  return (
-    <div className={`rounded-xl border px-3 py-2.5 text-xs ${config.className}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold uppercase tracking-wide">{config.label}</p>
-        <p className="tabular-nums text-[11px] opacity-90">
-          Motor {formatPct(effectiveRtp || baseRtp, 1)}
-          {adjustmentPct !== 0 && (
-            <span className="ml-1 opacity-75">
-              ({adjustmentPct > 0 ? '+' : ''}
-              {adjustmentPct.toFixed(1)}% vs base)
-            </span>
-          )}
-        </p>
-      </div>
-      <p className="mt-1 opacity-80">{config.desc}</p>
     </div>
   );
 }
@@ -973,11 +932,7 @@ function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; cloc
             <Clock className="w-3 h-3" />
             Tempo restante
           </p>
-          <p
-            className={`font-medium tabular-nums ${
-              countdown <= 5 ? 'text-admin-warning' : 'text-gray-200'
-            }`}
-          >
+          <p className={`font-medium tabular-nums ${countdown <= 5 ? 'text-admin-warning' : 'text-gray-200'}`}>
             {formatCountdown(countdown)}
           </p>
         </div>
@@ -1038,17 +993,9 @@ function UpcomingRow({
       <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
       <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
       <td className="py-2.5 px-1">
-        <div className="flex items-center gap-2 min-w-[88px]">
-          <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="h-full rounded-full"
-              style={{ ...styles.barStyle, width: `${crashBarWidth(x)}%` }}
-            />
-          </div>
-          <span className="text-[10px] w-10 shrink-0" style={{ color: styles.hex }}>
-            {crashTierLabel(tier)}
-          </span>
-        </div>
+        <span className="text-[10px]" style={{ color: styles.hex }}>
+          {crashTierLabel(tier)}
+        </span>
       </td>
       <td className="py-2.5 px-1 text-right font-mono font-semibold tabular-nums" style={styles.textStyle}>
         {formatCrashX(x)}
@@ -1071,14 +1018,12 @@ function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number })
       <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
       <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
       <td className="py-2.5 px-1">
-        <div className="flex items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums"
-            style={styles.chipStyle}
-          >
-            {formatCrashX(x)}
-          </span>
-        </div>
+        <span
+          className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums"
+          style={styles.chipStyle}
+        >
+          {formatCrashX(x)}
+        </span>
       </td>
       <td className="py-2.5 pr-3 pl-1 text-right text-gray-500 tabular-nums">
         {formatLocalTime(item.crash_at)}
@@ -1087,17 +1032,147 @@ function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number })
   );
 }
 
+function ConfigSection({
+  title,
+  titleExtra,
+  active,
+  disabled,
+  onToggle,
+  children,
+}: {
+  title: string;
+  titleExtra?: ReactNode;
+  active: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <PagePanel
+      className={
+        active
+          ? 'border-admin-accent/40 ring-1 ring-admin-accent/20'
+          : 'border-admin-border opacity-80'
+      }
+    >
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className={`text-lg font-semibold ${active ? 'text-admin-accent' : 'text-white'}`}>{title}</h2>
+            {titleExtra}
+          </div>
+          {active && (
+            <p className="text-xs text-admin-accent/80 mt-0.5">Ativo — controlando a geração das velas</p>
+          )}
+        </div>
+        <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+          <span className="text-xs text-gray-400">{active ? 'Ligado' : 'Desligado'}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={active}
+            disabled={disabled || active}
+            onClick={onToggle}
+            className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              active ? 'bg-admin-accent' : 'bg-white/10'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                active ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </label>
+      </div>
+      <div className={active ? '' : 'pointer-events-none opacity-50'}>{children}</div>
+    </PagePanel>
+  );
+}
+
+function GenerationBoundsFields({
+  minCrash,
+  maxCrash,
+  crashMax,
+  disabled,
+  onMinChange,
+  onMaxChange,
+}: {
+  minCrash: string;
+  maxCrash: string;
+  crashMax: number;
+  disabled?: boolean;
+  onMinChange: (value: string) => void;
+  onMaxChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <Field
+        label="Limite mínimo do crash (x)"
+        hint="Nenhuma vela abaixo desse valor."
+        value={minCrash}
+        disabled={disabled}
+        onChange={onMinChange}
+      />
+      <Field
+        label="Limite máximo do crash (x)"
+        hint={`Nenhuma vela acima desse valor. Máx. técnico: ${crashMax.toFixed(2)}x`}
+        value={maxCrash}
+        disabled={disabled}
+        onChange={onMaxChange}
+      />
+    </div>
+  );
+}
+
+function CrashBoundsFields({
+  minCrash,
+  maxCrash,
+  crashMax,
+  disabled,
+  onMinChange,
+  onMaxChange,
+}: {
+  minCrash: string;
+  maxCrash: string;
+  crashMax: number;
+  disabled?: boolean;
+  onMinChange: (value: string) => void;
+  onMaxChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+      <Field
+        label="Crash mínimo (x)"
+        hint="Início do intervalo uniforme."
+        value={minCrash}
+        disabled={disabled}
+        onChange={onMinChange}
+      />
+      <Field
+        label="Crash máximo (x)"
+        hint={`Fim do intervalo uniforme. Máx. técnico: ${crashMax.toFixed(2)}x`}
+        value={maxCrash}
+        disabled={disabled}
+        onChange={onMaxChange}
+      />
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
   example,
   value,
+  disabled,
   onChange,
 }: {
   label: string;
   hint?: string;
   example?: string;
   value: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -1107,42 +1182,11 @@ function Field({
       <input
         type="text"
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 w-full rounded-lg bg-admin-panel border border-admin-border px-3 py-2.5 text-white text-sm focus:outline-none focus:border-admin-accent/30"
+        className="mt-2 w-full rounded-lg bg-admin-panel border border-admin-border px-3 py-2.5 text-white text-sm focus:outline-none focus:border-admin-accent/30 disabled:opacity-60 disabled:cursor-not-allowed"
       />
       {example && <span className="block text-xs text-admin-accent/80 mt-1.5">{example}</span>}
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  hint,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm text-gray-200 font-medium">{label}</span>
-      {hint && <span className="block text-xs text-gray-500 mt-0.5">{hint}</span>}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-2 w-full rounded-lg bg-admin-panel border border-admin-border px-3 py-2.5 text-white text-sm focus:outline-none focus:border-admin-accent/30"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
     </label>
   );
 }

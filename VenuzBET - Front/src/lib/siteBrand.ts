@@ -1,6 +1,7 @@
 export const DEFAULT_NOME_BET = 'RoyalBet';
 export const DEFAULT_SITE_TITULO = `${DEFAULT_NOME_BET} | Apostas Online com Saques Rápidos`;
 export const DEFAULT_SITE_DOMINIO = 'royall.bet';
+export const DEFAULT_SITE_FAVICON = '/headline.png';
 
 export const PROPRIETARY_PROVIDER_SLUGS = new Set(['venuzbet', 'venuz']);
 
@@ -8,6 +9,7 @@ export interface SiteBrandDocument {
   nome_bet: string;
   site_titulo: string;
   site_dominio?: string;
+  site_favicon_url?: string;
 }
 
 export function normalizeNomeBet(value: unknown): string {
@@ -35,6 +37,33 @@ export function buildReferralLink(dominio: string, referralCode?: string | null)
 
 export function getOriginaisLabel(nomeBet: string = DEFAULT_NOME_BET): string {
   return `${normalizeNomeBet(nomeBet)} Originais`;
+}
+
+export function normalizeSiteFavicon(value: unknown): string {
+  const trimmed = String(value ?? '').trim();
+  return trimmed || DEFAULT_SITE_FAVICON;
+}
+
+function resolveFaviconType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.ico')) return 'image/x-icon';
+  return 'image/png';
+}
+
+export function applyFaviconToDocument(url: string) {
+  if (typeof document === 'undefined') return;
+
+  const href = normalizeSiteFavicon(url);
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+
+  link.type = resolveFaviconType(href);
+  link.href = href;
 }
 
 /** Ajusta rótulos de provedores próprios (venuzbet/venuz) para o nome configurado. */
@@ -75,4 +104,8 @@ export function applyBrandToDocument(brand: SiteBrandDocument | string) {
     document.head.appendChild(meta);
   }
   meta.setAttribute('content', description);
+
+  if (typeof brand !== 'string') {
+    applyFaviconToDocument(brand.site_favicon_url ?? DEFAULT_SITE_FAVICON);
+  }
 }

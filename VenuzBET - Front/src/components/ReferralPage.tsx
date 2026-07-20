@@ -138,11 +138,11 @@ export default function ReferralPage() {
         className={`flex flex-col min-h-full ${appPageContainerClass}`}
         style={{ backgroundColor: homeConfig.fundo }}
       >
-        <div className="flex-1 py-4 sm:py-6">
-          <div className="space-y-6">
+        <div className="flex-1 py-4 sm:py-6 max-md:pb-2">
+          <div className="space-y-5 md:space-y-6">
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <svg data-v-3bc5e6e0="" id="fi_9590121" enableBackground="new 0 0 512 512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" className="w-8 h-8">
+                <div className="flex items-start gap-2 mb-3 md:mb-4">
+                  <svg data-v-3bc5e6e0="" id="fi_9590121" enableBackground="new 0 0 512 512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" className="w-7 h-7 md:w-8 md:h-8 shrink-0 mt-0.5">
                     <linearGradient id="lg1">
                       <stop offset=".0022" stopColor="#236568"></stop>
                       <stop offset=".8472" stopColor="#2f878a"></stop>
@@ -286,12 +286,12 @@ export default function ReferralPage() {
                       </g>
                     </g>
                   </svg>
-                  <h1 className="text-white text-xl font-bold">
+                  <h1 className="text-white text-base sm:text-xl font-bold leading-snug">
                     Ganhe {formatCurrency(recompensa)} de SALDO REAL
                   </h1>
                 </div>
 
-                <p className="text-slate-300 leading-relaxed text-sm">
+                <p className="text-slate-300 leading-relaxed text-sm max-md:text-[13px]">
                   {recompensa > 0 ? (
                     <>
                       Indique seus amigos para a {nomeBet} e receba{' '}
@@ -307,20 +307,20 @@ export default function ReferralPage() {
                 </p>
               </div>
 
-              <div className="border-t border-slate-800 pt-6">
-                <div className="flex gap-2 mb-4">
+              <div className="border-t border-slate-800 pt-5 md:pt-6">
+                <div className="flex flex-col max-md:gap-2 sm:flex-row gap-2 mb-4">
                   <input
                     type="text"
                     value={loading ? 'Carregando...' : referralLink}
                     readOnly
                     disabled={loading}
-                    className="flex-1 px-3 py-2 rounded-lg border border-brand/30 text-slate-300 font-mono text-xs focus:outline-none disabled:opacity-50"
+                    className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-brand/30 text-slate-300 font-mono text-xs focus:outline-none disabled:opacity-50"
                     style={{ backgroundColor: cardBg }}
                   />
                   <button
                     onClick={handleCopyLink}
                     disabled={loading || !referralCode}
-                    className="px-4 py-2 rounded-lg text-white font-bold text-sm transition-all duration-200 flex items-center gap-2 whitespace-nowrap hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="max-md:w-full px-4 py-2.5 rounded-lg text-white font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: 'var(--brand-primary)' }}
                   >
                     <Copy className="w-4 h-4" />
@@ -365,7 +365,7 @@ export default function ReferralPage() {
             </div>
           </div>
 
-          <div className="min-h-[20vh]" aria-hidden="true" />
+          <div className="max-md:min-h-[6vh] md:min-h-[20vh]" aria-hidden="true" />
 
         <Footer containerClassName="w-full" />
       </div>

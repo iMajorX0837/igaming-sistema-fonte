@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { HOME_SECTION_GAMES_MAX } from '../lib/homeSectionGames';
 
@@ -73,7 +73,7 @@ export default function WeeklyGamesSlider({
   };
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const visibleGames = games.slice(0, HOME_SECTION_GAMES_MAX);
+  const visibleGames = useMemo(() => games.slice(0, HOME_SECTION_GAMES_MAX), [games]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [mobileCard, setMobileCard] = useState({ w: 104, h: 128 });
@@ -92,8 +92,10 @@ export default function WeeklyGamesSlider({
   const checkScrollability = useCallback(() => {
     if (scrollContainerRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-      setCanScrollLeft(scrollLeft > 0);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      const nextLeft = scrollLeft > 0;
+      const nextRight = scrollLeft < scrollWidth - clientWidth - 10;
+      setCanScrollLeft((prev) => (prev === nextLeft ? prev : nextLeft));
+      setCanScrollRight((prev) => (prev === nextRight ? prev : nextRight));
     }
   }, []);
 
@@ -106,7 +108,7 @@ export default function WeeklyGamesSlider({
       const cw = container.clientWidth;
       const w = Math.max(72, Math.floor((cw - MOBILE_GAP_PX * 2) / 3));
       const h = Math.round((w * CARD_HEIGHT) / CARD_WIDTH);
-      setMobileCard({ w, h });
+      setMobileCard((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
     };
 
     const onScrollOrResize = () => {
@@ -125,7 +127,7 @@ export default function WeeklyGamesSlider({
       container.removeEventListener('scroll', checkScrollability);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [visibleGames, checkScrollability]);
+  }, [checkScrollability, narrow, visibleGames.length]);
 
   const getScrollStep = () => {
     const el = scrollContainerRef.current;

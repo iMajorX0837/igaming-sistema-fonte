@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Menu, Trophy, Dices, Radio } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
+import { useHomeConfig } from '../hooks/useHomeConfig';
 
 interface MobileBottomNavProps {
   visible: boolean;
 }
 
 export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
+  const { config: homeConfig } = useHomeConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const [aviatorLoading, setAviatorLoading] = useState(false);
@@ -35,7 +37,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
     };
   }, [show]);
 
-  const openMenu = () => document.dispatchEvent(new CustomEvent('openMobileMenu'));
+  const toggleMenu = () => document.dispatchEvent(new CustomEvent('openMobileMenu'));
 
   const isEsporte = location.pathname === '/esportes';
   const isCasino = location.pathname === '/';
@@ -71,12 +73,12 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
   return (
     <nav
       data-mobile-nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-[55] md:hidden pointer-events-none"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Navegação principal"
     >
-      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl border px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: '#121319', borderColor: 'var(--brand-primary)' }}>
-        <button type="button" onClick={openMenu} className={`${itemBase} ${inactive}`} aria-label="Abrir menu">
+      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl border px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: homeConfig.fundo, borderColor: 'var(--brand-primary)' }}>
+        <button type="button" onClick={toggleMenu} className={`${itemBase} ${inactive}`} aria-label="Abrir ou fechar menu">
           <Menu className="h-5 w-5 shrink-0 opacity-80" strokeWidth={2.25} />
           <span className={`${labelClass} font-semibold`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Menu

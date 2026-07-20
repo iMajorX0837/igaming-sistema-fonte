@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
-import BackButton from './BackButton';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useUserProfileData } from '../hooks/useUserProfileData';
 import { useBetHistory } from '../hooks/useBetHistory';
-import type { UserProfileData } from '../lib/userProfileCache';
+import type { BetHistoryItem, UserProfileData } from '../lib/userProfileCache';
 import LoadingScreen from './LoadingScreen';
 import { appPageContainerClass } from '../constants/homeLayout';
 
@@ -16,11 +15,81 @@ interface ProfilePageProps {
   onBack: () => void;
 }
 
+const PROFILE_TABS = [
+  { id: 'minha-conta', label: 'Minha conta', icon: 'solar:user-bold-duotone' },
+  { id: 'seguranca', label: 'Segurança e login', icon: 'material-symbols:security' },
+  { id: 'historico', label: 'Histórico de jogo', icon: 'iconamoon:history-duotone' },
+  { id: 'verificacao', label: 'Verificação KYC', icon: 'hugeicons:face-id' },
+  { id: 'recesso', label: 'Recesso / Pausa', icon: 'material-symbols:autopause' },
+  { id: 'auto-exclusao', label: 'Auto-exclusão', icon: 'solar:user-block-rounded-bold-duotone' },
+] as const;
+
+function BetHistoryMobileCard({
+  item,
+  backgroundColor,
+}: {
+  item: BetHistoryItem;
+  backgroundColor: string;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-white/10 p-3 space-y-2.5"
+      style={{ backgroundColor }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div
+            className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${
+              item.tipo === 'win' ? 'bg-brand' : 'bg-red-500'
+            }`}
+          >
+            {item.tipo === 'win' ? (
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="12 5 12 19" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="12 5 12 19" />
+                <polyline points="19 12 12 19 5 12" />
+              </svg>
+            )}
+          </div>
+          <p className="text-sm font-semibold text-white truncate" title={item.jogo}>
+            {item.jogo}
+          </p>
+        </div>
+        <span className="text-[11px] text-slate-400 shrink-0">{item.data}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+        <div>
+          <p className="text-slate-500 mb-0.5">Valor</p>
+          <p style={{ color: '#DCDDDE' }}>R$ {item.valor.toFixed(2)}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 mb-0.5">Retorno</p>
+          <p style={{ color: '#DCDDDE' }}>{item.retorno > 0 ? `R$ ${item.retorno.toFixed(2)}` : 'R$ 0,00'}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 mb-0.5">Status</p>
+          <p style={{ color: '#DCDDDE' }}>{item.status}</p>
+        </div>
+        <div>
+          <p className="text-slate-500 mb-0.5">c/ bônus</p>
+          <p style={{ color: '#DCDDDE' }}>{item.bonus}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage({ onBack }: ProfilePageProps) {
   const { isAuthenticated, user } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const profileInputBg = `color-mix(in srgb, ${homeConfig.fundo} 90%, white)`;
+  const profileRowAltBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
+  const profileSectionClass =
+    'p-3 md:p-4 max-md:rounded-xl max-md:border max-md:border-white/10 max-md:mb-3 md:border-b';
   const [activeTab, setActiveTab] = useState('minha-conta');
   const [selectedPeriod, setSelectedPeriod] = useState('hoje');
   const [currentPage, setCurrentPage] = useState(1);
@@ -135,99 +204,46 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   return (
     <AppPageScaffold>
       <div className={`flex flex-col min-h-full ${appPageContainerClass}`}>
-        <div className="flex-1 py-4 sm:py-6">
-            <BackButton onClick={onBack} className="md:hidden mb-4 -mt-1" />
-            <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-              <div className="w-full md:w-48 flex-shrink-0">
-                <div className="flex md:flex-col gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide -mx-0.5 px-0.5 md:mx-0 md:px-0 md:space-y-1.5 md:overflow-visible">
-                  <button
-                    onClick={() => setActiveTab('minha-conta')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'minha-conta'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="solar:user-bold-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Minha conta
-                  </button>
+        <div className="flex-1 py-4 sm:py-6 max-md:pb-2">
+            <div className="flex items-center gap-2 mb-3 md:hidden">
+              <span
+                className="iconify i-solar:user-bold-duotone shrink-0"
+                aria-hidden="true"
+                style={{ fontSize: '28px' }}
+              />
+              <h1 className="text-white text-xl font-bold">Perfil</h1>
+            </div>
 
-                  <button
-                    onClick={() => setActiveTab('seguranca')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'seguranca'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="material-symbols:security" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Segurança e login
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('historico')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'historico'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="iconamoon:history-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Histórico de jogo
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('verificacao')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'verificacao'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="hugeicons:face-id" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Verificação KYC
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('recesso')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'recesso'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="material-symbols:autopause" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Recesso / Pausa
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('auto-exclusao')}
-                    className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap ${
-                      activeTab === 'auto-exclusao'
-                        ? 'bg-brand text-white border-2 border-brand'
-                        : 'text-slate-400 border-2 border-transparent'
-                    }`}
-                    style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                  >
-                    <span className="iconify shrink-0" data-icon="solar:user-block-rounded-bold-duotone" aria-hidden="true" style={{ fontSize: '18px' }}></span>
-                    Auto-exclusão
-                  </button>
+            <div className="flex flex-col md:flex-row gap-3 md:gap-6">
+              <div className="w-full md:w-48 flex-shrink-0 max-md:mb-1">
+                <div className="flex md:flex-col gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide -mx-0.5 px-0.5 md:mx-0 md:px-0 md:space-y-1.5 md:overflow-visible max-md:flex-nowrap max-md:snap-x max-md:snap-mandatory max-md:rounded-xl max-md:border max-md:border-white/10 max-md:p-1 max-md:bg-black/15">
+                  {PROFILE_TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-shrink-0 md:w-full flex items-center gap-1.5 px-2.5 py-2 md:px-3 md:py-2 text-xs font-medium transition-all rounded-lg whitespace-nowrap max-md:snap-start max-md:min-h-[44px] max-md:px-3 ${
+                        activeTab === tab.id
+                          ? 'bg-brand text-white border-2 border-brand'
+                          : 'text-slate-400 border-2 border-transparent'
+                      }`}
+                      style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
+                    >
+                      <span className="iconify shrink-0" data-icon={tab.icon} aria-hidden="true" style={{ fontSize: '18px' }} />
+                      {tab.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 max-md:pt-1">
                 {activeTab === 'minha-conta' && (
                   <div className="space-y-3">
                     <div>
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Dados da conta</h1>
                     </div>
 
-                    <div className="p-3 md:p-4 border-b" style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
                       <h2 className="text-white text-base md:text-lg font-semibold mb-2">Dados pessoais</h2>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -308,7 +324,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    <div className="p-3 md:p-4 border-b" style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                         <h2 className="text-white text-base md:text-lg font-semibold">Contato</h2>
                         <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
@@ -357,7 +373,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    <div className="p-3 md:p-4 pt-2">
+                    <div className={`${profileSectionClass} max-md:mb-0 pt-2 md:pt-2`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                         <h2 className="text-white text-base md:text-lg font-semibold">Endereço</h2>
                         <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
@@ -453,7 +469,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     </div>
 
                     {!showPasswordChange ? (
-                      <div className="p-3 md:p-4">
+                      <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
                             <h3 className="text-white font-semibold mb-0.5">Alterar senha de segurança</h3>
@@ -470,7 +486,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 md:p-4">
+                      <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
                         <h3 className="text-white font-semibold mb-1">Alterar senha de segurança</h3>
                         <p className="text-slate-400 text-sm mb-4">
                           Aqui você pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada é forte e segura
@@ -584,7 +600,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     )}
 
-                    <div className="p-3 md:p-4 border-t" style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={`${profileSectionClass} md:border-t`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">Autenticação de dois fatores (2FA)</h3>
@@ -594,7 +610,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    <div className="p-3 md:p-4 border-t" style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={`${profileSectionClass} max-md:mb-0 md:border-t`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <h3 className="text-white font-semibold mb-0.5">Contas Redes Sociais</h3>
@@ -612,38 +628,38 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-2">Histórico de apostas</h1>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 mb-4 md:mb-6">
+                    <div className="flex gap-2 mb-4 md:mb-6 max-md:flex-nowrap max-md:overflow-x-auto max-md:scrollbar-hide max-md:-mx-1 max-md:px-1 max-md:pb-1">
                       <button
                         onClick={() => { setSelectedPeriod('hoje'); setCurrentPage(1); }}
-                        className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
+                        className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'hoje' ? 1 : 0.5 }}
                       >
                         Somente hoje
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('ontem'); setCurrentPage(1); }}
-                        className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
+                        className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'ontem' ? 1 : 0.5 }}
                       >
                         Somente ontem
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('7dias'); setCurrentPage(1); }}
-                        className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
+                        className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '7dias' ? 1 : 0.5 }}
                       >
                         Últimos 7 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('30dias'); setCurrentPage(1); }}
-                        className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
+                        className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '30dias' ? 1 : 0.5 }}
                       >
                         Últimos 30 dias
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('total'); setCurrentPage(1); }}
-                        className="px-4 h-8 rounded-lg text-xs font-bold transition-all"
+                        className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'total' ? 1 : 0.5 }}
                       >
                         Período total
@@ -654,8 +670,26 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <LoadingScreen title="Carregando histórico..." variant="inline" className="py-8" />
                     )}
 
-                    <div className="rounded-xl overflow-hidden">
-                      <div className="overflow-x-auto">
+                    <div className="rounded-xl overflow-hidden max-md:border max-md:border-white/10">
+                      {!(isLoadingHistory && betHistory.length === 0) && (
+                      <div className="space-y-2 p-1 md:hidden">
+                        {betHistory.length === 0 ? (
+                          <div className="px-3 py-12 text-center">
+                            <p className="text-xs" style={{ color: '#DCDDDE' }}>Nenhum registro encontrado</p>
+                          </div>
+                        ) : (
+                          currentBets.map((item, index) => (
+                            <BetHistoryMobileCard
+                              key={`${item.jogo}-${item.data}-${index}`}
+                              item={item}
+                              backgroundColor={index % 2 === 0 ? homeConfig.fundo : profileRowAltBg}
+                            />
+                          ))
+                        )}
+                      </div>
+                      )}
+
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                           <thead style={{ backgroundColor: profileInputBg }}>
                             <tr>
@@ -680,7 +714,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                                 <tr 
                                   key={index} 
                                   className="transition-colors" 
-                                  style={{ backgroundColor: index % 2 === 0 ? homeConfig.fundo : '#181923' }}
+                                  style={{ backgroundColor: index % 2 === 0 ? homeConfig.fundo : profileRowAltBg }}
                                 >
                                   <td className="px-2 py-2 md:px-4 md:py-3 align-middle">
                                     <div className={`w-5 h-5 md:w-6 md:h-6 rounded flex items-center justify-center ${
@@ -778,14 +812,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 )}
 
                 {(activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
-                  <div className="p-6 md:p-8 text-center">
+                  <div className="p-6 md:p-8 text-center max-md:rounded-xl max-md:border max-md:border-white/10">
                     <p className="text-slate-400 text-base md:text-lg">Em construção</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="min-h-[20vh]" />
+            <div className="max-md:min-h-[6vh] md:min-h-[20vh]" />
         </div>
 
         <Footer containerClassName="w-full" />

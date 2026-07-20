@@ -110,7 +110,7 @@ function SidebarPromoCard({
       className={`relative isolate mx-auto ${textClassName} font-bold transition-all duration-200 hover:scale-[1.02] flex items-center overflow-hidden shrink-0 hover:no-underline ${
         collapsed
           ? 'w-10 h-10 justify-center rounded-lg'
-          : 'rounded-md justify-between px-4'
+          : 'rounded-md justify-between px-4 max-md:!w-full max-md:mx-0 max-md:!h-auto max-md:min-h-[50px] max-md:py-2.5'
       }`}
       style={{
         width: collapsed ? undefined : SIDEBAR_PROMO_CARD_WIDTH_PX,
@@ -198,7 +198,7 @@ function SidebarPromoCardContent({
 
   return (
     <div
-      className="text-sm font-black whitespace-nowrap"
+      className="text-sm font-black whitespace-nowrap max-md:whitespace-normal max-md:leading-tight"
       style={{ fontFamily: 'Montserrat, sans-serif', color: textColor }}
     >
       {labels.line1}
@@ -206,7 +206,7 @@ function SidebarPromoCardContent({
   );
 }
 
-// Componente para cones SVG customizados removido  menu usa CMS (iconify/imagem)
+// Componente para ?cones SVG customizados removido ? menu usa CMS (iconify/imagem)
 
 export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
   const { language, setLanguage } = useSidebarLanguage();
@@ -221,6 +221,37 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
   } = useSidebarMenu();
 
   const navigate = useNavigate();
+  const visiblePromoCards = promoCards.filter((card) => card.ativo);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const header = document.querySelector('[data-shell-header]');
+
+    const syncHeaderOffset = () => {
+      if (!mq.matches || !header) {
+        document.documentElement.style.removeProperty('--mobile-shell-header-height');
+        return;
+      }
+      document.documentElement.style.setProperty(
+        '--mobile-shell-header-height',
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+
+    syncHeaderOffset();
+
+    const ro = header ? new ResizeObserver(syncHeaderOffset) : null;
+    ro?.observe(header as Element);
+    mq.addEventListener('change', syncHeaderOffset);
+    window.addEventListener('resize', syncHeaderOffset);
+
+    return () => {
+      ro?.disconnect();
+      mq.removeEventListener('change', syncHeaderOffset);
+      window.removeEventListener('resize', syncHeaderOffset);
+      document.documentElement.style.removeProperty('--mobile-shell-header-height');
+    };
+  }, []);
 
   useEffect(() => {
     setSectionsExpanded((prev) => {
@@ -295,14 +326,14 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
       {isOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-[40] bg-black/60 md:hidden"
+          className="fixed inset-0 z-[45] bg-black/60 md:hidden"
           aria-label="Fechar menu"
           onClick={() => onCloseMobileDrawer?.()}
         />
       ) : null}
       <aside
         data-shell-sidebar
-        className={`fixed md:relative inset-y-0 left-0 z-[50] md:z-50 border-r border-white/15 h-full flex-shrink-0 flex flex-col transition-[width,transform] duration-300 ease-in-out max-md:shadow-2xl ${
+        className={`fixed md:relative max-md:top-[var(--mobile-shell-header-height,72px)] max-md:bottom-0 max-md:h-auto md:inset-y-0 md:h-full left-0 max-md:right-0 max-md:!w-full max-md:border-r-0 max-md:z-[54] md:z-50 border-r border-white/15 flex-shrink-0 flex flex-col transition-[width,transform] duration-300 ease-in-out max-md:shadow-2xl ${
           isOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'
         }`}
         style={{
@@ -310,11 +341,11 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
           width: isOpen ? SIDEBAR_WIDTH_EXPANDED_PX : SIDEBAR_WIDTH_COLLAPSED_PX,
         }}
       >
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-      <div className={`flex flex-col h-full ${isOpen ? '' : 'hidden'}`}>
-          <div className="px-3 pt-8 pb-8 border-b border-white/10">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide max-md:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+      <div className={`flex flex-col max-md:min-h-0 md:h-full ${isOpen ? '' : 'hidden'}`}>
+          <div className="px-3 pt-4 pb-8 max-md:pt-2 border-b border-white/10">
             <div className="space-y-2">
-              {promoCards.map((card) => (
+              {visiblePromoCards.map((card) => (
                 <SidebarPromoCard
                   key={card.id}
                   href={card.href}
@@ -423,7 +454,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
         </div>
 
       <div className={`flex flex-col items-center py-4 gap-4 ${isOpen ? 'hidden' : ''}`}>
-          {promoCards.map((card) => (
+          {visiblePromoCards.map((card) => (
             <SidebarPromoCard
               key={card.id}
               href={card.href}

@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 
-/** Abre o menu lateral no mobile quando o botão Menu da barra inferior dispara o evento. */
-export function useListenOpenMobileMenu(setOpen: (open: boolean) => void) {
+/** Alterna o menu lateral no mobile quando o botão Menu da barra inferior dispara o evento. */
+export function useListenOpenMobileMenu(setOpen: Dispatch<SetStateAction<boolean>>) {
   useEffect(() => {
-    const onOpen = () => setOpen(true);
-    document.addEventListener('openMobileMenu', onOpen);
-    return () => document.removeEventListener('openMobileMenu', onOpen);
+    const onToggle = () => setOpen((open) => !open);
+    document.addEventListener('openMobileMenu', onToggle);
+    return () => document.removeEventListener('openMobileMenu', onToggle);
   }, [setOpen]);
 }

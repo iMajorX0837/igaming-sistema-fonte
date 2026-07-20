@@ -9,6 +9,10 @@ export const ADMIN_IMAGE_SIZES = {
     size: '400×120 px',
     detail: 'PNG ou WebP com fundo transparente. Exibida no header com até ~180 px de largura.',
   },
+  siteFavicon: {
+    size: '32×32 px',
+    detail: 'PNG, ICO ou SVG quadrado. Exibido na aba do navegador (recomendado 32×32 ou 64×64 px).',
+  },
   loginModal: {
     size: '840×520 px',
     detail: 'Proporção ~4:3. Largura máxima no site: 420 px.',

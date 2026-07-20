@@ -45,7 +45,7 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar, isSidebarOpen = true, isCouponOpen: externalIsCouponOpen, onCouponOpen: externalOnCouponOpen, onCouponClose: externalOnCouponClose, authButtonsMarginLeft = 129 }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, loading: authLoading } = useAuth();
   const { config: headerConfig } = useHeaderConfig();
   const { language } = useSidebarLanguage();
   const copy = useMemo(() => getHeaderFooterCopy(language).header, [language]);
@@ -93,6 +93,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     }, 100);
     return () => clearTimeout(timer);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return;
+    setIsRegisterOpen(true);
+  }, [authLoading, isAuthenticated]);
 
   // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {

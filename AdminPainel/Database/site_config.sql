@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.site_config (
   header_logo_url TEXT NOT NULL DEFAULT '/assets/logo.png',
   nome_bet TEXT NOT NULL DEFAULT 'RoyalBet',
   site_titulo TEXT NOT NULL DEFAULT 'RoyalBet | Apostas Online com Saques Rápidos',
+  site_favicon_url TEXT NOT NULL DEFAULT '/headline.png',
 
   -- Modais de login / cadastro
   login_modal_imagem_url TEXT NOT NULL DEFAULT 'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png',
@@ -81,6 +82,8 @@ ALTER TABLE public.site_config
   ADD COLUMN IF NOT EXISTS nome_bet TEXT NOT NULL DEFAULT 'RoyalBet';
 ALTER TABLE public.site_config
   ADD COLUMN IF NOT EXISTS site_titulo TEXT NOT NULL DEFAULT 'RoyalBet | Apostas Online com Saques Rápidos';
+ALTER TABLE public.site_config
+  ADD COLUMN IF NOT EXISTS site_favicon_url TEXT NOT NULL DEFAULT '/headline.png';
 
 INSERT INTO public.site_config (id)
 VALUES (1)

@@ -1,4 +1,4 @@
-import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio } from './siteBrand';
+import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, DEFAULT_SITE_FAVICON, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio, normalizeSiteFavicon } from './siteBrand';
 import {
   applyBrandColorsToDocument,
   DEFAULT_BRAND_COLORS,
@@ -37,6 +37,7 @@ export interface BrandConfig {
   nome_bet: string;
   site_titulo: string;
   site_dominio: string;
+  site_favicon_url: string;
 }
 
 export interface SiteTheme {
@@ -81,6 +82,7 @@ export const DEFAULT_BRAND_CONFIG: BrandConfig = {
   nome_bet: DEFAULT_NOME_BET,
   site_titulo: DEFAULT_SITE_TITULO,
   site_dominio: DEFAULT_SITE_DOMINIO,
+  site_favicon_url: DEFAULT_SITE_FAVICON,
 };
 
 export const DEFAULT_SITE_THEME: SiteTheme = {
@@ -93,7 +95,7 @@ export const DEFAULT_SITE_THEME: SiteTheme = {
   brandColors: DEFAULT_BRAND_COLORS,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v8';
+const STORAGE_KEY = 'venuz-site-theme-v9';
 
 export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
@@ -154,6 +156,7 @@ function normalizeBrandFromCache(brand: Partial<BrandConfig> | undefined): Brand
     nome_bet: normalizeNomeBet(nomeBet),
     site_titulo: normalizeSiteTitulo(siteTitulo, nomeBet),
     site_dominio: normalizeSiteDominio(siteDominio),
+    site_favicon_url: normalizeSiteFavicon(brand.site_favicon_url),
   };
 }
 
@@ -164,6 +167,7 @@ function normalizeBrand(row: Record<string, unknown> | null | undefined): BrandC
     nome_bet: nomeBet,
     site_titulo: normalizeSiteTitulo(row.site_titulo, nomeBet),
     site_dominio: normalizeSiteDominio(row.site_dominio),
+    site_favicon_url: normalizeSiteFavicon(row.site_favicon_url),
   };
 }
 
@@ -234,6 +238,7 @@ export function buildSiteThemeFromSiteConfig(row: Record<string, unknown> | null
       nome_bet: row.nome_bet,
       site_titulo: row.site_titulo,
       site_dominio: row.site_dominio,
+      site_favicon_url: row.site_favicon_url,
     }),
     brandColors: normalizeBrandColorsFromSiteConfig(row),
   };

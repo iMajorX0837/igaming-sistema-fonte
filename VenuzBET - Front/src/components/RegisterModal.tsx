@@ -299,11 +299,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div
-        className="relative flex w-full max-w-[500px] flex-col overflow-hidden rounded-2xl shadow-2xl"
+        className="relative flex w-full max-w-[420px] md:max-w-[500px] flex-col overflow-hidden rounded-2xl shadow-2xl max-md:max-h-[calc(100vh-2rem)] md:h-[735px] md:w-[500px]"
         style={{
           backgroundColor: homeConfig.fundo,
-          width: '500px',
-          height: '735px',
           maxWidth: 'calc(100vw - 2rem)',
           maxHeight: 'calc(100vh - 2rem)',
         }}
@@ -346,13 +344,13 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
         )}
 
         <div
-          className="relative flex h-[200px] w-full shrink-0 items-center justify-center overflow-hidden"
+          className="relative flex w-full shrink-0 justify-center items-center overflow-hidden md:h-[200px]"
           style={{ backgroundColor: homeConfig.fundo }}
         >
           <img
             src={authModalsConfig.register_imagem_url || DEFAULT_AUTH_MODAL_IMAGE}
             alt="Registro"
-            className="h-full w-full object-cover object-center"
+            className="w-full h-auto object-contain md:h-full md:object-cover md:object-center"
           />
         </div>
 
