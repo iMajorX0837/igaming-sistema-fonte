@@ -230,6 +230,10 @@ function getPublicApiOrigin() {
 /** Lista efetiva: CORS_ORIGINS + origem de PUBLIC_API_URL (Aviator estático em api.*). */
 function getAllowedOrigins() {
   const fromEnv = parseCorsOrigins() || [];
+  // Em dev, lista vazia = CORS permissivo (localhost:5173, etc.)
+  if (!isProduction()) {
+    return fromEnv;
+  }
   const publicOrigin = getPublicApiOrigin();
   if (!publicOrigin || fromEnv.includes(publicOrigin)) {
     return fromEnv;
