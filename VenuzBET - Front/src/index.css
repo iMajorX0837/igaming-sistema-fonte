@@ -112,6 +112,33 @@
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y pinch-zoom;
     }
+
+    /* iOS Safari: scroll ocorre dentro do documento do iframe, não no elemento iframe.
+       touch-action/overflow nos pais bloqueiam o gesto; layout flex evita absolute inset-0. */
+    @supports (-webkit-touch-callout: none) {
+      html.game-player-active.game-player-scrollable,
+      html.game-player-active.game-player-scrollable body {
+        overscroll-behavior: auto;
+      }
+
+      .game-player-stage--scrollable {
+        touch-action: auto;
+      }
+
+      .game-iframe-wrapper--scrollable {
+        touch-action: auto;
+        overscroll-behavior: auto;
+        overflow: hidden;
+        -webkit-overflow-scrolling: auto;
+      }
+
+      .game-iframe-wrapper--scrollable .game-iframe--scrollable {
+        overflow: hidden !important;
+        touch-action: auto;
+        -webkit-overflow-scrolling: auto;
+        transform: translateZ(0);
+      }
+    }
   }
 
   .game-player-stage:fullscreen {

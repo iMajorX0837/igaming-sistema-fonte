@@ -193,13 +193,25 @@ function MobileGamePlayerFrame({
   showExitFullscreen: boolean;
   scrollable?: boolean;
 }) {
+  if (scrollable) {
+    return (
+      <div className="relative flex min-h-0 flex-1 w-full flex-col overflow-hidden">
+        <div
+          ref={playerStageRef}
+          className="game-player-stage game-player-stage--scrollable relative flex min-h-0 flex-1 w-full flex-col overflow-hidden bg-black"
+        >
+          {children}
+          {showExitFullscreen && <FullscreenExitButton onClick={onExitFullscreen} />}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`relative flex min-h-0 flex-1 w-full flex-col ${scrollable ? 'overflow-visible' : 'overflow-hidden'}`}
-    >
+    <div className="relative flex min-h-0 flex-1 w-full flex-col overflow-hidden">
       <div
         ref={playerStageRef}
-        className={`game-player-stage absolute inset-0 bg-black ${scrollable ? 'overflow-visible touch-pan-y' : 'overflow-hidden'}`}
+        className="game-player-stage absolute inset-0 overflow-hidden bg-black"
       >
         {children}
         {showExitFullscreen && <FullscreenExitButton onClick={onExitFullscreen} />}
@@ -684,10 +696,14 @@ export default function GamePage({
     if (!isMobile || !gameUrl) return undefined;
 
     document.documentElement.classList.add('game-player-active');
+    if (iframeScrollable) {
+      document.documentElement.classList.add('game-player-scrollable');
+    }
     return () => {
       document.documentElement.classList.remove('game-player-active');
+      document.documentElement.classList.remove('game-player-scrollable');
     };
-  }, [isMobile, gameUrl]);
+  }, [isMobile, gameUrl, iframeScrollable]);
 
   const gameInfoBarProps = {
     gameName,
@@ -711,6 +727,11 @@ export default function GamePage({
     ? 'w-full flex-1 min-h-0 max-md:rounded-none max-md:border-0 max-md:shadow-none'
     : `w-full shrink-0 ${playerShellHeightClass}`;
 
+  const mobileScrollableIframeClassName = 'h-full min-h-0 w-full flex-1 border-0 block';
+  const mobileScrollableIframeContainerClassName = 'flex min-h-0 flex-1 w-full h-full';
+  const mobileFixedIframeClassName = 'absolute inset-0 w-full h-full border-0 block';
+  const mobileFixedIframeContainerClassName = 'absolute inset-0 w-full h-full';
+
   const mobileGameShell = (content: ReactNode) => (
     <div
       className="fixed inset-0 z-[100] flex h-[100dvh] w-full flex-col overflow-hidden"
@@ -721,9 +742,7 @@ export default function GamePage({
         gameProvider={gameProvider}
         onClose={onBack}
       />
-      <div
-        className={`flex min-h-0 flex-1 flex-col ${iframeScrollable ? 'overflow-visible' : 'overflow-hidden'}`}
-      >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {content}
       </div>
     </div>
@@ -842,8 +861,16 @@ export default function GamePage({
                             showInsufficientBalance={showInsufficientBalance}
                             onDeposit={handleDepositFromGame}
                             onPlay={handlePlayWithoutDeposit}
-                            iframeClassName="absolute inset-0 w-full h-full border-0 block"
-                            containerClassName="absolute inset-0 w-full h-full"
+                            iframeClassName={
+                              iframeScrollable
+                                ? mobileScrollableIframeClassName
+                                : mobileFixedIframeClassName
+                            }
+                            containerClassName={
+                              iframeScrollable
+                                ? mobileScrollableIframeContainerClassName
+                                : mobileFixedIframeContainerClassName
+                            }
                             scrollable={iframeScrollable}
                           />
                         ) : (
