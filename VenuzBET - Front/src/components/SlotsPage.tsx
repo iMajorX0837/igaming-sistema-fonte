@@ -13,6 +13,7 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
 import { getOriginaisLabel } from '../lib/siteBrand';
 import { appPageContainerClass } from '../constants/homeLayout';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 
 interface SlotsPageProps {
   onGameSelect: (game: GameInfo) => void;
@@ -331,7 +332,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                               alt={game.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400/1e293b/64748b?text=Game';
+                                (e.target as HTMLImageElement).src = GAME_IMAGE_FALLBACK_LG;
                               }}
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">

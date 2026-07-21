@@ -3,6 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import https from 'https';
 import { URL } from 'url';
+import { requireMatchingUserCode } from './lib/auth.js';
+import {
+  assertProductionSecrets,
+  createCorsMiddleware,
+  createRateLimiter,
+  validateInternalApiSecret,
+  validatePlayFiverWebhook,
+} from './lib/security.js';
+import {
+  markCupomUsoFreeBonusGranted,
+  validateCupomUsoForFreeBonusGrant,
+} from './lib/freeBonusGrant.js';
 import {
   buildAviatorLaunchUrl,
   isAviatorGameCode,
@@ -17,8 +29,13 @@ import { createCpfHubRouter } from './routes/cpfHub.js';
 import { parseCpfHubApiKeys } from './lib/cpfHubKeys.js';
 import { createWebhooksAdminRouter } from './routes/webhooksAdmin.js';
 import { dispatchWebhookEvent } from './lib/webhookDispatcher.js';
+import { initMisticPayConfig } from './lib/misticpayConfig.js';
+import { initBspayConfig } from './lib/bspayConfig.js';
+import { initVeopagConfig } from './lib/veopagConfig.js';
+import { initPaymentGatewayConfig } from './lib/paymentGatewayConfig.js';
 
 dotenv.config();
+assertProductionSecrets();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,46 +52,48 @@ const PLAYFIVERS_UPSTREAM = (process.env.PLAYFIVERS_UPSTREAM_URL || 'https://api
 const PLAYFIVER_WEBHOOK_VERSION = '2026-07-18-unified-v2';
 
 // Configuração do Supabase
-const supabaseUrl = process.env.SUPABASE_URL || 'https://psoyhrnjnalroihnswoo.supabase.co';
+const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || '';
-const supabaseAnonKey =
-  process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzb3locm5qbmFscm9paG5zd29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4NjY4MjUsImV4cCI6MjA5OTQ0MjgyNX0.qZPWZ4f2RgVyim4BHiEn31bMSSrUQqzMVyeT1cd2bPA';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
-if (!supabaseServiceKey) {
-  console.warn('⚠️  SUPABASE_SERVICE_KEY não configurada. Usando anon key (pode ter limitações).');
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórios no .env');
+  if (process.env.NODE_ENV === 'production') process.exit(1);
 }
 
-const supabase = createClient(
-  supabaseUrl,
-  supabaseServiceKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1aXB2YXVmYmx2amZlc250anB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2ODg1OTEsImV4cCI6MjA4MDI2NDU5MX0.p2Zev8oCbVIPM_6wR_aBNm-15vhNcHdKQuguniwkP_8'
-);
+if (!supabaseServiceKey) {
+  console.warn('⚠️  SUPABASE_SERVICE_KEY não configurada. Webhook e operações admin podem falhar.');
+}
+
+if (!process.env.AVIATOR_INTERNAL_SECRET?.trim() && process.env.NODE_ENV === 'production') {
+  console.warn('⚠️  AVIATOR_INTERNAL_SECRET não configurada. Proteja /aviator/wallet em produção.');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+initMisticPayConfig(supabase);
+initBspayConfig(supabase);
+initVeopagConfig(supabase);
+initPaymentGatewayConfig(supabase);
+
+const gameLaunchRateLimit = createRateLimiter({ windowMs: 60_000, max: 30 });
+const freeBonusGrantRateLimit = createRateLimiter({ windowMs: 60_000, max: 10 });
+const webhookRateLimit = createRateLimiter({ windowMs: 60_000, max: 120 });
+const depositRateLimit = createRateLimiter({ windowMs: 60_000, max: 10 });
 
 // Middleware CORS configurado
-app.use((req, res, next) => {
-  // Permitir todas as origens durante desenvolvimento (incluindo localhost)
-  const origin = req.headers.origin;
-  
-  // Permitir todas as origens (incluindo localhost:5173)
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 horas
-  
-  // Responder imediatamente para requisições OPTIONS (preflight)
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
-  next();
-});
+app.use(createCorsMiddleware());
 
 // Proxy Aviator → Python (antes do body parser, para SSE e POST com stream)
 mountAviatorProxy(app, { enabled: AVIATOR_GAME_ENABLED });
 
-// Middleware para parsing JSON
-app.use(express.json());
+// Middleware para parsing JSON (preserva rawBody para HMAC do webhook)
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    },
+  })
+);
 
 // Middleware para logging
 app.use((req, res, next) => {
@@ -90,8 +109,16 @@ const PLAYFIVERS_FETCH_HEADERS = {
   'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
 };
 
-const PLAYFIVER_AGENT_TOKEN_DEFAULT = '8898269e-650f-42af-bea0-d93981c545b0';
-const PLAYFIVER_SECRET_KEY_DEFAULT = '8b83d392-6dae-423c-bb76-af873254a0e7';
+function getPlayFiverCredentials() {
+  const token = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+  const secret = (process.env.PLAYFIVER_SECRET_KEY || '').trim();
+
+  if (process.env.NODE_ENV === 'production' && (!token || !secret)) {
+    throw new Error('PLAYFIVER_AGENT_TOKEN e PLAYFIVER_SECRET_KEY são obrigatórios em produção');
+  }
+
+  return { token, secret };
+}
 
 /** game_code aceito pelo endpoint free_bonus (pode diferir do catálogo de launch) */
 const FREE_BONUS_GAME_CODE_BY_SLUG = {
@@ -104,21 +131,6 @@ const FREE_BONUS_GAME_CODE_BY_SLUG = {
   'sweet-bonanza-1000': 'vs20fruitswx',
   'sugar-rush-1000': 'vs20sugarrushx',
 };
-
-function getPlayFiverCredentials(source = {}) {
-  return {
-    token:
-      source.agent_token ||
-      source.agentToken ||
-      process.env.PLAYFIVER_AGENT_TOKEN ||
-      PLAYFIVER_AGENT_TOKEN_DEFAULT,
-    secret:
-      source.secret_key ||
-      source.secretKey ||
-      process.env.PLAYFIVER_SECRET_KEY ||
-      PLAYFIVER_SECRET_KEY_DEFAULT,
-  };
-}
 
 function fetchGetWithJsonBody(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -738,7 +750,8 @@ mountAviatorRoutes(app, { supabase, enabled: AVIATOR_GAME_ENABLED });
 // Depósitos PIX (MisticPay) — credenciais ficam no servidor
 app.use(
   '/api/deposit',
-  createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, dispatchWebhookEvent })
+  depositRateLimit,
+  createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, dispatchWebhookEvent }),
 );
 
 // Saques PIX (MisticPay) — aprovação admin com pagamento real
@@ -767,7 +780,7 @@ app.use(
 
 // CPF Hub — chaves ficam no servidor
 const cpfHubApiKeys = parseCpfHubApiKeys(process.env.CPFHUB_API_KEY);
-app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys }));
+app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys, supabase }));
 
 app.use(
   '/api/webhooks',
@@ -783,26 +796,8 @@ if (!AVIATOR_API_ENABLED) {
   });
 }
 
-// Middleware opcional para validação de webhook (descomente e configure se necessário)
-// const validateWebhook = (req, res, next) => {
-//   const signature = req.headers['x-playfiver-signature'];
-//   const secret = process.env.PLAYFIVER_SECRET_KEY;
-//   
-//   if (!secret) {
-//     return next(); // Se não houver secret configurado, pula validação
-//   }
-//   
-//   // Implementar validação de assinatura conforme documentação da Play Fiver
-//   // const expectedSignature = crypto.createHmac('sha256', secret)
-//   //   .update(JSON.stringify(req.body))
-//   //   .digest('hex');
-//   // 
-//   // if (signature !== expectedSignature) {
-//   //   return res.status(401).json({ error: 'Invalid signature' });
-//   // }
-//   
-//   next();
-// };
+// Middleware opcional para validação de webhook PlayFivers
+// Em dev local: PLAYFIVER_WEBHOOK_SKIP_VALIDATION=true
 
 /**
  * Webhook PlayFivers — consulta de saldo (type: BALANCE)
@@ -868,6 +863,14 @@ function isTransactionWebhook(body) {
  * Configure no painel apenas uma URL, ex.: https://api.seudominio.com/webhook
  */
 async function handlePlayFiverWebhook(req, res) {
+  if (!validatePlayFiverWebhook(req)) {
+    console.warn(`[webhook] Requisição rejeitada (não autorizada) ${req.method} ${req.path}`);
+    return res.status(401).json({
+      msg: 'UNAUTHORIZED',
+      balance: 0,
+    });
+  }
+
   const body = req.body;
   console.log(
     `📥 PlayFiver webhook [${req.method} ${req.path}]:`,
@@ -1176,7 +1179,7 @@ const PLAYFIVER_WEBHOOK_PATHS = [
 ];
 
 for (const webhookPath of PLAYFIVER_WEBHOOK_PATHS) {
-  app.post(webhookPath, handlePlayFiverWebhook);
+  app.post(webhookPath, webhookRateLimit, handlePlayFiverWebhook);
 }
 
 app.get(['/webhook', '/api/webhook', '/api'], (req, res) => {
@@ -1194,6 +1197,9 @@ app.get(['/webhook', '/api/webhook', '/api'], (req, res) => {
  * GET /dev/game?code=...&user=...
  */
 app.get('/dev/game', (req, res) => {
+  if (process.env.NODE_ENV === 'production' && !GAME_LAUNCH_MOCK) {
+    return res.status(404).json({ ok: false, error: 'Não encontrado' });
+  }
   const gameCode = String(req.query.code || 'jogo');
   const userCode = String(req.query.user || 'teste');
   const balance = String(req.query.balance || '0');
@@ -1279,11 +1285,12 @@ app.get('/api/v2/games', (req, res) => {
  * 
  * Faz proxy da requisição para a API Play Fiver usando o IP do servidor
  */
-app.post('/api/game_launch', async (req, res) => {
+app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
   try {
+    const auth = await requireMatchingUserCode(supabase, req, res);
+    if (!auth) return;
+
     const {
-      agentToken,
-      secretKey,
       user_code,
       game_code,
       provider,
@@ -1292,6 +1299,8 @@ app.post('/api/game_launch', async (req, res) => {
       user_rtp,
       lang
     } = req.body;
+
+    const { token: agentToken, secret: secretKey } = getPlayFiverCredentials();
 
     console.log(
       '🎮 Requisição de game_launch recebida:',
@@ -1315,11 +1324,18 @@ app.post('/api/game_launch', async (req, res) => {
       });
     }
 
-    // Validar campos obrigatórios
-    if (!agentToken || !secretKey || !user_code || !game_code) {
+    // Validar campos obrigatórios (credenciais PlayFivers ficam no servidor)
+    if (!user_code || !game_code) {
       return res.status(400).json({
         status: 0,
-        msg: 'Campos obrigatórios faltando: agentToken, secretKey, user_code, game_code'
+        msg: 'Campos obrigatórios faltando: user_code, game_code'
+      });
+    }
+
+    if (!GAME_LAUNCH_MOCK && (!agentToken || !secretKey)) {
+      return res.status(503).json({
+        status: 0,
+        msg: 'Serviço de jogos indisponível (credenciais não configuradas)',
       });
     }
 
@@ -1401,8 +1417,11 @@ app.post('/api/game_launch', async (req, res) => {
  */
 app.get('/api/free_bonus', async (req, res) => {
   try {
+    const auth = await requireMatchingUserCode(supabase, req, res);
+    if (!auth) return;
+
     const userCode = String(req.query.user_code || '').trim();
-    const { token, secret } = getPlayFiverCredentials(req.query);
+    const { token, secret } = getPlayFiverCredentials();
 
     if (!userCode) {
       return res.status(400).json({
@@ -1477,10 +1496,20 @@ app.get('/api/free_bonus', async (req, res) => {
  * Concede rodadas grátis ao ganhar na roleta (resolve slug → game_code se necessário)
  * POST /api/prize_wheel/grant
  */
-app.post('/api/prize_wheel/grant', async (req, res) => {
+app.post('/api/prize_wheel/grant', freeBonusGrantRateLimit, async (req, res) => {
   try {
-    const { user_code, game_code, jogo_slug, provider_slug, jogo_nome, rounds } = req.body;
-    const { token, secret } = getPlayFiverCredentials(req.body);
+    const isInternal = validateInternalApiSecret(req);
+    let authUserId = null;
+
+    if (!isInternal) {
+      const auth = await requireMatchingUserCode(supabase, req, res);
+      if (!auth) return;
+      authUserId = auth.user.id;
+    }
+
+    const { user_code, game_code, jogo_slug, provider_slug, jogo_nome, rounds, cupom_uso_id } =
+      req.body;
+    const { token, secret } = getPlayFiverCredentials();
 
     let resolvedGameCode = game_code ? String(game_code).trim() : null;
     if (!resolvedGameCode && (jogo_slug || jogo_nome)) {
@@ -1501,6 +1530,34 @@ app.post('/api/prize_wheel/grant', async (req, res) => {
       });
     }
 
+    if (!isInternal) {
+      if (!authUserId) {
+        return res.status(401).json({ status: false, msg: 'Não autenticado' });
+      }
+
+      const eligibility = await validateCupomUsoForFreeBonusGrant(
+        supabase,
+        authUserId,
+        cupom_uso_id,
+        { rounds }
+      );
+
+      if (!eligibility.ok) {
+        return res.status(eligibility.status || 403).json({
+          status: false,
+          msg: eligibility.msg,
+        });
+      }
+
+      if (!resolvedGameCode && eligibility.jogo_slug) {
+        resolvedGameCode = await resolveGameCodeFromSlug(
+          eligibility.jogo_slug,
+          eligibility.provider_slug,
+          eligibility.jogo_nome
+        );
+      }
+    }
+
     if (!resolvedGameCode) {
       return res.status(400).json({
         status: false,
@@ -1510,7 +1567,7 @@ app.post('/api/prize_wheel/grant', async (req, res) => {
 
     console.log(
       '🎡 prize_wheel/grant:',
-      JSON.stringify({ user_code, game_code: resolvedGameCode, rounds }, null, 2)
+      JSON.stringify({ user_code, game_code: resolvedGameCode, rounds, cupom_uso_id }, null, 2)
     );
 
     const grantResult = await grantPlayFiversFreeBonus({
@@ -1525,6 +1582,13 @@ app.post('/api/prize_wheel/grant', async (req, res) => {
       return res.status(grantResult.status || 502).json(grantResult.data);
     }
 
+    if (!isInternal && cupom_uso_id) {
+      const marked = await markCupomUsoFreeBonusGranted(supabase, cupom_uso_id, authUserId);
+      if (!marked.ok) {
+        console.error('prize_wheel/grant: falha ao marcar cupom_uso como usado', cupom_uso_id);
+      }
+    }
+
     res.status(200).json(grantResult.data);
   } catch (error) {
     console.error('❌ Erro em prize_wheel/grant:', error);
@@ -1536,36 +1600,14 @@ app.post('/api/prize_wheel/grant', async (req, res) => {
 });
 
 /**
- * Proxy para conceder rodadas grátis na PlayFivers
+ * Conceder rodadas grátis — bloqueado; use POST /api/prize_wheel/grant com cupom_uso_id válido.
  * POST /api/free_bonus
  */
-app.post('/api/free_bonus', async (req, res) => {
-  try {
-    const { user_code, game_code, rounds } = req.body;
-    const { token, secret } = getPlayFiverCredentials(req.body);
-
-    console.log('🎁 Requisição de free_bonus recebida:', JSON.stringify({ user_code, game_code, rounds }, null, 2));
-
-    const grantResult = await grantPlayFiversFreeBonus({
-      token,
-      secret,
-      user_code,
-      game_code,
-      rounds,
-    });
-
-    if (!grantResult.ok) {
-      return res.status(grantResult.status || 502).json(grantResult.data);
-    }
-
-    res.status(200).json(grantResult.data);
-  } catch (error) {
-    console.error('❌ Erro ao fazer proxy do free_bonus:', error);
-    res.status(500).json({
-      status: false,
-      msg: 'Erro interno do servidor ao conceder rodadas grátis',
-    });
-  }
+app.post('/api/free_bonus', (_req, res) => {
+  res.status(403).json({
+    status: false,
+    msg: 'Use POST /api/prize_wheel/grant com cupom_uso_id válido após ganhar na roleta ou ativar cupom.',
+  });
 });
 
 // ============================================
@@ -2476,6 +2518,8 @@ app.get('/', (req, res) => {
       depositPixCheck: 'POST /api/deposit/pix/check - Consulta e confirma pagamento PIX',
       withdrawApprove: 'POST /api/withdraw/approve - Aprova saque e paga via MisticPay (admin)',
       withdrawMisticPayWebhook: 'POST /api/withdraw/misticpay/webhook - Callback MisticPay saque',
+      withdrawBspayWebhook: 'POST /api/withdraw/bspay/webhook - Callback BSPay saque',
+      withdrawVeopagWebhook: 'POST /api/withdraw/veopag/webhook - Callback VeoPag saque',
       supabaseProxy: {
         query: 'POST /api/supabase/{select|insert|update|delete|upsert}/:table — Proxy legível no Network',
         rpc: 'POST /api/supabase/rpc/:name — Funções RPC (ex.: obter_config_plataforma)',

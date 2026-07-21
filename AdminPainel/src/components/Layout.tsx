@@ -10,6 +10,7 @@ import {
   Crown,
   Image,
   Shield,
+  CreditCard,
   Settings,
   ScrollText,
   Webhook,
@@ -65,6 +66,7 @@ const navGroups: NavGroup[] = [
       { path: '/depositos', icon: ArrowUpCircle, label: 'Depósitos' },
       { path: '/saques', icon: ArrowDownCircle, label: 'Saques' },
       { path: '/apostas', icon: Trophy, label: 'Apostas' },
+      { path: '/gateways', icon: CreditCard, label: 'Gateway de Pagamentos' },
     ],
   },
   {

@@ -16,6 +16,7 @@ import TopBannerPage from './pages/TopBannerPage';
 import PromotionsPage from './pages/PromotionsPage';
 import AdministracaoPage from './pages/AdministracaoPage';
 import ConfiguracoesPage from './pages/ConfiguracoesPage';
+import PaymentGatewayPage from './pages/PaymentGatewayPage';
 import CuponsPage from './pages/CuponsPage';
 import RoletaPage from './pages/RoletaPage';
 import AviatorRtpPage from './pages/AviatorRtpPage';
@@ -132,6 +133,9 @@ function App() {
         <Route path="tracking" element={<TrackingPage />} />
         <Route path="seguranca" element={<SegurancaPage />} />
         <Route path="configuracoes" element={<ConfiguracoesPage />} />
+        <Route path="gateways" element={<PaymentGatewayPage />} />
+        <Route path="misticpay" element={<Navigate to="/gateways" replace />} />
+        <Route path="bspay" element={<Navigate to="/gateways" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

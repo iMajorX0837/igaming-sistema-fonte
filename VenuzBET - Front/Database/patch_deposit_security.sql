@@ -1,0 +1,18 @@
+-- =============================================================================
+-- VenuzBET — Segurança de depósitos PIX (índice)
+-- Execute APÓS patch_security_hardening.sql
+--
+-- Pode rodar COM A API LIGADA — um arquivo por vez, na ordem:
+--
+--   1. patch_deposit_security_parte_1_funcoes.sql
+--   2. patch_deposit_security_parte_2_coluna.sql
+--   3. patch_deposit_security_parte_3_trigger_depositos.sql
+--   4. patch_deposit_security_parte_4_trigger_saques_rls.sql
+--   5. patch_deposit_security_parte_5_permissoes.sql  ← por último
+--
+-- Entre cada parte: aguarde "Success" no Supabase (~3–5s).
+-- Se der deadlock: rode só aquela parte de novo (não precisa parar a API).
+--
+-- Parte 5: reinicie a PlayFiverAPI uma vez antes, se ainda não fez desde
+-- o update que usa confirmar_deposito_pix_pago_server.
+-- =============================================================================

@@ -51,7 +51,11 @@ def _fetch_engine_config() -> dict | None:
     url = _bridge_url("/engine-config")
     if not url:
         return None
-    req = urllib.request.Request(url, method="GET")
+    headers = {}
+    secret = os.environ.get("AVIATOR_INTERNAL_SECRET", "").strip()
+    if secret:
+        headers["X-Aviator-Internal"] = secret
+    req = urllib.request.Request(url, method="GET", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=6) as resp:
             payload = json.loads(resp.read().decode("utf-8"))

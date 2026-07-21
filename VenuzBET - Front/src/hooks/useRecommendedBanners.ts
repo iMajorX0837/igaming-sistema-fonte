@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import type { CmsLinkTipo } from '../lib/cmsLink';
+import {
+  getInitialRecommendedBannersCache,
+  persistRecommendedBannersCache,
+  type RecommendedBanner,
+} from '../lib/cmsBannersCache';
 
-export interface RecommendedBanner {
-  id: string;
-  titulo: string | null;
-  imagem_url: string;
-  imagem_mobile_url: string | null;
-  href: string | null;
-  link_tipo: CmsLinkTipo;
-  ordem: number;
-  ativo: boolean;
-}
+export type { RecommendedBanner };
 
 export const DEFAULT_RECOMMENDED_BANNERS: RecommendedBanner[] = [
   {
@@ -46,12 +41,23 @@ export const DEFAULT_RECOMMENDED_BANNERS: RecommendedBanner[] = [
   },
 ];
 
+function bannersEqual(a: RecommendedBanner[], b: RecommendedBanner[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => {
+    const other = b[index];
+    return (
+      item.id === other.id &&
+      item.imagem_url === other.imagem_url &&
+      item.imagem_mobile_url === other.imagem_mobile_url
+    );
+  });
+}
+
 export function useRecommendedBanners() {
-  const [banners, setBanners] = useState<RecommendedBanner[]>(DEFAULT_RECOMMENDED_BANNERS);
-  const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState<RecommendedBanner[]>(() => getInitialRecommendedBannersCache());
+  const [loading, setLoading] = useState(() => getInitialRecommendedBannersCache().length === 0);
 
   const fetchBanners = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('cms_items')
@@ -62,19 +68,21 @@ export function useRecommendedBanners() {
 
       if (error) {
         console.error('Erro ao buscar recomendados:', error);
-        setBanners(DEFAULT_RECOMMENDED_BANNERS);
+        setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_RECOMMENDED_BANNERS));
         return;
       }
 
       if (!data || data.length === 0) {
-        setBanners(DEFAULT_RECOMMENDED_BANNERS);
+        setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_RECOMMENDED_BANNERS));
         return;
       }
 
-      setBanners(data as RecommendedBanner[]);
+      const next = data as RecommendedBanner[];
+      setBanners((prev) => (bannersEqual(prev, next) ? prev : next));
+      persistRecommendedBannersCache(next);
     } catch (err) {
       console.error('Erro ao buscar recomendados:', err);
-      setBanners(DEFAULT_RECOMMENDED_BANNERS);
+      setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_RECOMMENDED_BANNERS));
     } finally {
       setLoading(false);
     }

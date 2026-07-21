@@ -7,7 +7,7 @@ const DRAG_THRESHOLD = 48;
 
 export default function Banner() {
   const navigate = useNavigate();
-  const { banners } = useHomeBanners();
+  const { banners, loading } = useHomeBanners();
   const [currentBanner, setCurrentBanner] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -132,6 +132,12 @@ export default function Banner() {
     }
     openCmsLink(banner.href, banner.link_tipo, navigate);
   };
+
+  if (loading && banners.length === 0) {
+    return (
+      <div className="relative w-full aspect-[21/9] max-h-[380px] rounded-3xl overflow-hidden bg-slate-800/40 animate-pulse" />
+    );
+  }
 
   if (banners.length === 0) return null;
 

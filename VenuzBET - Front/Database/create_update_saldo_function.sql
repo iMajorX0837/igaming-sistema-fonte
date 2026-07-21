@@ -7,16 +7,23 @@ CREATE OR REPLACE FUNCTION public.subtrair_saldo_saque(
 )
 RETURNS JSON AS $$
 DECLARE
+  v_uid UUID;
   v_saldo_atual NUMERIC;
   v_novo_saldo NUMERIC;
-  v_result JSON;
 BEGIN
-  -- Buscar saldo atual do usuário
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'not_authenticated');
+  END IF;
+
+  IF p_usuario_id IS DISTINCT FROM v_uid THEN
+    RETURN json_build_object('success', false, 'error', 'forbidden');
+  END IF;
+
   SELECT saldo INTO v_saldo_atual
   FROM public.usuarios
   WHERE id = p_usuario_id;
 
-  -- Verificar se usuário existe
   IF v_saldo_atual IS NULL THEN
     RETURN json_build_object(
       'success', false,
@@ -24,7 +31,6 @@ BEGIN
     );
   END IF;
 
-  -- Verificar se há saldo suficiente
   IF v_saldo_atual < p_valor_saque THEN
     RETURN json_build_object(
       'success', false,
@@ -34,15 +40,13 @@ BEGIN
     );
   END IF;
 
-  -- Calcular novo saldo
   v_novo_saldo := v_saldo_atual - p_valor_saque;
 
-  -- Atualizar saldo do usuário
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
   UPDATE public.usuarios
   SET saldo = v_novo_saldo
   WHERE id = p_usuario_id;
 
-  -- Retornar sucesso com o novo saldo
   RETURN json_build_object(
     'success', true,
     'saldo_anterior', v_saldo_atual,

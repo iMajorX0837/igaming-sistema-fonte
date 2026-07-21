@@ -8,6 +8,12 @@ import { createAviatorWallet } from './wallet.js';
 import { createAviatorRounds, MAX_VELAS } from './rounds.js';
 import { createAviatorConfig } from './config.js';
 import { startAviatorRecoveryWatcher } from './recoveryWatcher.js';
+import {
+  createAviatorGameSessionToken,
+  validateAviatorGameSessionToken,
+  validateAviatorInternal,
+  validateAviatorGameSessionRequest,
+} from '../lib/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const AVIATOR_DIR = path.join(__dirname, '..', 'Aviator - Spribe (Clonado)');
@@ -24,6 +30,7 @@ export function isAviatorGameCode(gameCode, provider) {
 export function buildAviatorLaunchUrl(publicApiUrl, { userCode, lang = 'pt', balance = 0 }) {
   const base = publicApiUrl.replace(/\/$/, '');
   const host = new URL(base).host;
+  const gameSession = createAviatorGameSessionToken(userCode);
   const params = new URLSearchParams({
     param1: userCode,
     param2: 'venuz',
@@ -35,6 +42,9 @@ export function buildAviatorLaunchUrl(publicApiUrl, { userCode, lang = 'pt', bal
     currency: 'BRL',
     balance: String(balance ?? 0),
   });
+  if (gameSession) {
+    params.set('gs_token', gameSession);
+  }
   return `${base}/aviator/?${params.toString()}`;
 }
 
@@ -64,9 +74,19 @@ function proxyToPython(targetBase, req, res) {
 
   if (req.method === 'GET' || req.method === 'HEAD') {
     proxyReq.end();
-  } else {
-    req.pipe(proxyReq);
+    return;
   }
+
+  // express.json() on this route consumes the stream — re-send parsed body to Python
+  if (req.body !== undefined && req.readableEnded) {
+    const payload = Buffer.from(JSON.stringify(req.body), 'utf8');
+    proxyReq.setHeader('Content-Type', req.headers['content-type'] || 'application/json');
+    proxyReq.setHeader('Content-Length', payload.length);
+    proxyReq.end(payload);
+    return;
+  }
+
+  req.pipe(proxyReq);
 }
 
 let pythonProcess = null;
@@ -110,16 +130,30 @@ export function startAviatorPythonServer(nodePort, pythonPort) {
   console.log(`[AVIATOR] Python iniciado na porta ${pythonPort} (wallet: ${walletBridge})`);
 }
 
+function requireAviatorInternalOnly(req, res, next) {
+  if (validateAviatorInternal(req)) return next();
+  return res.status(403).json({ ok: false, error: 'Acesso negado' });
+}
+
+function requireAviatorGameSessionOrInternal(req, res, next) {
+  if (validateAviatorGameSessionRequest(req)) return next();
+  return res.status(403).json({ ok: false, error: 'Acesso negado' });
+}
+
 export function mountAviatorProxy(app, { enabled = true } = {}) {
   if (!enabled) return null;
 
   const pythonPort = Number(process.env.AVIATOR_PYTHON_PORT || 8001);
   const pythonBase = `http://127.0.0.1:${pythonPort}`;
+  const jsonParser = express.json({ limit: '1mb' });
+  const proxy = (req, res) => proxyToPython(pythonBase, req, res);
 
-  const proxyPaths = ['/api/game', '/api/history', '/api/chat', '/api/discord-notify'];
-  for (const prefix of proxyPaths) {
-    app.use(prefix, (req, res) => proxyToPython(pythonBase, req, res));
-  }
+  app.post('/api/game/rpc', jsonParser, requireAviatorGameSessionOrInternal, proxy);
+  app.get('/api/game/events', requireAviatorGameSessionOrInternal, proxy);
+  app.use('/api/game', requireAviatorGameSessionOrInternal, proxy);
+  app.use('/api/history', requireAviatorGameSessionOrInternal, proxy);
+  app.use('/api/chat', requireAviatorGameSessionOrInternal, proxy);
+  app.use('/api/discord-notify', requireAviatorInternalOnly, proxy);
 
   return { pythonPort, pythonBase };
 }
@@ -175,6 +209,30 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   const wallet = createAviatorWallet(supabase, rounds);
   const router = express.Router();
 
+  function requireAviatorInternal(req, res, next) {
+    if (validateAviatorInternal(req)) return next();
+    return res.status(403).json({ ok: false, error: 'Acesso negado' });
+  }
+
+  function requireAviatorInternalOrGameSession(req, res, next) {
+    if (validateAviatorInternal(req)) return next();
+
+    const userCode = String(
+      req.body?.user_code || req.body?.account || req.query?.account || ''
+    ).trim();
+    const token =
+      req.headers['x-game-session'] ||
+      req.headers['X-Game-Session'] ||
+      req.body?.game_session ||
+      req.query?.gs_token;
+
+    if (userCode && token && validateAviatorGameSessionToken(userCode, token)) {
+      return next();
+    }
+
+    return res.status(403).json({ ok: false, error: 'Acesso negado' });
+  }
+
   function sendHashedSvg(req, res, next) {
     const name = path.basename(req.path);
     if (!name.endsWith('.svg') || name.includes('..')) return next();
@@ -190,7 +248,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   app.get(/^\/[^/]+\.svg$/i, sendHashedSvg);
 
   /** Config do motor RTP (Python consulta a cada rodada). */
-  router.get('/engine-config', async (req, res) => {
+  router.get('/engine-config', requireAviatorInternal, async (req, res) => {
     try {
       const engine = await aviatorConfig.getEngineConfig();
       res.json(engine);
@@ -237,7 +295,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   });
 
   /** Invalida fila de velas após alteração de config (interno). */
-  router.post('/invalidate-queue', express.json(), async (req, res) => {
+  router.post('/invalidate-queue', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       aviatorConfig.invalidateCache();
       const proxied = await proxyPythonInternal('/api/rtp/invalidate', { method: 'POST', body: {} });
@@ -260,7 +318,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   });
 
   // ── Wallet bridge (Python chama estes endpoints) ──
-  router.get('/balance', async (req, res) => {
+  router.get('/balance', requireAviatorInternal, async (req, res) => {
     try {
       const userCode = String(req.query.user_code || req.query.account || '').trim();
       const result = await wallet.getBalance(userCode);
@@ -278,7 +336,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  router.post('/debit', express.json(), async (req, res) => {
+  router.post('/debit', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       const { user_code, gold, betId, roundId } = req.body || {};
       const result = await wallet.debit({
@@ -296,7 +354,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  router.post('/credit', express.json(), async (req, res) => {
+  router.post('/credit', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       const { user_code, gold, betId, roundId, betGold, tipo, cashoutMultiplier } = req.body || {};
       const result = await wallet.credit({
@@ -317,7 +375,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  router.post('/refund', express.json(), async (req, res) => {
+  router.post('/refund', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       const { user_code, gold, betId, roundId } = req.body || {};
       const result = await wallet.refund({
@@ -334,7 +392,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  router.post('/loss', express.json(), async (req, res) => {
+  router.post('/loss', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       const { user_code, betGold, betId, roundId } = req.body || {};
       await wallet.recordLoss({ userCode: user_code, betGold, betId, roundId });
@@ -346,7 +404,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   });
 
   /** Sincroniza rodada completa (Python → Supabase). */
-  router.post('/round', express.json(), async (req, res) => {
+  router.post('/round', express.json(), requireAviatorInternal, async (req, res) => {
     try {
       const result = await rounds.syncRound(req.body || {});
       if (!result.ok) return res.status(400).json(result);
@@ -358,7 +416,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   });
 
   /** Histórico de velas do Supabase (Python / admin). */
-  router.get('/history', async (req, res) => {
+  router.get('/history', requireAviatorInternal, async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit, 10) || MAX_VELAS, MAX_VELAS);
       const detailed = await rounds.listVelasDetailed(limit);
@@ -372,7 +430,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  router.get('/history/:externalRoundId', async (req, res) => {
+  router.get('/history/:externalRoundId', requireAviatorInternal, async (req, res) => {
     try {
       const detail = await rounds.getVelaDetail(req.params.externalRoundId);
       if (!detail) {
@@ -386,7 +444,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
   });
 
   /** Meu histórico de apostas (modal do jogo). */
-  router.post('/histories', express.json(), async (req, res) => {
+  router.post('/histories', express.json(), requireAviatorInternalOrGameSession, async (req, res) => {
     try {
       const userCode = String(
         req.body?.user_code || req.body?.account || req.query?.account || ''
@@ -424,7 +482,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
 
   app.use('/aviator/wallet', router);
 
-  app.post('/histories', express.json(), async (req, res) => {
+  app.post('/histories', express.json(), requireAviatorInternalOrGameSession, async (req, res) => {
     try {
       const userCode = String(
         req.body?.user_code || req.body?.account || req.query?.account || ''

@@ -7,7 +7,15 @@ import urllib.error
 import urllib.request
 
 WALLET_BRIDGE_URL = os.environ.get("WALLET_BRIDGE_URL", "").rstrip("/")
+AVIATOR_INTERNAL_SECRET = os.environ.get("AVIATOR_INTERNAL_SECRET", "").strip()
 GOLD_MULTIPLE = 100
+
+
+def _internal_headers(extra: dict | None = None) -> dict:
+    headers = dict(extra or {})
+    if AVIATOR_INTERNAL_SECRET:
+        headers["X-Aviator-Internal"] = AVIATOR_INTERNAL_SECRET
+    return headers
 
 
 def wallet_enabled() -> bool:
@@ -20,7 +28,7 @@ def _post(path: str, payload: dict) -> dict:
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=_internal_headers({"Content-Type": "application/json"}),
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=8) as resp:
@@ -29,7 +37,7 @@ def _post(path: str, payload: dict) -> dict:
 
 def _get(path: str) -> dict:
     url = f"{WALLET_BRIDGE_URL}{path}"
-    req = urllib.request.Request(url, method="GET")
+    req = urllib.request.Request(url, method="GET", headers=_internal_headers())
     with urllib.request.urlopen(req, timeout=8) as resp:
         return json.loads(resp.read().decode("utf-8"))
 

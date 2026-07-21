@@ -3,7 +3,9 @@ import { X, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
-import { DEFAULT_AUTH_MODAL_IMAGE } from '../lib/siteConfigCache';
+import { resolveLoginModalImageUrl } from '../lib/authModalImages';
+import AuthModalImage from './AuthModalImage';
+import { useModalAnimation } from '../hooks/useModalAnimation';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -30,10 +32,11 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
     email: '',
     password: '',
   });
+  const { shouldMount, backdropAnimation, panelAnimation } = useModalAnimation(isOpen);
 
-  if (!isOpen) return null;
+  if (!shouldMount) return null;
 
-  const loginImageUrl = authModalsConfig.login_imagem_url || DEFAULT_AUTH_MODAL_IMAGE;
+  const loginImageUrl = resolveLoginModalImageUrl(authModalsConfig);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -63,8 +66,15 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-[420px] rounded-2xl shadow-2xl overflow-hidden" style={{ backgroundColor: homeConfig.fundo }}>
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 ${backdropAnimation}`}>
+      <div
+        className={`relative flex w-full max-w-[420px] md:max-w-[500px] md:w-[500px] flex-col overflow-hidden rounded-2xl shadow-2xl max-md:max-h-[calc(100vh-2rem)] ${panelAnimation}`}
+        style={{
+          backgroundColor: homeConfig.fundo,
+          maxWidth: 'calc(100vw - 2rem)',
+          maxHeight: 'calc(100vh - 2rem)',
+        }}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 w-7 h-7 rounded-md bg-gray-800/80 hover:bg-gray-700 flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
@@ -72,16 +82,16 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
           <X className="w-4 h-4 text-gray-400 hover:text-gray-200 transition-colors" />
         </button>
 
-        <div className="relative flex w-full justify-center items-center overflow-hidden" style={{ backgroundColor: homeConfig.fundo }}>
-          <img
-            src={loginImageUrl}
-            alt="Login"
-            className="w-full h-auto object-contain"
-          />
-        </div>
+        <AuthModalImage
+          src={loginImageUrl}
+          alt="Login"
+          className="w-full h-auto max-h-[160px] md:max-h-[180px] object-contain object-center"
+          containerClassName="relative flex w-full shrink-0 justify-center items-center overflow-hidden"
+          containerStyle={{ backgroundColor: homeConfig.fundo }}
+        />
 
-        <div className="px-6 py-5">
-          <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="px-6 py-4">
+          <form onSubmit={handleSubmit} className="space-y-2.5">
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white">
                 <Mail className="w-5 h-5" />
@@ -143,8 +153,8 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
               {loading ? 'Entrando...' : 'ENTRAR'}
             </button>
 
-            <div className="text-center py-2">
-              <p className="text-xs text-slate-400 mb-2">Ou entre com</p>
+            <div className="text-center">
+              <p className="text-xs text-slate-400 mb-1.5">Ou entre com</p>
               <div className="flex gap-2 justify-center">
                 <button
                   type="button"
@@ -192,11 +202,11 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
               </div>
             </div>
 
-            <div className="text-center pt-2">
-              <p className="text-xs text-white font-bold mt-3">
+            <div className="text-center">
+              <p className="text-xs text-white font-bold">
                 Ainda n?o tem uma conta?
               </p>
-              <button type="button" onClick={handleSwitchRegister} className="text-brand-light font-bold text-xs hover:underline mt-2">
+              <button type="button" onClick={handleSwitchRegister} className="text-brand-light font-bold text-xs hover:underline mt-1">
                 Criar uma conta gr?tis
               </button>
             </div>

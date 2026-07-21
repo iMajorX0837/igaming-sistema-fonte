@@ -11,6 +11,8 @@ import {
   getCupomErrorMessage,
   validarCupom,
 } from '../lib/cupons';
+import { activateCupomFreeBonus } from '../lib/freeBonus';
+import { resolveFreeBonusGameBySlug } from '../utils/resolveGameBySlug';
 
 const MODAL_ANIM_MS = 320;
 
@@ -20,7 +22,7 @@ interface CouponModalProps {
 }
 
 export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const [couponCode, setCouponCode] = useState('');
   const [validating, setValidating] = useState(false);
@@ -133,6 +135,36 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
           type: 'error',
         });
         return;
+      }
+
+      if (
+        result.tipo_bonus === 'giros_gratis' &&
+        result.cupom_uso_id &&
+        user?.email &&
+        result.quantidade_giros
+      ) {
+        const resolved = result.jogo_slug
+          ? await resolveFreeBonusGameBySlug(result.jogo_slug, result.provider_slug)
+          : null;
+
+        if (resolved?.game_code) {
+          const grantResult = await activateCupomFreeBonus({
+            userCode: user.email,
+            gameCode: resolved.game_code,
+            rounds: result.quantidade_giros,
+            cupomUsoId: result.cupom_uso_id,
+          });
+
+          if (!grantResult.ok) {
+            setNotification({
+              message:
+                grantResult.msg ||
+                'Cupom ativado, mas não foi possível enviar as rodadas grátis à PlayFivers.',
+              type: 'error',
+            });
+            return;
+          }
+        }
       }
 
       const successMessage =

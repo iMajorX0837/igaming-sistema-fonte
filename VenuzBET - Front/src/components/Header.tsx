@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import RegisterModal from './RegisterModal';
 import LoginModal from './LoginModal';
@@ -14,6 +14,9 @@ import { SIDEBAR_WIDTH_COLLAPSED_PX, SIDEBAR_WIDTH_EXPANDED_PX } from './Sidebar
 import { supabase } from '../lib/supabase';
 import { getVipImageUrl } from '../lib/vip';
 import { appPageContainerClass } from '../constants/homeLayout';
+import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
+import { preloadRegisterModalImage } from '../lib/authModalImages';
+import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 
 const accountMenuItemClass =
   'flex items-center gap-3 px-4 py-1.5 text-sm text-[#CBD5E1] transition-colors duration-200 hover:text-white hover:no-underline';
@@ -57,6 +60,8 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     proximoNivel?.imagem_url ||
     (proximoNivel ? getVipImageUrl(proximoNivel.grupo) : null);
   const proximoCor = proximoNivel?.cor || 'rgb(255, 146, 17)';
+  const { config: authModalsConfig } = useAuthModalsConfig();
+  const autoRegisterOpenedRef = useRef(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -95,9 +100,23 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (authLoading || isAuthenticated) return;
-    setIsRegisterOpen(true);
-  }, [authLoading, isAuthenticated]);
+    if (authLoading || isAuthenticated || autoRegisterOpenedRef.current) return;
+
+    let cancelled = false;
+    const openRegisterModal = () => {
+      if (cancelled || autoRegisterOpenedRef.current) return;
+      autoRegisterOpenedRef.current = true;
+      setIsRegisterOpen(true);
+    };
+
+    const fallbackTimer = window.setTimeout(openRegisterModal, 1200);
+    void preloadRegisterModalImage(authModalsConfig).then(openRegisterModal);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [authLoading, isAuthenticated, authModalsConfig]);
 
   // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {
@@ -472,7 +491,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
         onClose={() => setIsLoginOpen(false)}
         onSwitchToRegister={() => {
           setIsLoginOpen(false);
-          setIsRegisterOpen(true);
+          window.setTimeout(() => setIsRegisterOpen(true), MODAL_ANIM_MS);
         }}
       />
       <RegisterModal 
@@ -480,9 +499,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
         onClose={() => setIsRegisterOpen(false)}
         onSwitchToLogin={() => {
           setIsRegisterOpen(false);
-          setIsLoginOpen(true);
+          window.setTimeout(() => setIsLoginOpen(true), MODAL_ANIM_MS);
         }}
-        onRegisterSuccess={() => setIsDepositOpen(true)}
+        onRegisterSuccess={() => {
+          window.setTimeout(() => setIsDepositOpen(true), MODAL_ANIM_MS);
+        }}
       />
       <DepositModal 
         isOpen={isDepositOpen} 

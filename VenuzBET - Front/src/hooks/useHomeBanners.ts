@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  getInitialHomeBannersCache,
+  persistHomeBannersCache,
+  type HomeBanner,
+} from '../lib/cmsBannersCache';
 
-export interface HomeBanner {
-  id: string;
-  titulo: string | null;
-  imagem_url: string;
-  href: string | null;
-  link_tipo: 'href' | 'external' | null;
-  ordem: number;
-  ativo: boolean;
-}
+export type { HomeBanner };
 
 export const DEFAULT_HOME_BANNERS: HomeBanner[] = [
   {
     id: 'default-1',
     titulo: 'Banner 1',
     imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757718140707.png',
+    href: null,
+    link_tipo: null,
     ordem: 1,
     ativo: true,
   },
@@ -23,17 +22,26 @@ export const DEFAULT_HOME_BANNERS: HomeBanner[] = [
     id: 'default-2',
     titulo: 'Banner 2',
     imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757718148455.png',
+    href: null,
+    link_tipo: null,
     ordem: 2,
     ativo: true,
   },
 ];
 
+function bannersEqual(a: HomeBanner[], b: HomeBanner[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => {
+    const other = b[index];
+    return item.id === other.id && item.imagem_url === other.imagem_url;
+  });
+}
+
 export function useHomeBanners() {
-  const [banners, setBanners] = useState<HomeBanner[]>(DEFAULT_HOME_BANNERS);
-  const [loading, setLoading] = useState(true);
+  const [banners, setBanners] = useState<HomeBanner[]>(() => getInitialHomeBannersCache());
+  const [loading, setLoading] = useState(() => getInitialHomeBannersCache().length === 0);
 
   const fetchBanners = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('cms_items')
@@ -44,19 +52,21 @@ export function useHomeBanners() {
 
       if (error) {
         console.error('Erro ao buscar banners:', error);
-        setBanners(DEFAULT_HOME_BANNERS);
+        setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_HOME_BANNERS));
         return;
       }
 
       if (!data || data.length === 0) {
-        setBanners(DEFAULT_HOME_BANNERS);
+        setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_HOME_BANNERS));
         return;
       }
 
-      setBanners(data as HomeBanner[]);
+      const next = data as HomeBanner[];
+      setBanners((prev) => (bannersEqual(prev, next) ? prev : next));
+      persistHomeBannersCache(next);
     } catch (err) {
       console.error('Erro ao buscar banners:', err);
-      setBanners(DEFAULT_HOME_BANNERS);
+      setBanners((prev) => (prev.length > 0 ? prev : DEFAULT_HOME_BANNERS));
     } finally {
       setLoading(false);
     }

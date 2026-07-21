@@ -3,6 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import { executeQuery } from '../lib/executeQuery.js';
 import { maybeDispatchDepositPaidFromRpc } from '../lib/depositWebhooks.js';
 import {
+  BLOCKED_USER_RPCS,
+  getQueryTableAndOperation,
+  isBlockedUserTableWrite,
+} from '../lib/proxySecurity.js';
+import { createRateLimiter } from '../lib/security.js';
+import {
   buildOtpAuthUrl,
   buildQrDataUrl,
   consume2FAChallenge,
@@ -28,6 +34,7 @@ export function createSupabaseProxyRouter({
   dispatchWebhookEvent,
 }) {
   const router = Router();
+  const authSignInRateLimit = createRateLimiter({ windowMs: 60_000, max: 20 });
 
   const authClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -144,7 +151,7 @@ export function createSupabaseProxyRouter({
   }
 
   /** POST /api/supabase/auth/sign-in */
-  router.post('/auth/sign-in', async (req, res) => {
+  router.post('/auth/sign-in', authSignInRateLimit, async (req, res) => {
     try {
       const { email, password } = req.body ?? {};
       if (!email || !password) {
@@ -185,6 +192,14 @@ export function createSupabaseProxyRouter({
               challengeToken,
             },
             error: null,
+          });
+        }
+      } else if (data?.user?.id) {
+        const record = await getAdmin2FARecord(data.user.id);
+        if (record?.cargo === 'admin') {
+          return res.status(403).json({
+            data: { user: null, session: null },
+            error: { message: 'Contas administrativas devem acessar pelo painel admin.' },
           });
         }
       }
@@ -559,10 +574,8 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/admin/update-user */
   router.post('/auth/admin/update-user', async (req, res) => {
     try {
-      const auth = await getAuthUser(req);
-      if (!auth) {
-        return res.status(401).json({ error: { message: 'Não autenticado' } });
-      }
+      const auth = await requireAdminUser(req, res);
+      if (!auth) return;
 
       if (!supabaseServiceKey) {
         return res.status(503).json({
@@ -592,6 +605,39 @@ export function createSupabaseProxyRouter({
     }
   });
 
+  async function assertProxyAllowed(req, res, { rpcName, spec } = {}) {
+    const auth = await getAuthUser(req);
+    if (!auth) {
+      return true;
+    }
+
+    const cargo = await getUserCargo(auth.user.id);
+    if (cargo === 'admin') {
+      return true;
+    }
+
+    if (rpcName && BLOCKED_USER_RPCS.has(rpcName)) {
+      res.status(403).json({
+        data: null,
+        error: { message: 'Operação não permitida' },
+        count: null,
+      });
+      return false;
+    }
+
+    const { table, operation } = getQueryTableAndOperation(spec ?? {});
+    if (table && operation && isBlockedUserTableWrite(table, operation)) {
+      res.status(403).json({
+        data: null,
+        error: { message: 'Operação não permitida nesta tabela' },
+        count: null,
+      });
+      return false;
+    }
+
+    return true;
+  }
+
   async function handleTableQuery(req, res) {
     try {
       const spec = req.body?.query;
@@ -601,6 +647,10 @@ export function createSupabaseProxyRouter({
           error: { message: 'Campo query obrigatório' },
           count: null,
         });
+      }
+
+      if (!(await assertProxyAllowed(req, res, { spec }))) {
+        return;
       }
 
       const client = getClientForRequest(req);
@@ -623,8 +673,13 @@ export function createSupabaseProxyRouter({
 
   async function handleRpc(req, res) {
     try {
-      const client = getClientForRequest(req);
       const fn = req.params.name;
+
+      if (!(await assertProxyAllowed(req, res, { rpcName: fn }))) {
+        return;
+      }
+
+      const client = getClientForRequest(req);
       const params = req.body?.params ?? req.body?.query?.params ?? {};
 
       const { data, error } = await client.rpc(fn, params);

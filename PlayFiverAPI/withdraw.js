@@ -1,6 +1,14 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { createMisticPayWithdraw, mapPixKeyTypeToMisticPay } from './misticpay.js';
+import {
+  createPixWithdraw,
+  mapPixKeyType,
+  getActivePaymentGateway,
+} from './lib/paymentGateway.js';
+import { getMisticPayWebhookSecret } from './misticpay.js';
+import { getBspayWebhookSecret, validateBspayWebhookSignature } from './bspay.js';
+import { getVeopagWebhookSecret, validateVeopagWebhookSignature } from './veopag.js';
 import { dispatchWithdrawApprovedWebhook } from './lib/withdrawWebhooks.js';
 
 /**
@@ -73,7 +81,7 @@ export function createWithdrawRouter({
 
   /**
    * POST /api/withdraw/approve
-   * Aprova saque pendente e envia PIX via MisticPay.
+   * Aprova saque pendente e envia PIX via gateway ativo.
    */
   router.post('/approve', requireAdmin, async (req, res) => {
     const saqueId = req.body?.saque_id ?? req.body?.saqueId;
@@ -110,7 +118,8 @@ export function createWithdrawRouter({
       }
 
       const origem = String(saque.origem ?? 'pix').toLowerCase();
-      let misticpayResult = null;
+      let gatewayResult = null;
+      const activeGateway = await getActivePaymentGateway();
 
       if (origem === 'pix' || !saque.origem) {
         if (!saque.chave || !String(saque.chave).trim()) {
@@ -121,16 +130,36 @@ export function createWithdrawRouter({
         }
 
         const webhookBase = (publicApiUrl || '').replace(/\/$/, '');
-        const projectWebhook = webhookBase
-          ? `${webhookBase}/api/withdraw/misticpay/webhook`
-          : undefined;
+        const webhookPaths = {
+          bspay: '/api/withdraw/bspay/webhook',
+          veopag: '/api/withdraw/veopag/webhook',
+          misticpay: '/api/withdraw/misticpay/webhook',
+        };
+        const webhookPath = webhookPaths[activeGateway] ?? webhookPaths.misticpay;
+        const postbackUrl = webhookBase ? `${webhookBase}${webhookPath}` : undefined;
 
-        misticpayResult = await createMisticPayWithdraw({
+        let receiverName;
+        let receiverDocument;
+        if (activeGateway === 'veopag') {
+          const { data: usuario } = await supabase
+            .from('usuarios')
+            .select('nome, cpf')
+            .eq('id', saque.usuario_id)
+            .maybeSingle();
+          receiverName = usuario?.nome ?? undefined;
+          receiverDocument = usuario?.cpf ?? undefined;
+        }
+
+        gatewayResult = await createPixWithdraw({
           amount: valor,
           pixKey: saque.chave,
-          pixKeyType: saque.key ?? mapPixKeyTypeToMisticPay(saque.key),
+          pixKeyType: saque.key ?? mapPixKeyType(saque.key),
           description: `Saque — ${saqueId}`,
-          projectWebhook,
+          externalId: String(saqueId),
+          receiverName,
+          receiverDocument,
+          projectWebhook: postbackUrl,
+          postbackUrl,
         });
       }
 
@@ -138,9 +167,9 @@ export function createWithdrawRouter({
         .from('saques')
         .update({
           status: 'aprovado',
-          misticpay_job_id: misticpayResult?.jobId ?? null,
-          misticpay_transaction_id: misticpayResult?.transactionId ?? null,
-          misticpay_status: misticpayResult?.status ?? (origem === 'pix' ? null : 'MANUAL'),
+          misticpay_job_id: gatewayResult?.jobId ?? null,
+          misticpay_transaction_id: gatewayResult?.transactionId ?? null,
+          misticpay_status: gatewayResult?.status ?? (origem === 'pix' ? null : 'MANUAL'),
           updated_at: new Date().toISOString(),
         })
         .eq('id', saqueId)
@@ -153,8 +182,8 @@ export function createWithdrawRouter({
         return res.status(500).json({
           ok: false,
           message:
-            misticpayResult != null
-              ? 'Pagamento enviado à MisticPay, mas falhou ao atualizar o saque. Verifique no painel e no gateway.'
+            gatewayResult != null
+              ? 'Pagamento enviado ao gateway, mas falhou ao atualizar o saque. Verifique no painel e no gateway.'
               : 'Erro ao atualizar status do saque.',
         });
       }
@@ -175,13 +204,14 @@ export function createWithdrawRouter({
       try {
         await req.adminClient.rpc('registrar_admin_log', {
           p_acao: 'Aprovar saque com pagamento PIX',
-          p_detalhes: `Saque ${saqueId} | Valor: R$ ${valor} | MisticPay: ${misticpayResult?.transactionId ?? 'manual'}`,
+          p_detalhes: `Saque ${saqueId} | Valor: R$ ${valor} | Gateway: ${gatewayResult?.transactionId ?? 'manual'}`,
           p_status: 'sucesso',
           p_categoria: 'saque',
           p_metadata: {
             saque_id: saqueId,
             valor,
-            misticpay: misticpayResult,
+            gateway: activeGateway,
+            payment: gatewayResult,
           },
         });
       } catch (logErr) {
@@ -195,17 +225,17 @@ export function createWithdrawRouter({
         valor,
         pixKey: updated.chave,
         pixKeyType: updated.key,
-        misticpay: misticpayResult,
+        misticpay: gatewayResult,
       });
 
       return res.status(200).json({
         ok: true,
         saque_id: saqueId,
-        misticpay: misticpayResult,
+        misticpay: gatewayResult,
         message:
-          misticpayResult?.message ??
+          gatewayResult?.message ??
           (origem === 'pix'
-            ? 'Saque enviado para processamento na MisticPay.'
+            ? 'Saque enviado para processamento no gateway.'
             : 'Saque aprovado.'),
       });
     } catch (error) {
@@ -213,24 +243,77 @@ export function createWithdrawRouter({
       return res.status(502).json({
         ok: false,
         message:
-          error instanceof Error ? error.message : 'Erro ao aprovar saque via MisticPay.',
+          error instanceof Error ? error.message : 'Erro ao aprovar saque via gateway.',
       });
     }
   });
 
-  /**
-   * POST /api/withdraw/misticpay/webhook
-   * Callback opcional da MisticPay sobre status do saque PIX.
-   */
-  router.post('/misticpay/webhook', async (req, res) => {
+  async function handleWithdrawGatewayWebhook(req, res, { gateway }) {
     try {
+      const webhookSecret =
+        gateway === 'bspay'
+          ? await getBspayWebhookSecret()
+          : gateway === 'veopag'
+            ? await getVeopagWebhookSecret()
+            : await getMisticPayWebhookSecret();
+      if (!webhookSecret) {
+        console.error(`withdraw/${gateway}/webhook: webhook secret não configurado`);
+        return res.status(503).json({ ok: false, message: 'Webhook não configurado' });
+      } else if (gateway === 'bspay') {
+        const rawBody = typeof req.rawBody === 'string' ? req.rawBody : JSON.stringify(req.body ?? {});
+        const valid = validateBspayWebhookSignature({
+          rawBody,
+          headers: req.headers,
+          secret: webhookSecret,
+        });
+        if (!valid) {
+          return res.status(401).json({ ok: false, message: 'Não autorizado' });
+        }
+      } else if (gateway === 'veopag') {
+        const rawBody = typeof req.rawBody === 'string' ? req.rawBody : JSON.stringify(req.body ?? {});
+        const valid = validateVeopagWebhookSignature({
+          rawBody,
+          headers: req.headers,
+          secret: webhookSecret,
+        });
+        if (!valid) {
+          return res.status(401).json({ ok: false, message: 'Não autorizado' });
+        }
+      } else {
+        const provided = String(
+          req.headers['x-misticpay-secret'] ||
+            req.headers['x-webhook-secret'] ||
+            req.body?.secret ||
+            '',
+        );
+        let valid = false;
+        try {
+          valid = crypto.timingSafeEqual(
+            Buffer.from(provided),
+            Buffer.from(String(webhookSecret)),
+          );
+        } catch {
+          valid = false;
+        }
+        if (!valid) {
+          return res.status(401).json({ ok: false, message: 'Não autorizado' });
+        }
+      }
+
       const payload = req.body ?? {};
       const data =
         typeof payload?.data === 'object' && payload.data !== null ? payload.data : payload;
 
-      const transactionId = data?.transactionId ?? data?.transaction_id;
+      const transactionId =
+        data?.transactionId ??
+        data?.transaction_id ??
+        payload?.transaction_id ??
+        payload?.transactionId;
       const jobId = data?.jobId ?? data?.job_id;
-      const status = String(data?.status ?? data?.transactionState ?? payload?.status ?? '').toUpperCase();
+      const event = String(payload?.event ?? '').toLowerCase();
+      const status = String(
+        data?.status ?? data?.transactionState ?? payload?.status ?? event ?? ''
+      ).toUpperCase();
 
       if (!transactionId && !jobId) {
         return res.status(200).json({ ok: true, ignored: true });
@@ -247,7 +330,7 @@ export function createWithdrawRouter({
       const { data: saque, error } = await query.maybeSingle();
 
       if (error) {
-        console.error('withdraw/misticpay/webhook lookup:', error);
+        console.error(`withdraw/${gateway}/webhook lookup:`, error);
         return res.status(500).json({ ok: false });
       }
 
@@ -260,25 +343,80 @@ export function createWithdrawRouter({
         updated_at: new Date().toISOString(),
       };
 
-      const failedStates = ['FAILED', 'FALHOU', 'CANCELLED', 'CANCELED', 'REJECTED', 'REJEITADO', 'ERROR'];
-      const isFailure = failedStates.some((s) => status.includes(s));
+      const failedStates = [
+        'FAILED',
+        'FALHOU',
+        'CANCELLED',
+        'CANCELED',
+        'REJECTED',
+        'REJEITADO',
+        'ERROR',
+        'CASHOUT.FAILED',
+        'CASHOUT_FAILED',
+      ];
+      const isFailure =
+        failedStates.some((s) => status.includes(s)) ||
+        event.includes('cashout.failed') ||
+        event.includes('withdrawal.failed') ||
+        status === 'FAILED';
 
       if (isFailure && saque.status === 'aprovado') {
         updates.status = 'falhou';
-        try {
-          await refundWithdrawBalance(saque.usuario_id, saque.valor);
-        } catch (refundError) {
-          console.error('withdraw/misticpay/webhook refund:', refundError);
+        const { data: updatedSaque, error: updateError } = await supabase
+          .from('saques')
+          .update(updates)
+          .eq('id', saque.id)
+          .eq('status', 'aprovado')
+          .select('id')
+          .maybeSingle();
+
+        if (updateError) {
+          console.error(`withdraw/${gateway}/webhook update:`, updateError);
+          return res.status(500).json({ ok: false });
         }
+
+        if (updatedSaque) {
+          try {
+            await refundWithdrawBalance(saque.usuario_id, saque.valor);
+          } catch (refundError) {
+            console.error(`withdraw/${gateway}/webhook refund:`, refundError);
+          }
+        }
+
+        return res.status(200).json({ ok: true });
       }
 
       await supabase.from('saques').update(updates).eq('id', saque.id);
 
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error('❌ withdraw/misticpay/webhook:', error);
+      console.error(`❌ withdraw/${gateway}/webhook:`, error);
       return res.status(500).json({ ok: false });
     }
+  }
+
+  /**
+   * POST /api/withdraw/misticpay/webhook
+   * Callback opcional da MisticPay sobre status do saque PIX.
+   */
+  router.post('/misticpay/webhook', async (req, res) => {
+    return handleWithdrawGatewayWebhook(req, res, { gateway: 'misticpay' });
+  });
+
+  /**
+   * POST /api/withdraw/bspay/webhook
+   * Callback BSPay sobre status do saque PIX.
+   */
+  router.post('/bspay/webhook', async (req, res) => {
+    return handleWithdrawGatewayWebhook(req, res, { gateway: 'bspay' });
+  });
+
+  /**
+   * POST /api/withdraw/veopag/webhook
+   * Callback VeoPag sobre status do saque PIX.
+   */
+  router.post('/veopag/webhook', async (req, res) => {
+    return handleWithdrawGatewayWebhook(req, res, { gateway: 'veopag' });
   });
 
   return router;

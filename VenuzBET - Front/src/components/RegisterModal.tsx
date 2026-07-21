@@ -3,7 +3,9 @@ import { X, Eye, EyeOff, CreditCard, Mail, Smartphone, Lock, AlertTriangle, Arro
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
-import { DEFAULT_AUTH_MODAL_IMAGE } from '../lib/siteConfigCache';
+import { resolveRegisterModalImageUrl } from '../lib/authModalImages';
+import AuthModalImage from './AuthModalImage';
+import { useModalAnimation } from '../hooks/useModalAnimation';
 
 interface RegisterModalProps {
   isOpen: boolean;
@@ -79,6 +81,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   const verifiedFullNameRef = useRef<string>('');
   const cpfVerifiedRef = useRef(false);
   const runCpfLookupRef = useRef<(digits: string) => Promise<void>>(async () => {});
+  const { shouldMount, backdropAnimation, panelAnimation } = useModalAnimation(isOpen);
 
   useEffect(() => {
     cpfVerifiedRef.current = cpfVerified;
@@ -190,7 +193,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     };
   }, [formData.cpf, resetCpfVerification]);
 
-  if (!isOpen) return null;
+  if (!shouldMount) return null;
 
   const formatCPF = (value: string) => {
     // Remove tudo que n?o ? d?gito
@@ -297,9 +300,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 ${backdropAnimation}`}>
       <div
-        className="relative flex w-full max-w-[420px] md:max-w-[500px] flex-col overflow-hidden rounded-2xl shadow-2xl max-md:max-h-[calc(100vh-2rem)] md:h-[735px] md:w-[500px]"
+        className={`relative flex w-full max-w-[420px] md:max-w-[500px] flex-col overflow-hidden rounded-2xl shadow-2xl max-md:max-h-[calc(100vh-2rem)] md:h-[735px] md:w-[500px] ${panelAnimation}`}
         style={{
           backgroundColor: homeConfig.fundo,
           maxWidth: 'calc(100vw - 2rem)',
@@ -343,16 +346,13 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
           </div>
         )}
 
-        <div
-          className="relative flex w-full shrink-0 justify-center items-center overflow-hidden md:h-[200px]"
-          style={{ backgroundColor: homeConfig.fundo }}
-        >
-          <img
-            src={authModalsConfig.register_imagem_url || DEFAULT_AUTH_MODAL_IMAGE}
-            alt="Registro"
-            className="w-full h-auto object-contain md:h-full md:object-cover md:object-center"
-          />
-        </div>
+        <AuthModalImage
+          src={resolveRegisterModalImageUrl(authModalsConfig)}
+          alt="Registro"
+          className="w-full h-auto object-contain md:h-full md:object-cover md:object-center"
+          containerClassName="relative flex w-full shrink-0 justify-center items-center overflow-hidden md:h-[200px]"
+          containerStyle={{ backgroundColor: homeConfig.fundo }}
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <form onSubmit={handleSubmit} className="space-y-2.5">

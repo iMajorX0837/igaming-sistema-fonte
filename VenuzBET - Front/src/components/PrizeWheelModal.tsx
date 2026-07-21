@@ -14,6 +14,7 @@ import {
 } from '../lib/prizeWheel';
 import { grantPrizeWheelBonus } from '../lib/freeBonus';
 import { resolveFreeBonusGameBySlug } from '../utils/resolveGameBySlug';
+import { useModalAnimation } from '../hooks/useModalAnimation';
 
 
 
@@ -117,21 +118,19 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
   }, []);
 
+  const { shouldMount, backdropAnimation, panelAnimation } = useModalAnimation(isOpen, resetState);
+
 
 
   useEffect(() => {
 
-    if (!isOpen) {
-
-      resetState();
-
-    } else {
+    if (isOpen) {
 
       void refreshStatus();
 
     }
 
-  }, [isOpen, resetState, refreshStatus]);
+  }, [isOpen, refreshStatus]);
 
 
 
@@ -173,6 +172,9 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
       const rounds = result.quantidade_giros ?? winningSegment?.quantidade_giros ?? 0;
 
       if (rounds > 0) {
+        if (!result.cupom_uso_id) {
+          result.grant_error = 'Prêmio registrado, mas falta identificador do cupom para ativar as rodadas.';
+        } else {
         const resolved = jogoSlug ? await resolveFreeBonusGameBySlug(jogoSlug, providerSlug) : null;
 
         if (!resolved?.game_code) {
@@ -182,6 +184,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
             userCode: user.email,
             gameCode: resolved.game_code,
             rounds,
+            cupomUsoId: result.cupom_uso_id,
           });
 
           if (!grantResult.ok) {
@@ -189,6 +192,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
               grantResult.msg ||
               'Prêmio sorteado, mas não foi possível enviar as rodadas grátis. Verifique em Rodadas Grátis na carteira.';
           }
+        }
         }
       } else {
         result.grant_error = 'Quantidade de rodadas do prêmio inválida.';
@@ -223,15 +227,13 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
   const handleClose = useCallback(() => {
 
-    resetState();
-
     onClose();
 
-  }, [onClose, resetState]);
+  }, [onClose]);
 
 
 
-  if (!isOpen) return null;
+  if (!shouldMount) return null;
 
 
 
@@ -239,7 +241,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
     <div
 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-md"
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-md ${backdropAnimation}`}
 
       onClick={handleClose}
 
@@ -247,7 +249,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
       <div
 
-        className="relative flex max-h-[92vh] w-full max-w-[434px] flex-col"
+        className={`relative flex max-h-[92vh] w-full max-w-[434px] flex-col ${panelAnimation}`}
 
         onClick={(event) => event.stopPropagation()}
 

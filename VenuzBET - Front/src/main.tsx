@@ -7,12 +7,14 @@ import { SiteConfigProvider } from './contexts/SiteConfigContext.tsx';
 import { SidebarLanguageProvider } from './contexts/SidebarLanguageContext.tsx';
 import { getInitialSiteTheme, hydrateDocumentTheme, buildSiteThemeFromSiteConfig, persistSiteTheme } from './lib/siteConfigCache';
 import { applyBrandToDocument } from './lib/siteBrand';
+import { preloadAuthModalImages } from './lib/authModalImages';
 import { supabase } from './lib/supabase';
 import './index.css';
 
 const initialTheme = getInitialSiteTheme();
 hydrateDocumentTheme(initialTheme);
 applyBrandToDocument(initialTheme.brand);
+void preloadAuthModalImages(initialTheme.authModals);
 
 void (async () => {
   try {
@@ -30,6 +32,7 @@ void (async () => {
     persistSiteTheme(theme);
     hydrateDocumentTheme(theme);
     applyBrandToDocument(theme.brand);
+    void preloadAuthModalImages(theme.authModals);
   } catch {
     // ignore — SiteConfigProvider refaz o fetch completo
   }

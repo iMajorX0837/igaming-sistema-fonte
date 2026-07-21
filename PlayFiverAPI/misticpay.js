@@ -1,14 +1,18 @@
-const MISTICPAY_API_BASE = (
-  process.env.MISTICPAY_API_URL || 'https://api.misticpay.com/api'
-).replace(/\/$/, '');
+import { getMisticPayConfigService } from './lib/misticpayConfig.js';
+import { enrichPixQrImage } from './lib/pixQrCode.js';
 
-function getMisticPayCredentials() {
-  const ci = process.env.MISTICPAY_CI?.trim();
-  const cs = process.env.MISTICPAY_CS?.trim();
+async function getMisticPayRuntime() {
+  const config = await getMisticPayConfigService().getConfig();
+  const ci = config.ci?.trim();
+  const cs = config.cs?.trim();
   if (!ci || !cs) {
-    throw new Error('Credenciais MisticPay não configuradas (MISTICPAY_CI / MISTICPAY_CS).');
+    throw new Error('Gateway de pagamento não configurado.');
   }
-  return { ci, cs };
+  return {
+    ci,
+    cs,
+    apiBase: (config.apiUrl || 'https://api.misticpay.com/api').replace(/\/$/, ''),
+  };
 }
 
 /**
@@ -43,9 +47,9 @@ function extractTransactionData(json) {
  * }} params
  */
 export async function createMisticPayTransaction(params) {
-  const { ci, cs } = getMisticPayCredentials();
+  const { ci, cs, apiBase } = await getMisticPayRuntime();
 
-  const res = await fetch(`${MISTICPAY_API_BASE}/transactions/create`, {
+  const res = await fetch(`${apiBase}/transactions/create`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -79,16 +83,16 @@ export async function createMisticPayTransaction(params) {
     );
   }
 
-  return result;
+  return enrichPixQrImage(result);
 }
 
 /**
  * @param {string | number} transactionId
  */
 export async function checkMisticPayTransaction(transactionId) {
-  const { ci, cs } = getMisticPayCredentials();
+  const { ci, cs, apiBase } = await getMisticPayRuntime();
 
-  const res = await fetch(`${MISTICPAY_API_BASE}/transactions/check`, {
+  const res = await fetch(`${apiBase}/transactions/check`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -185,7 +189,7 @@ export function normalizePixKeyForMisticPay(pixKey, pixKeyType) {
  * }} params
  */
 export async function createMisticPayWithdraw(params) {
-  const { ci, cs } = getMisticPayCredentials();
+  const { ci, cs, apiBase } = await getMisticPayRuntime();
 
   const pixKeyType = mapPixKeyTypeToMisticPay(params.pixKeyType);
   const pixKey = normalizePixKeyForMisticPay(params.pixKey, pixKeyType);
@@ -205,7 +209,7 @@ export async function createMisticPayWithdraw(params) {
     body.projectWebhook = params.projectWebhook;
   }
 
-  const res = await fetch(`${MISTICPAY_API_BASE}/transactions/withdraw`, {
+  const res = await fetch(`${apiBase}/transactions/withdraw`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -249,4 +253,9 @@ export async function createMisticPayWithdraw(params) {
           ? json.message
           : undefined,
   };
+}
+
+export async function getMisticPayWebhookSecret() {
+  const config = await getMisticPayConfigService().getConfig();
+  return config.webhookSecret?.trim() || '';
 }

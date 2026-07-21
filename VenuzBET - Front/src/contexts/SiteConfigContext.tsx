@@ -15,6 +15,7 @@ import {
   type BrandColorsConfig,
 } from '../lib/siteConfigCache';
 import { applyBrandToDocument } from '../lib/siteBrand';
+import { preloadAuthModalImages } from '../lib/authModalImages';
 
 interface SiteConfigContextValue extends SiteTheme {
   loading: boolean;
@@ -26,6 +27,10 @@ const SiteConfigContext = createContext<SiteConfigContextValue | null>(null);
 export function SiteConfigProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<SiteTheme>(() => getInitialSiteTheme());
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    void preloadAuthModalImages(theme.authModals);
+  }, [theme.authModals]);
 
   const refresh = useCallback(async () => {
     try {
@@ -45,6 +50,7 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       persistSiteTheme(nextTheme);
       hydrateDocumentTheme(nextTheme);
       applyBrandToDocument(nextTheme.brand);
+      void preloadAuthModalImages(nextTheme.authModals);
     } catch (error) {
       console.error('Erro ao buscar tema do site:', error);
     } finally {

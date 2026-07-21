@@ -7,6 +7,7 @@ import {
   createMisticPayTransaction,
   type MisticPayTransactionResult,
 } from '../lib/misticpay';
+import { generatePixQrDataUrl, resolvePixQrImageSrc } from '../lib/pixQrImage';
 import { dispatchVipProfileUpdated, formatBRL, type DepositVipResult } from '../lib/vip';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
@@ -76,6 +77,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   const [pixCheckError, setPixCheckError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pixTimeLeftMs, setPixTimeLeftMs] = useState(0);
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
   const [shouldMount, setShouldMount] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -186,6 +188,30 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
     const intervalId = window.setInterval(tick, 1000);
     return () => window.clearInterval(intervalId);
   }, [isOpen, pixSession, pixPaid]);
+
+  useEffect(() => {
+    if (!pixSession?.result) {
+      setQrSrc(null);
+      return;
+    }
+
+    const fromApi = resolvePixQrImageSrc(pixSession.result);
+    if (fromApi) {
+      setQrSrc(fromApi);
+      return;
+    }
+
+    let cancelled = false;
+    void generatePixQrDataUrl(pixSession.result.copyPaste).then((generated) => {
+      if (!cancelled) {
+        setQrSrc(generated);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pixSession?.result]);
 
   if (!shouldMount) return null;
 
@@ -318,12 +344,6 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   };
 
   const pixResult = pixSession?.result;
-  const qrSrc =
-    pixResult?.qrCodeBase64 != null
-      ? pixResult.qrCodeBase64.startsWith('data:')
-        ? pixResult.qrCodeBase64
-        : `data:image/png;base64,${pixResult.qrCodeBase64}`
-      : pixResult?.qrcodeUrl ?? null;
 
   const pixPaymentProgressPct = pixSession
     ? Math.min(100, Math.max(0, (pixTimeLeftMs / PIX_PAYMENT_TIMEOUT_MS) * 100))

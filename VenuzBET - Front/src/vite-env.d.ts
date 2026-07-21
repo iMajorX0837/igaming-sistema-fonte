@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL?: string;
-  readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_FREE_BONUS_URL?: string;
+  readonly VITE_PRIZE_WHEEL_GRANT_URL?: string;
+  readonly VITE_API_BASE?: string;
   /** Base path da API de depósitos PIX (ex.: /api/deposit). Em dev o Vite usa proxy automático. */
   readonly VITE_DEPOSIT_API_BASE?: string;
   /** URL do game_launch no browser (padrão: /api/game_launch no mesmo origin). */

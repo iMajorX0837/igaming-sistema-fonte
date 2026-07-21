@@ -16,6 +16,7 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
 import { getSidebarInitiallyOpen } from '../utils/sidebarInitialOpen';
 import { appPageContainerClass } from '../constants/homeLayout';
+import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import { isLiveProviderName, isSportGameCode } from '../api/playfiversCache';
 
 interface GamePageProps {
@@ -512,14 +513,19 @@ export default function GamePage({
 
       // Mesmo origin: em dev o Vite repassa para PlayFiverAPI local (VITE_GAME_LAUNCH_PROXY).
       const gameLaunchUrl = import.meta.env.VITE_GAME_LAUNCH_URL?.trim() || '/api/game_launch';
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Sessão expirada. Faça login novamente.');
+      }
+
       const response = await fetch(gameLaunchUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          agentToken: '8898269e-650f-42af-bea0-d93981c545b0',
-          secretKey: '8b83d392-6dae-423c-bb76-af873254a0e7',
           user_code: userCode,
           game_code: gameCode,
           ...(launchProvider ? { provider: launchProvider } : {}),
@@ -968,7 +974,7 @@ export default function GamePage({
         onClose={() => setIsLoginOpen(false)}
         onSwitchToRegister={() => {
           setIsLoginOpen(false);
-          setIsRegisterOpen(true);
+          window.setTimeout(() => setIsRegisterOpen(true), MODAL_ANIM_MS);
         }}
       />
 
@@ -977,9 +983,11 @@ export default function GamePage({
         onClose={() => setIsRegisterOpen(false)}
         onSwitchToLogin={() => {
           setIsRegisterOpen(false);
-          setIsLoginOpen(true);
+          window.setTimeout(() => setIsLoginOpen(true), MODAL_ANIM_MS);
         }}
-        onRegisterSuccess={() => setIsDepositOpen(true)}
+        onRegisterSuccess={() => {
+          window.setTimeout(() => setIsDepositOpen(true), MODAL_ANIM_MS);
+        }}
       />
       <DepositModal
         isOpen={isDepositOpen}

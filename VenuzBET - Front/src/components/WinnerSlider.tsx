@@ -4,6 +4,7 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import IconifyIcon from './IconifyIcon';
 import LoadingScreen from './LoadingScreen';
+import { GAME_IMAGE_FALLBACK_SM } from '../lib/gameImageFallback';
 
 interface WinnerSliderProps {
   onGameSelect: (game: GameInfo) => void;
@@ -253,7 +254,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
               alt={winner.game}
               className="h-16 w-16 shrink-0 rounded-lg object-cover shadow-md"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64x64?text=Game';
+                (e.target as HTMLImageElement).src = GAME_IMAGE_FALLBACK_SM;
               }}
             />
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">

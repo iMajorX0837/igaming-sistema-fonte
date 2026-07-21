@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
@@ -58,6 +58,7 @@ export default function TrackingPage() {
   const [loading, setLoading] = useState(true);
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
+  const persistingRef = useRef<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     try {
@@ -122,6 +123,22 @@ export default function TrackingPage() {
       return;
     }
 
+    const duplicateInForm = rows.some(
+      (item) => item.key !== row.key && item.pixel_id.trim() === pixelId,
+    );
+    if (duplicateInForm) {
+      showToast('Este Pixel ID já está em outro campo da lista.', 'warning');
+      return;
+    }
+
+    if (persistingRef.current.has(row.key)) return;
+
+    const persistKey = row.id ? `update:${row.id}` : `insert:${pixelId}`;
+    if (persistingRef.current.has(persistKey)) return;
+
+    persistingRef.current.add(row.key);
+    persistingRef.current.add(persistKey);
+
     setSaving(row.key, true);
     try {
       if (row.id) {
@@ -134,6 +151,11 @@ export default function TrackingPage() {
           .eq('id', row.id);
 
         if (error) {
+          if (error.code === '23505') {
+            showToast('Este Pixel ID já está cadastrado.', 'warning');
+            await loadData();
+            return;
+          }
           showToast(`Erro ao salvar: ${error.message}`, 'error');
           await loadData();
           return;
@@ -155,6 +177,11 @@ export default function TrackingPage() {
         .single();
 
       if (error) {
+        if (error.code === '23505') {
+          showToast('Este Pixel ID já está cadastrado.', 'warning');
+          await loadData();
+          return;
+        }
         showToast(`Erro ao adicionar: ${error.message}`, 'error');
         return;
       }
@@ -168,6 +195,8 @@ export default function TrackingPage() {
       );
       showToast('Pixel adicionado!', 'success');
     } finally {
+      persistingRef.current.delete(row.key);
+      persistingRef.current.delete(persistKey);
       setSaving(row.key, false);
     }
   };

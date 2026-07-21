@@ -46,6 +46,7 @@ export interface AtivarCupomResult {
   jogo_nome?: string;
   provider_slug?: string;
   status_giro?: string;
+  cupom_uso_id?: string;
 }
 
 export interface AplicarCupomDepositoResult {

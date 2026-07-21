@@ -1,4 +1,4 @@
-import { PLAYFIVER_AGENT_TOKEN, PLAYFIVER_SECRET_KEY } from '../config/playfiversCredentials';
+import { supabase } from './supabase';
 
 export interface FreeBonusItem {
   id: number;
@@ -28,13 +28,27 @@ interface FreeBonusListResponse {
   data?: FreeBonusItem[];
 }
 
+async function getAccessToken(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 export async function listFreeBonuses(userCode: string): Promise<FreeBonusItem[]> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    console.error('listFreeBonuses: usuário não autenticado');
+    return [];
+  }
+
   const baseUrl = import.meta.env.VITE_FREE_BONUS_URL?.trim() || '/api/free_bonus';
   const url = `${baseUrl}?user_code=${encodeURIComponent(userCode)}`;
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   let data: FreeBonusListResponse | null = null;
@@ -52,30 +66,31 @@ export async function listFreeBonuses(userCode: string): Promise<FreeBonusItem[]
   return Array.isArray(data?.data) ? data.data : [];
 }
 
+const PRIZE_WHEEL_GRANT_URL =
+  import.meta.env.VITE_PRIZE_WHEEL_GRANT_URL?.trim() || '/api/prize_wheel/grant';
+
 export async function grantPrizeWheelBonus(params: {
   userCode: string;
   gameCode: string;
   rounds: number;
+  cupomUsoId: string;
 }): Promise<GrantFreeBonusResult> {
-  return grantFreeBonus(params);
-}
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    return { ok: false, msg: 'Faça login para ativar as rodadas grátis.' };
+  }
 
-export async function grantFreeBonus(params: {
-  userCode: string;
-  gameCode: string;
-  rounds: number;
-}): Promise<GrantFreeBonusResult> {
-  const url = import.meta.env.VITE_FREE_BONUS_URL?.trim() || '/api/free_bonus';
-
-  const response = await fetch(url, {
+  const response = await fetch(PRIZE_WHEEL_GRANT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
-      agent_token: PLAYFIVER_AGENT_TOKEN,
-      secret_key: PLAYFIVER_SECRET_KEY,
       user_code: params.userCode,
       game_code: params.gameCode,
       rounds: params.rounds,
+      cupom_uso_id: params.cupomUsoId,
     }),
   });
 
@@ -97,6 +112,15 @@ export async function grantFreeBonus(params: {
   }
 
   return { ok: true, msg };
+}
+
+export async function activateCupomFreeBonus(params: {
+  userCode: string;
+  gameCode: string;
+  rounds: number;
+  cupomUsoId: string;
+}): Promise<GrantFreeBonusResult> {
+  return grantPrizeWheelBonus(params);
 }
 
 export function getFreeBonusStatusLabel(status: string): string {

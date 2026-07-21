@@ -57,6 +57,7 @@ export interface GirarRoletaResult {
   status_giro?: string;
   proximo_giro_em?: string;
   grant_error?: string;
+  cupom_uso_id?: string;
 }
 
 const DEFAULT_IMAGES = {

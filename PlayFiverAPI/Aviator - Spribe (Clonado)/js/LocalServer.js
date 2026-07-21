@@ -86,7 +86,10 @@
     const cfg = window.enterGameConfig || {};
     const res = await fetch("/api/game/rpc", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(cfg.gameSession ? { "X-Game-Session": cfg.gameSession } : {}),
+      },
       body: JSON.stringify({
         serverCode: serverCode,
         data: data || {},
@@ -108,7 +111,12 @@
       eventSource = null;
     }
     const id = getIdentity();
-    const url = "/api/game/events?userId=" + encodeURIComponent(id.userId);
+    const cfg = window.enterGameConfig || {};
+    const account = String(cfg.account || "").trim();
+    const params = new URLSearchParams({ userId: id.userId });
+    if (account) params.set("account", account);
+    if (cfg.gameSession) params.set("gs_token", cfg.gameSession);
+    const url = "/api/game/events?" + params.toString();
     eventSource = new EventSource(url);
     eventSource.onmessage = function (ev) {
       if (!ev.data || !onPush) return;
@@ -249,7 +257,10 @@
     try {
       const res = await fetch("/aviator/wallet/histories", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(cfg.gameSession ? { "X-Game-Session": cfg.gameSession } : {}),
+        },
         body: JSON.stringify({
           user_code: account,
           userId: data && data.userId,

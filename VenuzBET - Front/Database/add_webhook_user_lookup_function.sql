@@ -19,5 +19,5 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Política para permitir que a função seja executada por qualquer role
-GRANT EXECUTE ON FUNCTION public.get_user_by_email(TEXT) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_user_by_email(TEXT) TO service_role;
 

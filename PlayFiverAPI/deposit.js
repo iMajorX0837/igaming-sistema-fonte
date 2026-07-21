@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { createMisticPayTransaction, checkMisticPayTransaction } from './misticpay.js';
+import { createPixTransaction, checkPixTransaction } from './lib/paymentGateway.js';
 import {
   dispatchDepositCreatedWebhook,
   dispatchDepositPaidWebhook,
@@ -49,6 +49,18 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
     return { user: data.user, token };
   }
 
+  async function getPlatformDepositLimits() {
+    const { data, error } = await supabase.rpc('obter_config_plataforma');
+    if (error || !data?.ok) {
+      return { min: 20, max: 1_000_000 };
+    }
+
+    return {
+      min: Number(data.deposito_minimo) || 20,
+      max: Number(data.deposito_maximo) || 1_000_000,
+    };
+  }
+
   /**
    * POST /api/deposit/pix/create
    * Gera cobrança PIX na MisticPay e registra depósito pendente.
@@ -72,6 +84,20 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
         return res.status(400).json({
           ok: false,
           message: 'Informe um valor inteiro em reais válido.',
+        });
+      }
+
+      const limits = await getPlatformDepositLimits();
+      if (amount < limits.min) {
+        return res.status(400).json({
+          ok: false,
+          message: `Valor mínimo de depósito: R$ ${limits.min},00.`,
+        });
+      }
+      if (amount > limits.max) {
+        return res.status(400).json({
+          ok: false,
+          message: `Valor máximo de depósito: R$ ${limits.max.toLocaleString('pt-BR')},00.`,
         });
       }
 
@@ -101,13 +127,16 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
         (profile?.nome ?? user.user_metadata?.nome ?? user.email ?? 'Cliente').trim() || 'Cliente';
       const transactionId = randomUUID();
 
-      const pixResult = await createMisticPayTransaction({
+      const pixResult = await createPixTransaction({
         amount,
         payerName,
         payerDocument: cpfDigits,
+        payerEmail: profile?.email ?? user.email ?? '',
         transactionId,
         description: `Depósito — ${payerName}`,
       });
+
+      const checkTransactionId = pixResult.externalTransactionId ?? transactionId;
 
       const { data: depRow, error: insertError } = await supabase
         .from('depositos')
@@ -116,6 +145,7 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
           valor: amount,
           status: 'pendente',
           cupom_codigo: cupomCodigo,
+          gateway_check_id: String(checkTransactionId),
         })
         .select('id')
         .maybeSingle();
@@ -138,8 +168,6 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
           origem: 'pix',
         });
       }
-
-      const checkTransactionId = pixResult.externalTransactionId ?? transactionId;
 
       return res.status(200).json({
         ok: true,
@@ -188,7 +216,7 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
         });
       }
 
-      const { transactionState } = await checkMisticPayTransaction(checkTransactionId);
+      const { transactionState } = await checkPixTransaction(checkTransactionId);
       const state = transactionState.toUpperCase();
 
       if (state === 'PENDENTE') {
@@ -212,33 +240,46 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
       let cupomBonus = null;
 
       if (depositoId) {
-        const { data: depOwner, error: depOwnerError } = await supabase
+        const { data: depRow, error: depOwnerError } = await supabase
           .from('depositos')
-          .select('id, usuario_id')
+          .select('id, usuario_id, gateway_check_id')
           .eq('id', depositoId)
           .maybeSingle();
 
         if (depOwnerError) {
           console.error('deposit/pix/check owner:', depOwnerError);
-        } else if (!depOwner || depOwner.usuario_id !== user.id) {
+        } else if (!depRow || depRow.usuario_id !== user.id) {
           return res.status(403).json({
             ok: false,
             message: 'Depósito não pertence ao usuário autenticado.',
           });
+        } else if (
+          depRow.gateway_check_id &&
+          String(depRow.gateway_check_id) !== String(checkTransactionId)
+        ) {
+          return res.status(403).json({
+            ok: false,
+            message: 'Transação PIX não corresponde a este depósito.',
+          });
         }
 
-        const { data: rpcData, error: rpcError } = await userSupabase.rpc('confirmar_deposito_pix_pago', {
-          p_deposito_id: depositoId,
-        });
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          'confirmar_deposito_pix_pago_server',
+          {
+            p_deposito_id: depositoId,
+            p_usuario_id: user.id,
+            p_gateway_check_id: String(checkTransactionId),
+          },
+        );
 
         if (rpcError) {
-          console.error('confirmar_deposito_pix_pago:', rpcError);
+          console.error('confirmar_deposito_pix_pago_server:', rpcError);
           confirmError =
             'Pagamento confirmado na operadora, mas houve erro ao atualizar o saldo. Entre em contato com o suporte.';
         } else {
           const row = parseRpcJson(rpcData);
           if (row && row.ok === false) {
-            console.error('confirmar_deposito_pix_pago recusou:', row);
+            console.error('confirmar_deposito_pix_pago_server recusou:', row);
             confirmError =
               'Pagamento confirmado, mas não foi possível concluir o depósito no sistema. Entre em contato com o suporte.';
           } else {
