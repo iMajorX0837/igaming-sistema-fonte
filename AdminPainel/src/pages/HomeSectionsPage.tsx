@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import SortableOrderList from '../components/SortableOrderList';
@@ -71,7 +71,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
       const { data, error } = await supabase.from('site_config').select('home_fundo').eq('id', 1).maybeSingle();
 
       if (error) {
-        showToast('Erro ao carregar cor da home. Execute site_config.sql.', 'error');
+        showToast('Erro ao carregar cor da home. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 
@@ -146,7 +146,7 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
         .order('ordem', { ascending: true });
 
       if (error) {
-        showToast('Execute home_sections.sql no Supabase.', 'error');
+        showToast('Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

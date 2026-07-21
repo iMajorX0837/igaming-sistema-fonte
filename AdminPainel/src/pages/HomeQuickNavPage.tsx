@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import SortableOrderList from '../components/SortableOrderList';
@@ -184,7 +184,7 @@ export default function HomeQuickNavPage({ embedded = false }: { embedded?: bool
         .order('ordem', { ascending: true });
 
       if (fetchError) {
-        setError('Erro ao carregar atalhos. Execute cms_items.sql no Supabase.');
+        setError('Erro ao carregar atalhos. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

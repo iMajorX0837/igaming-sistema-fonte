@@ -246,7 +246,7 @@ export default function SaqueRiskAnalysisModal({ saqueId, onClose }: SaqueRiskAn
 
         if (rpcError) {
           console.error(rpcError);
-          setError('Erro ao carregar análise. Execute saques_risco_admin.sql no Supabase.');
+          setError('Erro ao carregar análise. Execute deploy/supabase_nova_casa.sql no Supabase.');
           return;
         }
 

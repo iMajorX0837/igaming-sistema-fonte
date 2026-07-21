@@ -74,7 +74,7 @@ export default function WebhooksPage() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        showToast('Erro ao carregar webhooks. Execute webhooks.sql no Supabase.', 'error');
+        showToast('Erro ao carregar webhooks. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

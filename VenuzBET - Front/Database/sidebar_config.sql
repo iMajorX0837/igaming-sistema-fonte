@@ -1,2 +1,0 @@
--- DEPRECATED: execute site_config.sql
--- Colunas migradas: sidebar_fundo, sidebar_item_fundo, sidebar_idioma_ativo_fundo

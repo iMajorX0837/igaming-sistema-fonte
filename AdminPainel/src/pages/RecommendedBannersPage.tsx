@@ -152,7 +152,7 @@ export default function RecommendedBannersPage({ embedded = false }: { embedded?
         .order('ordem', { ascending: true });
 
       if (fetchError) {
-        setError('Erro ao carregar recomendados. Execute cms_items.sql no Supabase.');
+        setError('Erro ao carregar recomendados. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

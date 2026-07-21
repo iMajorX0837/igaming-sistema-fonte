@@ -125,7 +125,7 @@ export default function SidebarCardsPage() {
         .maybeSingle();
 
       if (error) {
-        showToast('Erro ao carregar cores do site. Execute site_config.sql.', 'error');
+        showToast('Erro ao carregar cores do site. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 
@@ -270,7 +270,7 @@ export default function SidebarCardsPage() {
         updated_at: new Date().toISOString(),
       });
       if (upsertError) {
-        showToast('Erro ao salvar imagens dos modais. Execute site_config.sql.', 'error');
+        showToast('Erro ao salvar imagens dos modais. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
       showToast('Imagens dos modais salvas!', 'success');
@@ -293,7 +293,7 @@ export default function SidebarCardsPage() {
         updated_at: new Date().toISOString(),
       });
       if (upsertError) {
-        showToast('Erro ao salvar cores de destaque. Execute patch_brand_colors.sql.', 'error');
+        showToast('Erro ao salvar cores de destaque. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
       setBrandColors({ primary: resolved.primary, hover: resolved.hover });

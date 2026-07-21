@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -167,7 +167,7 @@ export default function DepositosPage() {
 
       if (rpcError) {
         console.error(rpcError);
-        setError('Erro ao carregar depósitos. Execute depositos_admin.sql no Supabase.');
+        setError('Erro ao carregar depósitos. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

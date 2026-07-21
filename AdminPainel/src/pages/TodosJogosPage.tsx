@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import SortableOrderList from '../components/SortableOrderList';
@@ -79,7 +79,7 @@ export default function TodosJogosPage() {
       ]);
 
       if (configRes.error) {
-        showToast('Execute all_games_page.sql no Supabase.', 'error');
+        showToast('Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
       } else if (configRes.data) {
         setPageConfig({
           titulo: String(configRes.data.titulo || defaultPageConfig.titulo),

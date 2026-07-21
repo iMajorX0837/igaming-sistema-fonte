@@ -238,7 +238,7 @@ export default function SidebarCardsAdmin() {
         .order('ordem', { ascending: true });
 
       if (fetchError) {
-        setError('Erro ao carregar cards. Execute cms_items.sql no Supabase.');
+        setError('Erro ao carregar cards. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

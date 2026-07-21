@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
@@ -381,7 +381,7 @@ export default function AviatorRtpPage() {
         if (cancelled) return;
 
         if (error) {
-          showToast('Execute patch_aviator_modo_geracao.sql no Supabase.', 'error');
+          showToast('Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
           return;
         }
 

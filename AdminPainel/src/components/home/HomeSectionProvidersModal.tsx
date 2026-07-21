@@ -71,7 +71,7 @@ export default function HomeSectionProvidersModal({
       }
 
       if (savedRes.error) {
-        throw new Error('Execute home_section_providers.sql no Supabase.');
+        throw new Error('Execute deploy/supabase_nova_casa.sql no Supabase.');
       }
 
       const allProviders: CatalogProviderOption[] = [

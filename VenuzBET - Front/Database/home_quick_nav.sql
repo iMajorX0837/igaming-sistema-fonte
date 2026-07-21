@@ -1,2 +1,0 @@
--- DEPRECATED: execute cms_items.sql
--- secao migrada: quick_nav

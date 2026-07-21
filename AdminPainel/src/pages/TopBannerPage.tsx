@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
@@ -48,7 +48,7 @@ export default function TopBannerPage() {
         .maybeSingle();
 
       if (error) {
-        showToast('Execute site_config.sql no Supabase.', 'error');
+        showToast('Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

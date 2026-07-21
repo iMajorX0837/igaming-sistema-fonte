@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import SortableOrderList from '../components/SortableOrderList';
@@ -95,7 +95,7 @@ export default function PromotionsPage() {
         .order('ordem', { ascending: true });
 
       if (fetchError) {
-        setError('Erro ao carregar promoções. Execute cms_items.sql no Supabase.');
+        setError('Erro ao carregar promoções. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

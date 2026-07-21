@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import { GIROS_JOGOS_PERMITIDOS, getJogoGirosBySlug } from '../lib/girosJogosPermitidos';
@@ -79,7 +79,7 @@ export default function CuponsPage() {
         .order('created_at', { ascending: false });
 
       if (fetchError) {
-        setError('Erro ao carregar cupons. Execute cupons.sql e cupons_rpc.sql no Supabase.');
+        setError('Erro ao carregar cupons. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

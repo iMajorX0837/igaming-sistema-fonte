@@ -174,7 +174,7 @@ export default function SaquesPage() {
 
       if (rpcError) {
         console.error(rpcError);
-        setError('Erro ao carregar saques. Execute saques_admin.sql no Supabase.');
+        setError('Erro ao carregar saques. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

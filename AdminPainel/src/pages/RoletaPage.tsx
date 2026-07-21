@@ -135,7 +135,7 @@ export default function RoletaPage() {
       ]);
 
       if (configRes.error) {
-        setError('Execute prize_wheel.sql e prize_wheel_rpc.sql no Supabase.');
+        setError('Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

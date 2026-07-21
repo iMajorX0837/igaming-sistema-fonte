@@ -37,7 +37,7 @@ function isValidSiteDominio(value: string): boolean {
 
 export default function SiteBrandPage() {
   const { showToast } = useToast();
-  const { setLogoUrl, setNomeBet, refresh } = useAdminSiteBrand();
+  const { setLogoUrl, setNomeBet, setFaviconUrl, refresh } = useAdminSiteBrand();
   const [form, setForm] = useState<SiteBrandForm>(defaultForm);
   const [headerFundo, setHeaderFundo] = useState('#121319');
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function SiteBrandPage() {
         .maybeSingle();
 
       if (error) {
-        showToast('Erro ao carregar identidade do site. Execute site_config.sql.', 'error');
+        showToast('Erro ao carregar identidade do site. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 
@@ -75,6 +75,9 @@ export default function SiteBrandPage() {
         setHeaderFundo(String(data.header_fundo || '#121319'));
         setLogoUrl(nextLogo);
         setNomeBet(nextNome);
+        setFaviconUrl(
+          String(data.site_favicon_url || defaultForm.favicon_url).trim() || defaultForm.favicon_url,
+        );
       }
     } finally {
       setLoading(false);
@@ -135,6 +138,7 @@ export default function SiteBrandPage() {
       showToast('Identidade do site salva!', 'success');
       setLogoUrl(form.logo_url.trim());
       setNomeBet(nomeBet);
+      setFaviconUrl(faviconUrl);
       await refresh();
     } catch {
       showToast('Erro ao salvar identidade do site.', 'error');
@@ -274,7 +278,10 @@ export default function SiteBrandPage() {
               hint="Ícone exibido na aba do navegador. Use PNG, ICO ou SVG quadrado."
               sizeHint={ADMIN_IMAGE_SIZES.siteFavicon}
               value={form.favicon_url}
-              onChange={(v) => setForm({ ...form, favicon_url: v })}
+              onChange={(v) => {
+                setForm({ ...form, favicon_url: v });
+                setFaviconUrl(v);
+              }}
               placeholder="https://exemplo.com/favicon.png ou /headline.png"
             />
 
@@ -295,7 +302,7 @@ export default function SiteBrandPage() {
           </PagePanel>
         </div>
 
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 min-w-0 space-y-5">
           <PagePanel>
             <div className="flex items-center gap-2 mb-4">
               <Globe className="w-4 h-4 text-admin-muted" />
@@ -363,8 +370,14 @@ export default function SiteBrandPage() {
                   <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
                     Jogos originais: <span className="text-white">{originaisLabel}</span>
                   </li>
-                  <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
-                    Favicon da aba: <span className="text-white">{form.favicon_url.trim() || '—'}</span>
+                  <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2 min-w-0 overflow-hidden">
+                    <span className="block">Favicon da aba:</span>
+                    <span
+                      className="mt-0.5 block text-white text-xs truncate"
+                      title={form.favicon_url.trim() || undefined}
+                    >
+                      {form.favicon_url.trim() || '—'}
+                    </span>
                   </li>
                   <li className="rounded-md bg-admin-panel border border-admin-border px-3 py-2">
                     Alt da logo: <span className="text-white">{form.nome_bet || '—'}</span>

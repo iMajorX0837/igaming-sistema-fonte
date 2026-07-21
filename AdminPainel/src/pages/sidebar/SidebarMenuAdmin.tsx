@@ -411,7 +411,7 @@ export default function SidebarMenuAdmin() {
         .order('ordem', { ascending: true });
 
       if (error) {
-        showToast('Erro ao carregar menu da sidebar. Execute sidebar_menu.sql.', 'error');
+        showToast('Erro ao carregar menu da sidebar. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

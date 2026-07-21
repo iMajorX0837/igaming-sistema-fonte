@@ -87,7 +87,7 @@ export default function HomeSectionGamesModal({
       }
 
       if (gamesRes.error) {
-        throw new Error('Execute home_section_games.sql no Supabase.');
+        throw new Error('Execute deploy/supabase_nova_casa.sql no Supabase.');
       }
 
       const apiProviders: ProviderOption[] = providersRes.data

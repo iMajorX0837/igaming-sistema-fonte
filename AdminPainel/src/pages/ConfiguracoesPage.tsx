@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -84,7 +84,7 @@ export default function ConfiguracoesPage() {
 
       if (error) {
         console.error(error);
-        showToast('Erro ao carregar configurações. Execute site_config.sql.', 'error');
+        showToast('Erro ao carregar configurações. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

@@ -330,7 +330,7 @@ export default function UsuarioDetalhesPage() {
 
       if (error) {
         console.error(error);
-        showToast('Erro ao carregar usuário. Execute usuario_detalhes_admin.sql no Supabase.', 'error');
+        showToast('Erro ao carregar usuário. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 
@@ -421,7 +421,7 @@ export default function UsuarioDetalhesPage() {
 
       if (error) {
         console.error(error);
-        showToast('Erro ao carregar Indique e Ganhe. Execute patch_indicacao_usuario.sql.', 'error');
+        showToast('Erro ao carregar Indique e Ganhe. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

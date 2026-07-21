@@ -70,7 +70,7 @@ export default function AdministracaoPage() {
 
       if (fetchError) {
         console.error(fetchError);
-        setError('Erro ao carregar membros da equipe. Execute o script admin_equipe.sql no Supabase.');
+        setError('Erro ao carregar membros da equipe. Execute deploy/supabase_nova_casa.sql no Supabase.');
         return;
       }
 

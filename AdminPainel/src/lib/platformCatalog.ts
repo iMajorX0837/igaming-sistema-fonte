@@ -71,7 +71,7 @@ export async function loadPlatformDbOverrides(): Promise<PlatformDbOverrides> {
   ]);
 
   if (providersRes.error || gamesRes.error) {
-    throw new Error('Execute jogos.sql no Supabase antes de usar esta página.');
+    throw new Error('Execute deploy/supabase_nova_casa.sql no Supabase.');
   }
 
   return {

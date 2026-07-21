@@ -69,7 +69,7 @@ export default function TrackingPage() {
         .order('created_at', { ascending: true });
 
       if (error) {
-        showToast('Erro ao carregar pixels. Execute tracking_pixels.sql no Supabase.', 'error');
+        showToast('Erro ao carregar pixels. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
         return;
       }
 

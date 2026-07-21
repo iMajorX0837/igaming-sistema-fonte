@@ -1,2 +1,0 @@
--- DEPRECATED: execute site_config.sql
--- Coluna migrada: home_fundo

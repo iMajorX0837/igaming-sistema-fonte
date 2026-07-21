@@ -67,7 +67,7 @@ export function usePaymentGatewayConfig() {
 
       if (gatewayRes.error) {
         showToast(
-          'Erro ao carregar gateways. Execute patch_veopag_config.sql no Supabase.',
+          'Erro ao carregar gateways. Execute deploy/supabase_nova_casa.sql no Supabase.',
           'error',
         );
         return;
@@ -86,7 +86,7 @@ export function usePaymentGatewayConfig() {
 
       if (misticpayRes.error) {
         showToast(
-          'Erro ao carregar MisticPay. Execute patch_misticpay_config.sql no Supabase.',
+          'Erro ao carregar MisticPay. Execute deploy/supabase_nova_casa.sql no Supabase.',
           'error',
         );
       } else {
