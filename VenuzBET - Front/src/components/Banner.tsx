@@ -135,7 +135,9 @@ export default function Banner() {
 
   if (loading && banners.length === 0) {
     return (
-      <div className="relative w-full aspect-[21/9] max-h-[380px] rounded-3xl overflow-hidden bg-slate-800/40 animate-pulse" />
+      <div className="@container w-full">
+        <div className="relative w-full h-[min(380px,calc(100cqw*9/21))] rounded-3xl overflow-hidden bg-slate-800/40 animate-pulse" />
+      </div>
     );
   }
 
@@ -144,11 +146,12 @@ export default function Banner() {
   const canDrag = banners.length > 1;
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full aspect-[21/9] max-h-[380px] rounded-3xl overflow-hidden select-none ${
-        canDrag ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
-      }`}
+    <div className="@container w-full">
+      <div
+        ref={containerRef}
+        className={`relative w-full h-[min(380px,calc(100cqw*9/21))] rounded-3xl overflow-hidden select-none ${
+          canDrag ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+        }`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -184,7 +187,7 @@ export default function Banner() {
               src={banner.imagem_url}
               alt={banner.titulo || 'Banner'}
               draggable={false}
-              className="w-full h-full object-contain pointer-events-none"
+              className="w-full h-full object-cover pointer-events-none"
             />
           </div>
         ))}
@@ -207,6 +210,7 @@ export default function Banner() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
