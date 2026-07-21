@@ -151,19 +151,56 @@ export function validatePlayFiverWebhook(req) {
     }
   }
 
-  // PlayFivers envia agent_token + secret_key no JSON do callback (BALANCE / WinBet).
+  // PlayFivers envia secret_key no JSON do callback (BALANCE / WinBet).
   const body = req.body ?? {};
-  const bodySecret = body.secret_key || body.secretKey;
-  const bodyToken = body.agent_token || body.agentToken;
+  const bodySecret = String(body.secret_key || body.secretKey || body.secret || '').trim();
+  const bodyToken = String(body.agent_token || body.agentToken || '').trim();
   const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
 
-  if (bodySecret === secret) {
-    if (!expectedToken || bodyToken === expectedToken) {
+  if (bodySecret && bodySecret === secret) {
+    // secret_key válido basta; agent_token é checado só se vier no payload
+    if (!bodyToken || !expectedToken || bodyToken === expectedToken) {
       return true;
     }
   }
 
   return false;
+}
+
+/** Motivo seguro (sem vazar secrets) para log quando webhook PlayFivers é rejeitado. */
+export function describePlayFiverWebhookRejection(req) {
+  const secret = (
+    process.env.PLAYFIVER_WEBHOOK_SECRET ||
+    process.env.PLAYFIVER_SECRET_KEY ||
+    ''
+  ).trim();
+
+  if (!secret) return 'PLAYFIVER_SECRET_KEY não configurada';
+
+  const body = req.body ?? {};
+  const bodySecret = String(body.secret_key || body.secretKey || body.secret || '').trim();
+  const bodyToken = String(body.agent_token || body.agentToken || '').trim();
+  const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+
+  const parts = [];
+  if (req.headers['x-playfiver-secret'] || req.headers['x-webhook-secret']) {
+    parts.push('header_secret_presente');
+  }
+  if (req.headers['x-playfiver-signature']) parts.push('assinatura_presente');
+  if (bodySecret) {
+    parts.push(bodySecret === secret ? 'body_secret_ok' : 'body_secret_invalido');
+  } else {
+    parts.push('body_secret_ausente');
+  }
+  if (bodyToken) {
+    parts.push(
+      !expectedToken || bodyToken === expectedToken ? 'body_token_ok' : 'body_token_invalido'
+    );
+  } else {
+    parts.push('body_token_ausente');
+  }
+
+  return parts.join(', ');
 }
 
 export function validateInternalApiSecret(req) {

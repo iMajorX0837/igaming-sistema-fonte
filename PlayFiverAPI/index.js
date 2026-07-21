@@ -10,6 +10,7 @@ import {
   createRateLimiter,
   validateInternalApiSecret,
   validatePlayFiverWebhook,
+  describePlayFiverWebhookRejection,
 } from './lib/security.js';
 import {
   markCupomUsoFreeBonusGranted,
@@ -864,7 +865,11 @@ function isTransactionWebhook(body) {
  */
 async function handlePlayFiverWebhook(req, res) {
   if (!validatePlayFiverWebhook(req)) {
-    console.warn(`[webhook] Requisição rejeitada (não autorizada) ${req.method} ${req.path}`);
+    const reason = describePlayFiverWebhookRejection(req);
+    const bodyKeys = req.body && typeof req.body === 'object' ? Object.keys(req.body).join(', ') : '-';
+    console.warn(
+      `[webhook] Requisição rejeitada (não autorizada) ${req.method} ${req.path} | ${reason} | body_keys: ${bodyKeys}`
+    );
     return res.status(401).json({
       msg: 'UNAUTHORIZED',
       balance: 0,
