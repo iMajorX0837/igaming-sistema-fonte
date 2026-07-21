@@ -217,8 +217,28 @@ function parseCorsOrigins() {
     .filter(Boolean);
 }
 
+function getPublicApiOrigin() {
+  const raw = (process.env.PUBLIC_API_URL || '').trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Lista efetiva: CORS_ORIGINS + origem de PUBLIC_API_URL (Aviator estático em api.*). */
+function getAllowedOrigins() {
+  const fromEnv = parseCorsOrigins() || [];
+  const publicOrigin = getPublicApiOrigin();
+  if (!publicOrigin || fromEnv.includes(publicOrigin)) {
+    return fromEnv;
+  }
+  return [...fromEnv, publicOrigin];
+}
+
 export function createCorsMiddleware() {
-  const allowedOrigins = parseCorsOrigins();
+  const allowedOrigins = getAllowedOrigins();
 
   return (req, res, next) => {
     const origin = req.headers.origin;

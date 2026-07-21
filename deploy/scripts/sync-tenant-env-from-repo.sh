@@ -49,7 +49,7 @@ else
   sed -i "1i NODE_ENV=production" "$OUT"
 fi
 
-CORS_LINE="CORS_ORIGINS=https://$DOMAIN,https://www.$DOMAIN,https://admin.$DOMAIN"
+CORS_LINE="CORS_ORIGINS=https://$DOMAIN,https://www.$DOMAIN,https://admin.$DOMAIN,https://api.$DOMAIN,http://$DOMAIN,http://www.$DOMAIN,http://admin.$DOMAIN,http://api.$DOMAIN"
 if grep -q '^CORS_ORIGINS=' "$OUT"; then
   sed -i "s|^CORS_ORIGINS=.*|$CORS_LINE|" "$OUT"
 else

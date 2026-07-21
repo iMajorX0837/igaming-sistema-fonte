@@ -30,7 +30,7 @@ if ($apiContent -notmatch '(?m)^NODE_ENV=') {
   $apiContent = $apiContent -replace '(?m)^NODE_ENV=.*', 'NODE_ENV=production'
 }
 if ($apiContent -notmatch '(?m)^CORS_ORIGINS=') {
-  $apiContent += "`r`nCORS_ORIGINS=https://$Domain,https://www.$Domain,https://admin.$Domain"
+  $apiContent += "`r`nCORS_ORIGINS=https://$Domain,https://www.$Domain,https://admin.$Domain,https://api.$Domain,http://$Domain,http://www.$Domain,http://admin.$Domain,http://api.$Domain"
 }
 $apiContent | Set-Content (Join-Path $TenantDir "env.api") -NoNewline
 
