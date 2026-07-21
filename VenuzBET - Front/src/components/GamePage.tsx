@@ -18,6 +18,7 @@ import { getSidebarInitiallyOpen } from '../utils/sidebarInitialOpen';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import { isLiveProviderName, isSportGameCode } from '../api/playfiversCache';
+import { isOfficialSpribeGameCode } from '../lib/officialSpribe';
 
 interface GamePageProps {
   gameName: string;
@@ -541,7 +542,11 @@ export default function GamePage({
           user_code: userCode,
           game_code: gameCode,
           ...(launchProvider ? { provider: launchProvider } : {}),
-          game_original: gameOriginal || isSportGameCode(gameCode) || isLiveProviderName(gameProvider),
+          game_original:
+            gameOriginal ||
+            isSportGameCode(gameCode) ||
+            isLiveProviderName(gameProvider) ||
+            isOfficialSpribeGameCode(gameCode),
           user_balance: currentBalance,
           user_rtp: 70,
           lang: 'pt',

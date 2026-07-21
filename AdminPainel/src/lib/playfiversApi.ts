@@ -3,6 +3,7 @@ import {
   playFiversRequestQueue,
 } from './playfiversRequestQueue';
 import { resolveProviderImageUrl } from './providerLogos';
+import { isPlayFiverSpribeProvider, PLAYFIVERS_SPRIBE_WALLET } from './officialSpribe';
 
 
 
@@ -25,6 +26,8 @@ export const PLAYFIVERS_API_V2 = getPlayFiversApiBase();
 export const PLAYFIVERS_SLOTS_WALLET = 'Carteira PlayFiver (Slots)';
 
 export const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
+
+export { PLAYFIVERS_SPRIBE_WALLET };
 
 
 
@@ -102,7 +105,7 @@ export function isPlayFiverLiveProvider(prov: ApiProvider): boolean {
 
 export function isPlayFiverEnabledProvider(prov: ApiProvider): boolean {
 
-  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov);
+  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov) || isPlayFiverSpribeProvider(prov);
 
 }
 
@@ -176,6 +179,7 @@ export function getProviderSlug(providerName: string): string {
     Spribe: 'spribe',
     Propria: 'spribe',
     Própria: 'spribe',
+    'OFICIAL - SPRIBE': 'oficial-spribe',
     Evoplay: 'evoplay',
     BGaming: 'bgaming',
     Ezugi: 'ezugi',

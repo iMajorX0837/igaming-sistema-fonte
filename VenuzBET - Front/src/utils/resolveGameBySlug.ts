@@ -51,6 +51,7 @@ const getProviderSlug = (providerName: string): string => {
     Spribe: 'spribe',
     Propria: 'spribe',
     Própria: 'spribe',
+    'OFICIAL - SPRIBE': 'oficial-spribe',
     Evoplay: 'evoplay',
     BGaming: 'bgaming',
     Ezugi: 'ezugi',
@@ -66,6 +67,7 @@ const getProviderSlug = (providerName: string): string => {
   if (lower.includes('pragmatic') && lower.includes('live')) return 'pragmaticlive';
   if (lower.includes('pragmatic')) return 'pragmatic';
   if (lower.includes('pg soft') || lower.includes('pgsoft')) return 'pgsoft';
+  if (lower.includes('oficial') && lower.includes('spribe')) return 'oficial-spribe';
   if (lower.includes('propria') || lower.includes('própria')) return 'spribe';
 
   return createSlug(trimmed);

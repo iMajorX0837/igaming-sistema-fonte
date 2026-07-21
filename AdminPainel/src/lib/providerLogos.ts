@@ -8,6 +8,7 @@ function isSpribeProvider(providerName: string): boolean {
     normalized === 'Propria' ||
     normalized === 'Própria' ||
     lower === 'spribe' ||
+    lower.includes('oficial - spribe') ||
     lower.includes('propria') ||
     lower.includes('própria')
   );

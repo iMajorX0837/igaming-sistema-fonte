@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isOfficialSpribeAviatorGameCode } from './officialSpribe';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -83,6 +84,7 @@ export function isPlatformGameEnabled(
   gameCode: string,
   settings: PlatformSettings | null = settingsCache
 ): boolean {
+  if (isOfficialSpribeAviatorGameCode(gameCode)) return false;
   if (!settings) return true;
   if (settings.disabledProviders.has(providerId)) return false;
   return !settings.disabledGames.has(gameKey(providerId, gameCode));

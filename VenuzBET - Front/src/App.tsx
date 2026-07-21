@@ -32,6 +32,7 @@ import PrizeWheel from './components/PrizeWheel';
 import { resolveGameBySlug } from './utils/resolveGameBySlug';
 import { captureTrackingParams } from './lib/trackingParams';
 import MetaPixelTracker from './components/MetaPixelTracker';
+import { normalizeInternalHref } from './lib/cmsLink';
 
 export interface GameInfo {
   name: string;
@@ -195,16 +196,24 @@ function AppContent() {
 
       while (target && target !== document.body) {
         if (target.tagName === 'A') {
-          const href = (target as HTMLAnchorElement).href;
-          const url = new URL(href);
-          const pathname = url.pathname;
-          
-          // Se for uma rota interna, usa navigate
-          if (url.origin === window.location.origin) {
+          const anchor = target as HTMLAnchorElement;
+          const rawHref = anchor.getAttribute('href');
+          if (!rawHref) return;
+
+          const trimmed = rawHref.trim();
+          if (!trimmed || trimmed.startsWith('#')) return;
+
+          if (/^https?:\/\//i.test(trimmed)) {
+            const url = new URL(trimmed);
+            if (url.origin !== window.location.origin) return;
             e.preventDefault();
-            navigate(pathname);
+            navigate(`${url.pathname}${url.search}${url.hash}`);
             return;
           }
+
+          e.preventDefault();
+          navigate(normalizeInternalHref(trimmed));
+          return;
         }
         target = target.parentElement as HTMLElement;
       }

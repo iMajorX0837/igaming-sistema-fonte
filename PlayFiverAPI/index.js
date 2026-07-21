@@ -499,6 +499,7 @@ function getProviderSlug(providerName) {
 }
 
 const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
+const PLAYFIVERS_SPRIBE_WALLET = 'Carteira Oficial (Spribe)';
 
 function isLiveProviderName(name) {
   const lower = String(name || '').trim().toLowerCase();
@@ -513,10 +514,16 @@ function isSportGameLaunch(gameCode) {
   return String(gameCode || '').trim().toLowerCase() === 'sport';
 }
 
+/** Jogos da carteira OFICIAL - SPRIBE (SPB_*) exigem game_original=true na PlayFivers. */
+function isSpribeOfficialGameCode(gameCode) {
+  return String(gameCode || '').trim().toUpperCase().startsWith('SPB_');
+}
+
 async function shouldLaunchWithGameOriginal(gameCode, provider, requestedOriginal) {
   if (requestedOriginal === true) return true;
   if (isSportGameLaunch(gameCode)) return true;
   if (provider && isLiveProviderName(provider)) return true;
+  if (isSpribeOfficialGameCode(gameCode)) return true;
 
   if (!gameCode) return false;
 
@@ -593,7 +600,8 @@ async function resolveGameCodeFromSlug(jogoSlug, providerSlug, jogoNome) {
     (prov) =>
       prov.status === 1 &&
       (prov.wallet?.name === 'Carteira PlayFiver (Slots)' ||
-        prov.wallet?.name === 'Carteira Oficial (Live)')
+        prov.wallet?.name === PLAYFIVERS_LIVE_WALLET ||
+        prov.wallet?.name === PLAYFIVERS_SPRIBE_WALLET)
   );
 
   let foundProvider = null;

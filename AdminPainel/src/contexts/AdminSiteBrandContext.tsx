@@ -1,47 +1,23 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  DEFAULT_FAVICON_URL,
+  DEFAULT_LOGO_URL,
+  DEFAULT_NOME_BET,
+  applyAdminFavicon,
+  applyAdminPageTitle,
+  buildAdminSiteBrandFromRow,
+  formatAdminPageTitle,
+  normalizeFaviconUrl,
+} from '../lib/adminSiteBrand';
+import { getInitialAdminSiteBrand, persistAdminSiteBrand } from '../lib/adminSiteBrandCache';
 
-const DEFAULT_LOGO_URL = '/assets/logo.png';
-const DEFAULT_NOME_BET = 'RoyalBet';
-const DEFAULT_FAVICON_URL = '/headline.png';
-const ADMIN_PAGE_TITLE_PREFIX = 'Admin Painel';
-
-export function formatAdminPageTitle(nomeBet: string = DEFAULT_NOME_BET): string {
-  const brand = String(nomeBet || DEFAULT_NOME_BET).trim() || DEFAULT_NOME_BET;
-  return `${ADMIN_PAGE_TITLE_PREFIX} - ${brand}`;
-}
-
-export function applyAdminPageTitle(nomeBet: string = DEFAULT_NOME_BET) {
-  if (typeof document === 'undefined') return;
-  document.title = formatAdminPageTitle(nomeBet);
-}
-
-function resolveFaviconType(url: string): string {
-  const lower = url.toLowerCase();
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  if (lower.endsWith('.ico')) return 'image/x-icon';
-  return 'image/png';
-}
-
-export function normalizeFaviconUrl(value: unknown): string {
-  const trimmed = String(value ?? '').trim();
-  return trimmed || DEFAULT_FAVICON_URL;
-}
-
-export function applyAdminFavicon(faviconUrl: string = DEFAULT_FAVICON_URL) {
-  if (typeof document === 'undefined') return;
-
-  const href = normalizeFaviconUrl(faviconUrl);
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
-  }
-
-  link.type = resolveFaviconType(href);
-  link.href = href;
-}
+export {
+  applyAdminFavicon,
+  applyAdminPageTitle,
+  formatAdminPageTitle,
+  normalizeFaviconUrl,
+};
 
 interface AdminSiteBrandContextValue {
   logoUrl: string;
@@ -56,9 +32,10 @@ interface AdminSiteBrandContextValue {
 const AdminSiteBrandContext = createContext<AdminSiteBrandContextValue | null>(null);
 
 export function AdminSiteBrandProvider({ children }: { children: React.ReactNode }) {
-  const [logoUrl, setLogoUrlState] = useState(DEFAULT_LOGO_URL);
-  const [nomeBet, setNomeBetState] = useState(DEFAULT_NOME_BET);
-  const [faviconUrl, setFaviconUrlState] = useState(DEFAULT_FAVICON_URL);
+  const initialBrand = getInitialAdminSiteBrand();
+  const [logoUrl, setLogoUrlState] = useState(initialBrand.logoUrl);
+  const [nomeBet, setNomeBetState] = useState(initialBrand.nomeBet);
+  const [faviconUrl, setFaviconUrlState] = useState(initialBrand.faviconUrl);
 
   const refresh = useCallback(async () => {
     try {
@@ -70,28 +47,31 @@ export function AdminSiteBrandProvider({ children }: { children: React.ReactNode
 
       if (error || !data) return;
 
-      const nextLogo = String(data.header_logo_url || DEFAULT_LOGO_URL).trim() || DEFAULT_LOGO_URL;
-      const nextNome = String(data.nome_bet || DEFAULT_NOME_BET).trim() || DEFAULT_NOME_BET;
-      const nextFavicon = normalizeFaviconUrl(data.site_favicon_url);
-      setLogoUrlState(nextLogo);
-      setNomeBetState(nextNome);
-      setFaviconUrlState(nextFavicon);
+      const nextBrand = buildAdminSiteBrandFromRow(data as Record<string, unknown>);
+      setLogoUrlState(nextBrand.logoUrl);
+      setNomeBetState(nextBrand.nomeBet);
+      setFaviconUrlState(nextBrand.faviconUrl);
+      persistAdminSiteBrand(nextBrand);
     } catch {
       // ignore fetch errors; keep current values
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     void refresh();
   }, [refresh]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyAdminPageTitle(nomeBet);
   }, [nomeBet]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     applyAdminFavicon(faviconUrl);
   }, [faviconUrl]);
+
+  useLayoutEffect(() => {
+    persistAdminSiteBrand({ logoUrl, nomeBet, faviconUrl });
+  }, [logoUrl, nomeBet, faviconUrl]);
 
   const setLogoUrl = useCallback((url: string) => {
     const trimmed = url.trim();

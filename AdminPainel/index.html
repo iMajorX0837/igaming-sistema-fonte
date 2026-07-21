@@ -5,6 +5,17 @@
     <link rel="icon" type="image/png" href="/headline.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin Painel</title>
+    <script>
+      try {
+        var cachedBrand = localStorage.getItem('venuz-admin-site-brand-v1');
+        if (cachedBrand) {
+          var brand = JSON.parse(cachedBrand);
+          if (brand && brand.nomeBet) {
+            document.title = 'Admin Painel - ' + brand.nomeBet;
+          }
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

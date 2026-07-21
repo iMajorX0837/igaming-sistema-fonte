@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { normalizeInternalHref } from '../lib/cmsLink';
 import type { SidebarLanguage } from '../i18n/sidebar';
 
 export type SidebarCardIconType = 'emoji' | 'image' | 'iconify' | 'none';
@@ -146,7 +147,7 @@ function normalizeCard(row: Record<string, unknown>): SidebarPromoCard {
   return {
     id: String(row.id),
     nome_admin: String(row.nome_admin || ''),
-    href: String(row.href || '#'),
+    href: row.href ? normalizeInternalHref(String(row.href)) : '#',
     ordem: Number(row.ordem) || 0,
     ativo: Boolean(row.ativo),
     background_color: String(row.background_color || '#6212A5'),

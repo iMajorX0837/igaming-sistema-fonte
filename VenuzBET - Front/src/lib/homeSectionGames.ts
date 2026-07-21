@@ -30,6 +30,7 @@ export function getProviderSlug(providerName: string): string {
     Playson: 'playson',
     Habanero: 'habanero',
     Spribe: 'spribe',
+    'OFICIAL - SPRIBE': 'oficial-spribe',
     Evoplay: 'evoplay',
     BGaming: 'bgaming',
     Ezugi: 'ezugi',
@@ -43,7 +44,9 @@ export function getProviderSlug(providerName: string): string {
   if (lower.includes('pragmatic') && lower.includes('live')) return 'pragmaticlive';
   if (lower.includes('pragmatic')) return 'pragmatic';
   if (lower.includes('pg soft') || lower.includes('pgsoft')) return 'pgsoft';
-  if (lower.includes('propria') || lower.includes('própria') || lower.includes('spribe')) return 'spribe';
+  if (lower.includes('oficial') && lower.includes('spribe')) return 'oficial-spribe';
+  if (lower.includes('propria') || lower.includes('própria')) return 'spribe';
+  if (lower.includes('spribe')) return 'spribe';
 
   return createSlug(trimmed);
 }

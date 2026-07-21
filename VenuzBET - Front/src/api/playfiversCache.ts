@@ -1,6 +1,7 @@
 import { PLAYFIVERS_API_V2 } from '../config/playfivers';
 import { resolveProviderImageUrl } from '../lib/providerLogos';
 import { playFiversRequestQueue } from './playfiversRequestQueue';
+import { isPlayFiverSpribeProvider, PLAYFIVERS_SPRIBE_WALLET } from '../lib/officialSpribe';
 import {
   ensurePlatformGameSettingsLoaded,
   isPlatformGameEnabled,
@@ -60,6 +61,8 @@ export const PLAYFIVERS_SLOTS_WALLET = 'Carteira PlayFiver (Slots)';
 /** Carteira dos jogos ao vivo (Evolution, Pragmatic Live, etc.) */
 export const PLAYFIVERS_LIVE_WALLET = 'Carteira Oficial (Live)';
 
+export { PLAYFIVERS_SPRIBE_WALLET };
+
 export function isPlayFiverSlotsProvider(prov: ApiProvider): boolean {
   return prov.status === 1 && prov.wallet.name === PLAYFIVERS_SLOTS_WALLET;
 }
@@ -68,9 +71,9 @@ export function isPlayFiverLiveProvider(prov: ApiProvider): boolean {
   return prov.status === 1 && prov.wallet.name === PLAYFIVERS_LIVE_WALLET;
 }
 
-/** Slots + cassino ao vivo habilitados na plataforma. */
+/** Slots, cassino ao vivo e Spribe oficial habilitados na plataforma. */
 export function isPlayFiverEnabledProvider(prov: ApiProvider): boolean {
-  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov);
+  return isPlayFiverSlotsProvider(prov) || isPlayFiverLiveProvider(prov) || isPlayFiverSpribeProvider(prov);
 }
 
 /** Provedores da carteira live (Evolution, Pragmatic Live, Ezugi, etc.). */

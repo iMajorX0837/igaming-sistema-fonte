@@ -2,11 +2,26 @@ import type { NavigateFunction } from 'react-router-dom';
 
 export type CmsLinkTipo = 'href' | 'external' | null;
 
+/** Garante rota interna absoluta a partir da raiz (evita /help/help/... ao clicar links relativos). */
+export function normalizeInternalHref(href: string): string {
+  const trimmed = href.trim();
+  if (!trimmed) return '/';
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    }
+  }
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
 export function normalizeCmsLink(href: string): { href: string | null; link_tipo: CmsLinkTipo } {
   const trimmed = href.trim();
   if (!trimmed) return { href: null, link_tipo: null };
   if (/^https?:\/\//i.test(trimmed)) return { href: trimmed, link_tipo: 'external' };
-  return { href: trimmed.startsWith('/') ? trimmed : `/${trimmed}`, link_tipo: 'href' };
+  return { href: normalizeInternalHref(trimmed), link_tipo: 'href' };
 }
 
 export function openCmsLink(
@@ -22,5 +37,5 @@ export function openCmsLink(
     return;
   }
 
-  navigate(target.startsWith('/') ? target : `/${target}`);
+  navigate(normalizeInternalHref(target));
 }

@@ -24,6 +24,10 @@ import {
   PROPRIETARY_PROVIDER_ID,
 } from '../lib/proprietaryCatalog';
 import ToggleSwitch from '../components/jogos/ToggleSwitch';
+import {
+  getOfficialSpribeGameDefaultActive,
+  isOfficialSpribeAviatorGameCode,
+} from '../lib/officialSpribe';
 import StatusBadge from '../components/jogos/StatusBadge';
 import CategoryTabs from '../components/jogos/CategoryTabs';
 import { CategorySection, getCategorySections } from '../components/jogos/CategorySection';
@@ -163,7 +167,7 @@ export default function JogosPage() {
           nome: game.name,
           image_url: game.image_url,
           api_status: game.status === true,
-          ativo: gameMap.get(game.game_code) ?? true,
+          ativo: gameMap.get(game.game_code) ?? getOfficialSpribeGameDefaultActive(game.game_code),
         }))
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
@@ -296,15 +300,19 @@ export default function JogosPage() {
         { onConflict: 'api_provider_id' }
       );
 
-      const rows = provider.games.map((game) => ({
-        api_provider_id: provider.id,
-        game_code: game.game_code,
-        nome: game.nome,
-        image_url: game.image_url,
-        api_status: game.api_status,
-        ativo,
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = provider.games.map((game) => {
+        const shouldActivate =
+          ativo && isOfficialSpribeAviatorGameCode(game.game_code) ? false : ativo;
+        return {
+          api_provider_id: provider.id,
+          game_code: game.game_code,
+          nome: game.nome,
+          image_url: game.image_url,
+          api_status: game.api_status,
+          ativo: shouldActivate,
+          updated_at: new Date().toISOString(),
+        };
+      });
 
       const { error } = await supabase.from('platform_games').upsert(rows, {
         onConflict: 'api_provider_id,game_code',
@@ -318,7 +326,16 @@ export default function JogosPage() {
       setProviders((prev) =>
         prev.map((p) =>
           p.id === provider.id
-            ? { ...p, games: p.games.map((g) => ({ ...g, ativo })) }
+            ? {
+                ...p,
+                games: p.games.map((g) => ({
+                  ...g,
+                  ativo:
+                    ativo && isOfficialSpribeAviatorGameCode(g.game_code)
+                      ? false
+                      : ativo,
+                })),
+              }
             : p
         )
       );
