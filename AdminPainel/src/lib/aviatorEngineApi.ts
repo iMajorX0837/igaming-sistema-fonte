@@ -1,6 +1,6 @@
 function apiBase() {
-  if (import.meta.env.DEV) return '';
-  return import.meta.env.VITE_PLAYFIVERS_PROXY?.trim() || '';
+  // Dev: Vite proxy (vite.config.ts). Prod: nginx admin.*/aviator → API.
+  return '';
 }
 
 async function authHeaders() {
