@@ -194,14 +194,6 @@ export function createSupabaseProxyRouter({
             error: null,
           });
         }
-      } else if (data?.user?.id) {
-        const record = await getAdmin2FARecord(data.user.id);
-        if (record?.cargo === 'admin') {
-          return res.status(403).json({
-            data: { user: null, session: null },
-            error: { message: 'Contas administrativas devem acessar pelo painel admin.' },
-          });
-        }
       }
 
       res.json({ data, error: null });
