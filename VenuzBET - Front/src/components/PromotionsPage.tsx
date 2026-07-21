@@ -77,7 +77,7 @@ export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps)
       <div className="flex flex-col min-h-full" style={{ backgroundColor: homeConfig.fundo }}>
         <div className="mx-auto w-full max-w-[1080px] px-6 py-8 flex-1">
         {loading ? (
-          <LoadingScreen title="Carregando promoções..." variant="page" className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]" />
+          <LoadingScreen title="Carregando promoÃ§Ãµes..." variant="page" className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]" />
         ) : banners.length === 0 ? (
           <div
             className="flex min-h-[40vh] items-center justify-center rounded-xl border px-6 py-16"
@@ -87,7 +87,7 @@ export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps)
               className="text-center text-lg font-semibold text-slate-300"
               style={{ fontFamily: 'Montserrat, sans-serif' }}
             >
-              Sem promoções no momento
+              Sem promoÃ§Ãµes no momento
             </p>
           </div>
         ) : (
