@@ -105,6 +105,39 @@ export function validateAviatorGameSessionRequest(req) {
   return validateAviatorGameSessionToken(accountEmail, token);
 }
 
+function getPlayFiverWebhookSecret() {
+  return (
+    process.env.PLAYFIVER_WEBHOOK_SECRET ||
+    process.env.PLAYFIVER_SECRET_KEY ||
+    ''
+  ).trim();
+}
+
+function getPlayFiverAgentToken() {
+  return (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+}
+
+/** Credenciais no body — PlayFivers usa agent_code/agent_secret ou agent_token/secret_key. */
+function extractPlayFiverWebhookCredentials(body) {
+  const payload = body && typeof body === 'object' ? body : {};
+  const bodySecret = String(
+    payload.agent_secret ||
+      payload.agentSecret ||
+      payload.secret_key ||
+      payload.secretKey ||
+      payload.secret ||
+      ''
+  ).trim();
+  const bodyToken = String(
+    payload.agent_code ||
+      payload.agentCode ||
+      payload.agent_token ||
+      payload.agentToken ||
+      ''
+  ).trim();
+  return { bodySecret, bodyToken };
+}
+
 export function validatePlayFiverWebhook(req) {
   if (process.env.PLAYFIVER_WEBHOOK_SKIP_VALIDATION === 'true') {
     if (isProduction()) {
@@ -114,11 +147,7 @@ export function validatePlayFiverWebhook(req) {
     return true;
   }
 
-  const secret = (
-    process.env.PLAYFIVER_WEBHOOK_SECRET ||
-    process.env.PLAYFIVER_SECRET_KEY ||
-    ''
-  ).trim();
+  const secret = getPlayFiverWebhookSecret();
 
   if (!secret) {
     if (isProduction()) {
@@ -151,14 +180,11 @@ export function validatePlayFiverWebhook(req) {
     }
   }
 
-  // PlayFivers envia secret_key no JSON do callback (BALANCE / WinBet).
-  const body = req.body ?? {};
-  const bodySecret = String(body.secret_key || body.secretKey || body.secret || '').trim();
-  const bodyToken = String(body.agent_token || body.agentToken || '').trim();
-  const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+  // PlayFivers: agent_code + agent_secret (ou agent_token + secret_key).
+  const { bodySecret, bodyToken } = extractPlayFiverWebhookCredentials(req.body);
+  const expectedToken = getPlayFiverAgentToken();
 
   if (bodySecret && bodySecret === secret) {
-    // secret_key válido basta; agent_token é checado só se vier no payload
     if (!bodyToken || !expectedToken || bodyToken === expectedToken) {
       return true;
     }
@@ -169,18 +195,13 @@ export function validatePlayFiverWebhook(req) {
 
 /** Motivo seguro (sem vazar secrets) para log quando webhook PlayFivers é rejeitado. */
 export function describePlayFiverWebhookRejection(req) {
-  const secret = (
-    process.env.PLAYFIVER_WEBHOOK_SECRET ||
-    process.env.PLAYFIVER_SECRET_KEY ||
-    ''
-  ).trim();
+  const secret = getPlayFiverWebhookSecret();
 
   if (!secret) return 'PLAYFIVER_SECRET_KEY não configurada';
 
   const body = req.body ?? {};
-  const bodySecret = String(body.secret_key || body.secretKey || body.secret || '').trim();
-  const bodyToken = String(body.agent_token || body.agentToken || '').trim();
-  const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+  const { bodySecret, bodyToken } = extractPlayFiverWebhookCredentials(body);
+  const expectedToken = getPlayFiverAgentToken();
 
   const parts = [];
   if (req.headers['x-playfiver-secret'] || req.headers['x-webhook-secret']) {
