@@ -118,9 +118,9 @@ export default function HomeQuickNav() {
   }
 
   return (
-    <div className="-mx-1 overflow-x-auto pb-1 scrollbar-hide animate-page-enter">
+    <div className="overflow-x-auto pb-1 pt-0.5 scrollbar-hide animate-page-enter">
       <nav
-        className="flex w-max min-w-full justify-start gap-2 px-1 sm:gap-2.5"
+        className="flex w-max min-w-full justify-start gap-2 px-1.5 sm:gap-2.5"
         aria-label="Atalhos de jogos e categorias"
       >
         {items.map((item, index) => (

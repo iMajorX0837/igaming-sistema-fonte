@@ -265,6 +265,18 @@
   }
 }
 
+@property --quick-nav-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes quickNavBorderSpin {
+  to {
+    --quick-nav-angle: 360deg;
+  }
+}
+
 @layer components {
   .quick-nav-rgb-shell {
     position: relative;
@@ -274,16 +286,15 @@
     overflow: hidden;
     border-radius: 0.5rem;
     padding: 1.5px;
+    isolation: isolate;
   }
 
-  .quick-nav-rgb-shell::before {
-    content: '';
-    position: absolute;
-    inset: -120%;
-    opacity: 0;
-    transition: opacity 0.4s ease;
+  /* Anima o ângulo do gradiente (sem transform) — evita bug de compositing no iOS Safari
+     nos primeiros cards dentro de overflow-x-auto. */
+  .quick-nav-rgb-shell.is-active {
+    --quick-nav-angle: 0deg;
     background: conic-gradient(
-      from 0deg,
+      from var(--quick-nav-angle),
       transparent 0deg 115deg,
       #ff3366 130deg,
       #ff9933 155deg,
@@ -296,20 +307,7 @@
       transparent 328deg,
       transparent 360deg
     );
-    animation: quickNavRgbArc 5s linear infinite;
-    animation-play-state: paused;
-    pointer-events: none;
-  }
-
-  .quick-nav-rgb-shell.is-active::before {
-    opacity: 1;
-    animation-play-state: running;
-  }
-
-  @keyframes quickNavRgbArc {
-    to {
-      transform: rotate(360deg);
-    }
+    animation: quickNavBorderSpin 5s linear infinite;
   }
 
   .prize-wheel-widget {
