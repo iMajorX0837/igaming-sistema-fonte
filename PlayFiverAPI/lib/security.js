@@ -151,16 +151,15 @@ export function validatePlayFiverWebhook(req) {
     }
   }
 
-  if (!isProduction()) {
-    const body = req.body ?? {};
-    const bodySecret = body.secret_key || body.secretKey;
-    const bodyToken = body.agent_token || body.agentToken;
-    const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
+  // PlayFivers envia agent_token + secret_key no JSON do callback (BALANCE / WinBet).
+  const body = req.body ?? {};
+  const bodySecret = body.secret_key || body.secretKey;
+  const bodyToken = body.agent_token || body.agentToken;
+  const expectedToken = (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
 
-    if (bodySecret === secret) {
-      if (!expectedToken || bodyToken === expectedToken) {
-        return true;
-      }
+  if (bodySecret === secret) {
+    if (!expectedToken || bodyToken === expectedToken) {
+      return true;
     }
   }
 
