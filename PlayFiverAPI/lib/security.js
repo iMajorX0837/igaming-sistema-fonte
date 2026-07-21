@@ -185,9 +185,11 @@ export function validatePlayFiverWebhook(req) {
   const expectedToken = getPlayFiverAgentToken();
 
   if (bodySecret && bodySecret === secret) {
-    if (!bodyToken || !expectedToken || bodyToken === expectedToken) {
-      return true;
-    }
+    return true;
+  }
+
+  if (bodyToken && expectedToken && bodyToken === expectedToken && bodySecret && bodySecret === secret) {
+    return true;
   }
 
   return false;
@@ -214,11 +216,12 @@ export function describePlayFiverWebhookRejection(req) {
     parts.push('body_secret_ausente');
   }
   if (bodyToken) {
-    parts.push(
-      !expectedToken || bodyToken === expectedToken ? 'body_token_ok' : 'body_token_invalido'
-    );
+    parts.push('body_agent_code_presente');
+    if (expectedToken) {
+      parts.push(bodyToken === expectedToken ? 'body_agent_code_ok' : 'body_agent_code_diferente');
+    }
   } else {
-    parts.push('body_token_ausente');
+    parts.push('body_agent_code_ausente');
   }
 
   return parts.join(', ');
