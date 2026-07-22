@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import PagePanel from '../ui/PagePanel';
 import BspayForm from './BspayForm';
 import { GATEWAY_PROVIDERS } from './constants';
 import MisticPayForm from './MisticPayForm';
@@ -18,45 +17,54 @@ const configuredById = (config: PaymentGatewayConfig, id: PaymentGatewayId) => {
   return config.veopagConfigured;
 };
 
+const labelMap: Record<PaymentGatewayId, string> = {
+  misticpay: 'MisticPay',
+  bspay: 'BSPay',
+  veopag: 'VeoPag',
+};
+
+function roleBadges(config: PaymentGatewayConfig, id: PaymentGatewayId) {
+  const badges: string[] = [];
+  if (config.activeDepositGateway === id) badges.push('Depósito');
+  if (config.activeWithdrawGateway === id) badges.push('Saque');
+  return badges;
+}
+
 export default function GatewayConfigPanel({ config }: GatewayConfigPanelProps) {
-  const [configTab, setConfigTab] = useState<PaymentGatewayId>(config.activeGateway);
+  const [configTab, setConfigTab] = useState<PaymentGatewayId>(config.activeDepositGateway);
 
   useEffect(() => {
-    setConfigTab(config.activeGateway);
-  }, [config.activeGateway]);
+    setConfigTab(config.activeDepositGateway);
+  }, [config.activeDepositGateway]);
 
   return (
-    <PagePanel padding={false} className="overflow-hidden !p-0">
-      <div className="px-5 md:px-6 pt-5 md:pt-6 pb-4 border-b border-admin-border">
-        <h2 className="text-base font-semibold text-admin-foreground">Credenciais</h2>
-        <p className="text-sm text-admin-muted mt-1">
-          Configure cada provedor independentemente. Apenas o gateway ativo processará pagamentos.
-        </p>
-      </div>
-
-      <div className="flex border-b border-admin-border overflow-x-auto px-4 md:px-6 gap-1">
+    <div className="w-full overflow-hidden rounded-xl border border-admin-border bg-admin-panel-2/20">
+      <div className="flex gap-1 overflow-x-auto border-b border-admin-border px-4 md:px-5">
         {GATEWAY_PROVIDERS.map((provider) => {
           const isActive = configTab === provider.id;
-          const isLive = config.activeGateway === provider.id;
+          const roles = roleBadges(config, provider.id);
 
           return (
             <button
               key={provider.id}
               type="button"
               onClick={() => setConfigTab(provider.id)}
-              className={`flex flex-col items-start gap-0.5 px-4 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px min-w-[120px] ${
+              className={`flex min-w-[132px] flex-col items-start gap-0.5 whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-medium transition-colors -mb-px ${
                 isActive
-                  ? 'text-white border-white'
-                  : 'text-gray-500 border-transparent hover:text-gray-300'
+                  ? 'border-white text-white'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}
             >
               <span className="flex items-center gap-2">
                 {provider.label}
-                {isLive ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
-                    Ativo
+                {roles.map((role) => (
+                  <span
+                    key={role}
+                    className="rounded-full bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400"
+                  >
+                    {role}
                   </span>
-                ) : null}
+                ))}
               </span>
               <span className="text-xs font-normal">
                 <ConfigStatusBadge configured={configuredById(config, provider.id)} />
@@ -66,11 +74,17 @@ export default function GatewayConfigPanel({ config }: GatewayConfigPanelProps) 
         })}
       </div>
 
+      <div className="border-b border-admin-border bg-admin-panel-2/30 px-5 py-3 text-xs text-admin-muted md:px-6">
+        Ativos agora: depósitos em{' '}
+        <strong className="text-admin-foreground">{labelMap[config.activeDepositGateway]}</strong>, saques
+        em <strong className="text-admin-foreground">{labelMap[config.activeWithdrawGateway]}</strong>
+      </div>
+
       <div className="p-5 md:p-6">
         {configTab === 'misticpay' && <MisticPayForm config={config} />}
         {configTab === 'bspay' && <BspayForm config={config} />}
         {configTab === 'veopag' && <VeopagForm config={config} />}
       </div>
-    </PagePanel>
+    </div>
   );
 }

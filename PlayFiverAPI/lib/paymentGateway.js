@@ -23,8 +23,12 @@ import {
 } from '../veopag.js';
 import { getPaymentGatewayConfigService } from './paymentGatewayConfig.js';
 
-async function getActiveGateway() {
-  return getPaymentGatewayConfigService().getActiveGateway();
+async function getDepositGateway() {
+  return getPaymentGatewayConfigService().getDepositGateway();
+}
+
+async function getWithdrawGateway() {
+  return getPaymentGatewayConfigService().getWithdrawGateway();
 }
 
 /**
@@ -39,7 +43,7 @@ async function getActiveGateway() {
  * }} params
  */
 export async function createPixTransaction(params) {
-  const gateway = await getActiveGateway();
+  const gateway = await getDepositGateway();
 
   if (gateway === 'bspay') {
     return createBspayTransaction(params);
@@ -60,7 +64,7 @@ export async function createPixTransaction(params) {
 
 /** @param {string | number} transactionId */
 export async function checkPixTransaction(transactionId) {
-  const gateway = await getActiveGateway();
+  const gateway = await getDepositGateway();
 
   if (gateway === 'bspay') {
     return checkBspayTransaction(transactionId);
@@ -87,7 +91,7 @@ export async function checkPixTransaction(transactionId) {
  * }} params
  */
 export async function createPixWithdraw(params) {
-  const gateway = await getActiveGateway();
+  const gateway = await getWithdrawGateway();
 
   if (gateway === 'bspay') {
     if (!params.externalId) {
@@ -135,12 +139,21 @@ export function mapPixKeyType(dbKey) {
   return mapPixKeyTypeToMisticPay(dbKey);
 }
 
+export async function getDepositPaymentGateway() {
+  return getDepositGateway();
+}
+
+export async function getWithdrawPaymentGateway() {
+  return getWithdrawGateway();
+}
+
+/** @deprecated Use getWithdrawPaymentGateway para saques ou getDepositPaymentGateway para depósitos */
 export async function getActivePaymentGateway() {
-  return getActiveGateway();
+  return getWithdrawGateway();
 }
 
 export async function getWithdrawWebhookSecret() {
-  const gateway = await getActiveGateway();
+  const gateway = await getWithdrawGateway();
   if (gateway === 'bspay') {
     return getBspayWebhookSecret();
   }

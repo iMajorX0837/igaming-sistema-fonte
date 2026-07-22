@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   createPixWithdraw,
   mapPixKeyType,
-  getActivePaymentGateway,
+  getWithdrawPaymentGateway,
 } from './lib/paymentGateway.js';
 import { getMisticPayWebhookSecret } from './misticpay.js';
 import { getBspayWebhookSecret, validateBspayWebhookSignature } from './bspay.js';
@@ -119,7 +119,7 @@ export function createWithdrawRouter({
 
       const origem = String(saque.origem ?? 'pix').toLowerCase();
       let gatewayResult = null;
-      const activeGateway = await getActivePaymentGateway();
+      const activeGateway = await getWithdrawPaymentGateway();
 
       if (origem === 'pix' || !saque.origem) {
         if (!saque.chave || !String(saque.chave).trim()) {

@@ -13,62 +13,64 @@ export default function VeopagForm({ config }: VeopagFormProps) {
   const v = config.veopag;
 
   return (
-    <div className="grid gap-5 max-w-xl">
-      <FormField label="Client ID" hint="Gerado em dashboard.veopag.com/credentials">
-        <input
-          className={gatewayInputClassName}
-          value={v.clientId}
-          onChange={(e) => v.setClientId(e.target.value)}
-          placeholder="client_id"
-          autoComplete="off"
-        />
-      </FormField>
+    <div className="w-full space-y-5">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <FormField label="Client ID" hint="Gerado em dashboard.veopag.com/credentials">
+          <input
+            className={gatewayInputClassName}
+            value={v.clientId}
+            onChange={(e) => v.setClientId(e.target.value)}
+            placeholder="client_id"
+            autoComplete="off"
+          />
+        </FormField>
 
-      <FormField
-        label="Client Secret"
-        hint={
-          v.clientSecretConfigured
-            ? 'Já configurado. Deixe em branco para manter.'
-            : 'Obrigatório na primeira configuração (exibido apenas uma vez).'
-        }
-      >
-        <input
-          type="password"
-          className={gatewayInputClassName}
-          value={v.clientSecret}
-          onChange={(e) => v.setClientSecret(e.target.value)}
-          placeholder={v.clientSecretConfigured ? '••••••••••••' : 'client_secret'}
-          autoComplete="new-password"
-        />
-      </FormField>
+        <FormField
+          label="Client Secret"
+          hint={
+            v.clientSecretConfigured
+              ? 'Já configurado. Deixe em branco para manter.'
+              : 'Obrigatório na primeira configuração (exibido apenas uma vez).'
+          }
+        >
+          <input
+            type="password"
+            className={gatewayInputClassName}
+            value={v.clientSecret}
+            onChange={(e) => v.setClientSecret(e.target.value)}
+            placeholder={v.clientSecretConfigured ? '••••••••••••' : 'client_secret'}
+            autoComplete="new-password"
+          />
+        </FormField>
 
-      <FormField label="URL da API" hint={`Padrão: ${DEFAULT_VEOPAG_API_URL}`}>
-        <input
-          className={gatewayInputClassName}
-          value={v.apiUrl}
-          onChange={(e) => v.setApiUrl(e.target.value)}
-          placeholder={DEFAULT_VEOPAG_API_URL}
-          autoComplete="off"
-        />
-      </FormField>
+        <FormField label="URL da API" hint={`Padrão: ${DEFAULT_VEOPAG_API_URL}`}>
+          <input
+            className={gatewayInputClassName}
+            value={v.apiUrl}
+            onChange={(e) => v.setApiUrl(e.target.value)}
+            placeholder={DEFAULT_VEOPAG_API_URL}
+            autoComplete="off"
+          />
+        </FormField>
 
-      <FormField
-        label="Webhook Signature"
-        hint={
-          v.webhookConfigured
-            ? 'HMAC: X-Webhook-Signature + X-Webhook-Timestamp'
-            : 'Opcional, recomendado em produção.'
-        }
-      >
-        <input
-          type="password"
-          className={gatewayInputClassName}
-          value={v.webhookSecret}
-          onChange={(e) => v.setWebhookSecret(e.target.value)}
-          placeholder={v.webhookConfigured ? '••••••••••••' : 'webhook_signature'}
-          autoComplete="new-password"
-        />
-      </FormField>
+        <FormField
+          label="Webhook Signature"
+          hint={
+            v.webhookConfigured
+              ? 'HMAC: X-Webhook-Signature + X-Webhook-Timestamp'
+              : 'Opcional, recomendado em produção.'
+          }
+        >
+          <input
+            type="password"
+            className={gatewayInputClassName}
+            value={v.webhookSecret}
+            onChange={(e) => v.setWebhookSecret(e.target.value)}
+            placeholder={v.webhookConfigured ? '••••••••••••' : 'webhook_signature'}
+            autoComplete="new-password"
+          />
+        </FormField>
+      </div>
 
       <UpdatedAtFooter updatedAt={v.updatedAt} />
 

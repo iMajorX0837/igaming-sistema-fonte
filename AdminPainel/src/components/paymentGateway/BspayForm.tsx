@@ -13,7 +13,8 @@ export default function BspayForm({ config }: BspayFormProps) {
   const b = config.bspay;
 
   return (
-    <div className="grid gap-5 max-w-xl">
+    <div className="w-full space-y-5">
+      <div className="grid gap-5 lg:grid-cols-2">
       <FormField label="Client ID" hint="OAuth client_id da BSPay">
         <input
           className={gatewayInputClassName}
@@ -87,6 +88,7 @@ export default function BspayForm({ config }: BspayFormProps) {
           autoComplete="new-password"
         />
       </FormField>
+      </div>
 
       <UpdatedAtFooter updatedAt={b.updatedAt} />
 

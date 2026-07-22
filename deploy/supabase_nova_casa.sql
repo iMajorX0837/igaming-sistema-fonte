@@ -12670,6 +12670,164 @@ REVOKE EXECUTE ON FUNCTION public.confirmar_deposito_pix_pago(UUID) FROM anon;
 GRANT EXECUTE ON FUNCTION public.confirmar_deposito_pix_pago(UUID) TO service_role;
 
 -- =============================================================================
+-- [68/68] Gateways separados: depósitos vs saques
+-- =============================================================================
+
+ALTER TABLE public.integration_secrets
+  ADD COLUMN IF NOT EXISTS payment_gateway_deposit TEXT,
+  ADD COLUMN IF NOT EXISTS payment_gateway_withdraw TEXT;
+
+UPDATE public.integration_secrets
+SET
+  payment_gateway_deposit = COALESCE(
+    NULLIF(TRIM(payment_gateway_deposit), ''),
+    NULLIF(TRIM(payment_gateway), ''),
+    'misticpay'
+  ),
+  payment_gateway_withdraw = COALESCE(
+    NULLIF(TRIM(payment_gateway_withdraw), ''),
+    NULLIF(TRIM(payment_gateway), ''),
+    'misticpay'
+  )
+WHERE id = 1;
+
+ALTER TABLE public.integration_secrets
+  ALTER COLUMN payment_gateway_deposit SET DEFAULT 'misticpay',
+  ALTER COLUMN payment_gateway_withdraw SET DEFAULT 'misticpay';
+
+UPDATE public.integration_secrets
+SET
+  payment_gateway_deposit = COALESCE(NULLIF(TRIM(payment_gateway_deposit), ''), 'misticpay'),
+  payment_gateway_withdraw = COALESCE(NULLIF(TRIM(payment_gateway_withdraw), ''), 'misticpay')
+WHERE id = 1;
+
+ALTER TABLE public.integration_secrets
+  ALTER COLUMN payment_gateway_deposit SET NOT NULL,
+  ALTER COLUMN payment_gateway_withdraw SET NOT NULL;
+
+ALTER TABLE public.integration_secrets
+  DROP CONSTRAINT IF EXISTS integration_secrets_payment_gateway_deposit_check;
+
+ALTER TABLE public.integration_secrets
+  ADD CONSTRAINT integration_secrets_payment_gateway_deposit_check
+  CHECK (payment_gateway_deposit IN ('misticpay', 'bspay', 'veopag'));
+
+ALTER TABLE public.integration_secrets
+  DROP CONSTRAINT IF EXISTS integration_secrets_payment_gateway_withdraw_check;
+
+ALTER TABLE public.integration_secrets
+  ADD CONSTRAINT integration_secrets_payment_gateway_withdraw_check
+  CHECK (payment_gateway_withdraw IN ('misticpay', 'bspay', 'veopag'));
+
+CREATE OR REPLACE FUNCTION public.obter_payment_gateway_admin()
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row public.integration_secrets%ROWTYPE;
+  v_deposit TEXT;
+  v_withdraw TEXT;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  SELECT * INTO v_row FROM public.integration_secrets WHERE id = 1;
+
+  IF NOT FOUND THEN
+    INSERT INTO public.integration_secrets (id) VALUES (1)
+    ON CONFLICT (id) DO NOTHING;
+    SELECT * INTO v_row FROM public.integration_secrets WHERE id = 1;
+  END IF;
+
+  v_deposit := COALESCE(
+    NULLIF(TRIM(v_row.payment_gateway_deposit), ''),
+    NULLIF(TRIM(v_row.payment_gateway), ''),
+    'misticpay'
+  );
+  v_withdraw := COALESCE(
+    NULLIF(TRIM(v_row.payment_gateway_withdraw), ''),
+    NULLIF(TRIM(v_row.payment_gateway), ''),
+    'misticpay'
+  );
+
+  RETURN json_build_object(
+    'ok', true,
+    'payment_gateway', v_deposit,
+    'payment_gateway_deposit', v_deposit,
+    'payment_gateway_withdraw', v_withdraw,
+    'misticpay_configured',
+      COALESCE(NULLIF(TRIM(v_row.misticpay_ci), ''), '') <> ''
+      AND COALESCE(NULLIF(TRIM(v_row.misticpay_cs), ''), '') <> '',
+    'bspay_configured',
+      COALESCE(NULLIF(TRIM(v_row.bspay_client_id), ''), '') <> ''
+      AND COALESCE(NULLIF(TRIM(v_row.bspay_client_secret), ''), '') <> ''
+      AND COALESCE(NULLIF(TRIM(v_row.bspay_signing_key), ''), '') <> '',
+    'veopag_configured',
+      COALESCE(NULLIF(TRIM(v_row.veopag_client_id), ''), '') <> ''
+      AND COALESCE(NULLIF(TRIM(v_row.veopag_client_secret), ''), '') <> '',
+    'updated_at', v_row.updated_at
+  );
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.salvar_payment_gateway_admin(TEXT);
+
+CREATE OR REPLACE FUNCTION public.salvar_payment_gateway_admin(
+  p_payment_gateway_deposit TEXT,
+  p_payment_gateway_withdraw TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_deposit TEXT;
+  v_withdraw TEXT;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  v_deposit := LOWER(TRIM(COALESCE(p_payment_gateway_deposit, '')));
+  v_withdraw := LOWER(TRIM(COALESCE(p_payment_gateway_withdraw, '')));
+
+  IF v_deposit NOT IN ('misticpay', 'bspay', 'veopag') THEN
+    RETURN json_build_object('ok', false, 'error', 'Gateway de depósito inválido.');
+  END IF;
+
+  IF v_withdraw NOT IN ('misticpay', 'bspay', 'veopag') THEN
+    RETURN json_build_object('ok', false, 'error', 'Gateway de saque inválido.');
+  END IF;
+
+  INSERT INTO public.integration_secrets (id, payment_gateway, payment_gateway_deposit, payment_gateway_withdraw)
+  VALUES (1, v_deposit, v_deposit, v_withdraw)
+  ON CONFLICT (id) DO UPDATE
+  SET
+    payment_gateway = EXCLUDED.payment_gateway_deposit,
+    payment_gateway_deposit = EXCLUDED.payment_gateway_deposit,
+    payment_gateway_withdraw = EXCLUDED.payment_gateway_withdraw,
+    updated_at = NOW();
+
+  RETURN json_build_object(
+    'ok', true,
+    'payment_gateway', v_deposit,
+    'payment_gateway_deposit', v_deposit,
+    'payment_gateway_withdraw', v_withdraw
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.obter_payment_gateway_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.salvar_payment_gateway_admin(TEXT, TEXT) TO authenticated;
+
+COMMENT ON COLUMN public.integration_secrets.payment_gateway_deposit IS 'Gateway PIX para depósitos: misticpay, bspay ou veopag';
+COMMENT ON COLUMN public.integration_secrets.payment_gateway_withdraw IS 'Gateway PIX para saques: misticpay, bspay ou veopag';
+
+-- =============================================================================
 -- FIM - Instalacao completa
 -- =============================================================================
 -- Promover admin apos criar conta:

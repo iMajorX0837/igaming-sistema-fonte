@@ -38,8 +38,8 @@ export const ADMIN_IMAGE_SIZES = {
     detail: 'Proporção 4:3. Exibido em grid de 3 colunas no desktop.',
   },
   recommendedMobile: {
-    size: '720×960 px',
-    detail: 'Proporção 4:3. Usado em telas mobile (até 767 px).',
+    size: '249×74 px',
+    detail: 'Horizontal. Exibido em carrossel lateral no mobile (249×74 px).',
   },
   quickNav: {
     size: '256×256 px',

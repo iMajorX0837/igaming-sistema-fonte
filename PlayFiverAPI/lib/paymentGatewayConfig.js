@@ -6,11 +6,16 @@ function envFallbackGateway() {
   return VALID_GATEWAYS.has(raw) ? raw : 'misticpay';
 }
 
+function normalizeGateway(value, fallback) {
+  const gateway = String(value || fallback).trim().toLowerCase();
+  return VALID_GATEWAYS.has(gateway) ? gateway : fallback;
+}
+
 export function createPaymentGatewayConfig(supabase) {
   let cache = null;
   let cacheAt = 0;
 
-  async function getActiveGateway({ force = false } = {}) {
+  async function loadGateways({ force = false } = {}) {
     const now = Date.now();
     if (!force && cache && now - cacheAt < CACHE_TTL_MS) {
       return cache;
@@ -19,7 +24,7 @@ export function createPaymentGatewayConfig(supabase) {
     const fallback = envFallbackGateway();
 
     if (!supabase) {
-      cache = fallback;
+      cache = { deposit: fallback, withdraw: fallback };
       cacheAt = now;
       return cache;
     }
@@ -27,27 +32,45 @@ export function createPaymentGatewayConfig(supabase) {
     try {
       const { data, error } = await supabase
         .from('integration_secrets')
-        .select('payment_gateway')
+        .select('payment_gateway, payment_gateway_deposit, payment_gateway_withdraw')
         .eq('id', 1)
         .maybeSingle();
 
       if (error) {
-        console.warn('[PAYMENT] Falha ao carregar gateway ativo:', error.message);
-        cache = fallback;
+        console.warn('[PAYMENT] Falha ao carregar gateways ativos:', error.message);
+        cache = { deposit: fallback, withdraw: fallback };
         cacheAt = now;
         return cache;
       }
 
-      const gateway = String(data?.payment_gateway || fallback).trim().toLowerCase();
-      cache = VALID_GATEWAYS.has(gateway) ? gateway : fallback;
+      const legacy = normalizeGateway(data?.payment_gateway, fallback);
+      cache = {
+        deposit: normalizeGateway(data?.payment_gateway_deposit, legacy),
+        withdraw: normalizeGateway(data?.payment_gateway_withdraw, legacy),
+      };
       cacheAt = now;
       return cache;
     } catch (err) {
-      console.warn('[PAYMENT] Erro ao carregar gateway ativo:', err?.message || err);
-      cache = fallback;
+      console.warn('[PAYMENT] Erro ao carregar gateways ativos:', err?.message || err);
+      cache = { deposit: fallback, withdraw: fallback };
       cacheAt = now;
       return cache;
     }
+  }
+
+  async function getDepositGateway(options) {
+    const gateways = await loadGateways(options);
+    return gateways.deposit;
+  }
+
+  async function getWithdrawGateway(options) {
+    const gateways = await loadGateways(options);
+    return gateways.withdraw;
+  }
+
+  /** @deprecated Use getDepositGateway ou getWithdrawGateway */
+  async function getActiveGateway(options) {
+    return getDepositGateway(options);
   }
 
   function invalidateCache() {
@@ -55,7 +78,7 @@ export function createPaymentGatewayConfig(supabase) {
     cacheAt = 0;
   }
 
-  return { getActiveGateway, invalidateCache };
+  return { getDepositGateway, getWithdrawGateway, getActiveGateway, invalidateCache };
 }
 
 let sharedGatewayConfig = null;

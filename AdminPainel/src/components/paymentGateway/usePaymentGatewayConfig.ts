@@ -14,13 +14,20 @@ import type {
   VeopagConfigResponse,
 } from './types';
 
+function resolveGatewayId(value: PaymentGatewayId | string | undefined): PaymentGatewayId {
+  if (value === 'bspay' || value === 'veopag') return value;
+  return 'misticpay';
+}
+
 export function usePaymentGatewayConfig() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
 
   const [savingGateway, setSavingGateway] = useState(false);
-  const [gateway, setGateway] = useState<PaymentGatewayId>('misticpay');
-  const [activeGateway, setActiveGateway] = useState<PaymentGatewayId>('misticpay');
+  const [depositGateway, setDepositGateway] = useState<PaymentGatewayId>('misticpay');
+  const [withdrawGateway, setWithdrawGateway] = useState<PaymentGatewayId>('misticpay');
+  const [activeDepositGateway, setActiveDepositGateway] = useState<PaymentGatewayId>('misticpay');
+  const [activeWithdrawGateway, setActiveWithdrawGateway] = useState<PaymentGatewayId>('misticpay');
   const [misticpayConfigured, setMisticpayConfigured] = useState(false);
   const [bspayConfigured, setBspayConfigured] = useState(false);
   const [veopagConfigured, setVeopagConfigured] = useState(false);
@@ -75,10 +82,16 @@ export function usePaymentGatewayConfig() {
 
       const gatewayData = gatewayRes.data as PaymentGatewayResponse;
       if (gatewayData?.ok) {
-        const g = gatewayData.payment_gateway;
-        const resolved = g === 'bspay' || g === 'veopag' ? g : 'misticpay';
-        setGateway(resolved);
-        setActiveGateway(resolved);
+        const deposit = resolveGatewayId(
+          gatewayData.payment_gateway_deposit ?? gatewayData.payment_gateway,
+        );
+        const withdraw = resolveGatewayId(
+          gatewayData.payment_gateway_withdraw ?? gatewayData.payment_gateway,
+        );
+        setDepositGateway(deposit);
+        setWithdrawGateway(withdraw);
+        setActiveDepositGateway(deposit);
+        setActiveWithdrawGateway(withdraw);
         setMisticpayConfigured(!!gatewayData.misticpay_configured);
         setBspayConfigured(!!gatewayData.bspay_configured);
         setVeopagConfigured(!!gatewayData.veopag_configured);
@@ -155,15 +168,21 @@ export function usePaymentGatewayConfig() {
       veopag: 'VeoPag',
     };
 
-    if (!configuredMap[gateway]) {
-      showToast(`Configure a ${labelMap[gateway]} antes de ativá-la.`, 'warning');
+    if (!configuredMap[depositGateway]) {
+      showToast(`Configure a ${labelMap[depositGateway]} antes de usá-la em depósitos.`, 'warning');
+      return;
+    }
+
+    if (!configuredMap[withdrawGateway]) {
+      showToast(`Configure a ${labelMap[withdrawGateway]} antes de usá-la em saques.`, 'warning');
       return;
     }
 
     setSavingGateway(true);
     try {
       const { data, error } = await supabase.rpc('salvar_payment_gateway_admin', {
-        p_payment_gateway: gateway,
+        p_payment_gateway_deposit: depositGateway,
+        p_payment_gateway_withdraw: withdrawGateway,
       });
 
       if (error) {
@@ -173,12 +192,13 @@ export function usePaymentGatewayConfig() {
 
       const result = data as PaymentGatewayResponse;
       if (!result?.ok) {
-        showToast(result?.error || 'Erro ao salvar gateway.', 'error');
+        showToast(result?.error || 'Erro ao salvar gateways.', 'error');
         return;
       }
 
-      showToast('Gateway ativo atualizado!', 'success');
-      setActiveGateway(gateway);
+      showToast('Gateways ativos atualizados!', 'success');
+      setActiveDepositGateway(depositGateway);
+      setActiveWithdrawGateway(withdrawGateway);
       await loadConfig();
     } finally {
       setSavingGateway(false);
@@ -316,9 +336,12 @@ export function usePaymentGatewayConfig() {
 
   return {
     loading,
-    gateway,
-    activeGateway,
-    setGateway,
+    depositGateway,
+    withdrawGateway,
+    activeDepositGateway,
+    activeWithdrawGateway,
+    setDepositGateway,
+    setWithdrawGateway,
     misticpayConfigured,
     bspayConfigured,
     veopagConfigured,

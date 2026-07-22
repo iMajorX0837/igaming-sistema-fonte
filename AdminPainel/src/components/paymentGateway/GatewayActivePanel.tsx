@@ -1,8 +1,8 @@
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Button from '../ui/Button';
-import PagePanel from '../ui/PagePanel';
-import { GATEWAY_PROVIDERS } from './constants';
-import { ConfigStatusBadge, SectionTitle } from './ui';
+import { GATEWAY_ROLES } from './constants';
+import GatewayRoleSelector from './GatewayRoleSelector';
+import { SectionTitle } from './ui';
 import type { PaymentGatewayConfig } from './usePaymentGatewayConfig';
 import type { PaymentGatewayId } from './types';
 
@@ -10,67 +10,86 @@ interface GatewayActivePanelProps {
   config: PaymentGatewayConfig;
 }
 
-const configuredById = (config: PaymentGatewayConfig, id: PaymentGatewayId) => {
-  if (id === 'misticpay') return config.misticpayConfigured;
-  if (id === 'bspay') return config.bspayConfigured;
-  return config.veopagConfigured;
+const labelMap: Record<PaymentGatewayId, string> = {
+  misticpay: 'MisticPay',
+  bspay: 'BSPay',
+  veopag: 'VeoPag',
 };
 
 export default function GatewayActivePanel({ config }: GatewayActivePanelProps) {
-  const { gateway, activeGateway, setGateway, savingGateway, handleSaveGateway } = config;
+  const {
+    depositGateway,
+    activeDepositGateway,
+    setDepositGateway,
+    withdrawGateway,
+    activeWithdrawGateway,
+    setWithdrawGateway,
+    savingGateway,
+    handleSaveGateway,
+    misticpayConfigured,
+    bspayConfigured,
+    veopagConfigured,
+  } = config;
+
+  const configuredMap: Record<PaymentGatewayId, boolean> = {
+    misticpay: misticpayConfigured,
+    bspay: bspayConfigured,
+    veopag: veopagConfigured,
+  };
+
+  const hasChanges =
+    depositGateway !== activeDepositGateway || withdrawGateway !== activeWithdrawGateway;
 
   return (
-    <PagePanel variant="accent">
-      <div className="grid gap-5 max-w-3xl">
-        <SectionTitle>Gateway ativo</SectionTitle>
-        <p className="text-sm text-admin-muted -mt-2">
-          Selecione qual provedor PIX processará depósitos e saques na plataforma.
+    <div className="grid w-full gap-6">
+      <div>
+        <SectionTitle>Gateways ativos</SectionTitle>
+        <p className="-mt-2 text-sm text-admin-muted">
+          Escolha provedores diferentes para depósitos e saques, se quiser. Cada um precisa estar
+          configurado na aba Credenciais antes de ser ativado.
         </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {GATEWAY_PROVIDERS.map((provider) => {
-            const isSelected = gateway === provider.id;
-            const isConfigured = configuredById(config, provider.id);
-            const isLive = activeGateway === provider.id;
-
-            return (
-              <button
-                key={provider.id}
-                type="button"
-                onClick={() => setGateway(provider.id)}
-                className={`rounded-xl border p-4 text-left transition-all ${
-                  isSelected
-                    ? 'border-admin-accent bg-admin-accent/8 ring-1 ring-admin-accent/25'
-                    : 'border-admin-border bg-admin-panel-2 hover:border-admin-border-strong'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className="font-semibold text-admin-foreground">{provider.label}</span>
-                  {isLive ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full shrink-0">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Em uso
-                    </span>
-                  ) : isSelected ? (
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-admin-accent bg-admin-accent/15 px-2 py-0.5 rounded-full shrink-0">
-                      Selecionado
-                    </span>
-                  ) : null}
-                </div>
-                <p className="text-xs text-admin-muted mb-2">{provider.description}</p>
-                <p className="text-xs">
-                  <ConfigStatusBadge configured={isConfigured} />
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        <Button onClick={() => void handleSaveGateway()} disabled={savingGateway}>
-          {savingGateway ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Salvar gateway ativo
-        </Button>
       </div>
-    </PagePanel>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+          {GATEWAY_ROLES.map((roleMeta) => (
+            <GatewayRoleSelector
+              key={roleMeta.role}
+              config={config}
+              roleMeta={roleMeta}
+              selected={roleMeta.role === 'deposit' ? depositGateway : withdrawGateway}
+              active={roleMeta.role === 'deposit' ? activeDepositGateway : activeWithdrawGateway}
+              onSelect={roleMeta.role === 'deposit' ? setDepositGateway : setWithdrawGateway}
+            />
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-admin-border bg-admin-panel-2/30 px-4 py-3 text-sm text-admin-muted">
+        <span className="font-medium text-admin-foreground">Resumo atual:</span>{' '}
+        Depósitos via <strong className="text-admin-foreground">{labelMap[activeDepositGateway]}</strong>
+        {' · '}
+        Saques via <strong className="text-admin-foreground">{labelMap[activeWithdrawGateway]}</strong>
+        {hasChanges ? (
+          <span className="mt-1 block text-amber-400">
+            Alterações pendentes: depósitos → {labelMap[depositGateway]}, saques →{' '}
+            {labelMap[withdrawGateway]}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => void handleSaveGateway()} disabled={savingGateway || !hasChanges}>
+          {savingGateway ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Salvar gateways ativos
+        </Button>
+        {!hasChanges ? (
+          <span className="text-xs text-admin-muted">Nenhuma alteração para salvar.</span>
+        ) : null}
+        {!configuredMap[depositGateway] || !configuredMap[withdrawGateway] ? (
+          <span className="text-xs text-amber-400">
+            Configure as credenciais dos gateways selecionados antes de salvar.
+          </span>
+        ) : null}
+      </div>
+    </div>
   );
 }

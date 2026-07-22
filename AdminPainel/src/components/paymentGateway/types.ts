@@ -4,6 +4,8 @@ export interface PaymentGatewayResponse {
   ok: boolean;
   error?: string;
   payment_gateway?: PaymentGatewayId;
+  payment_gateway_deposit?: PaymentGatewayId;
+  payment_gateway_withdraw?: PaymentGatewayId;
   misticpay_configured?: boolean;
   bspay_configured?: boolean;
   veopag_configured?: boolean;
@@ -40,8 +42,17 @@ export interface VeopagConfigResponse {
   updated_at?: string;
 }
 
+export type PaymentGatewayRole = 'deposit' | 'withdraw';
+
 export interface GatewayProviderMeta {
   id: PaymentGatewayId;
   label: string;
   description: string;
+}
+
+export interface GatewayRoleMeta {
+  role: PaymentGatewayRole;
+  title: string;
+  description: string;
+  iconLabel: string;
 }
