@@ -160,6 +160,7 @@ Isso cria:
 # Copiar do tenant IP ou editar manualmente
 cp tenants/venuz/env.api tenants/stewgaming/env.api
 sed -i 's|PUBLIC_API_URL=.*|PUBLIC_API_URL=https://api.stewgaming.com|' tenants/stewgaming/env.api
+sed -i 's|PUBLIC_SITE_URL=.*|PUBLIC_SITE_URL=https://stewgaming.com|' tenants/stewgaming/env.api
 nano tenants/stewgaming/env.api   # conferir Supabase, MisticPay, etc.
 ```
 
@@ -344,8 +345,8 @@ git pull
 
 ### API não responde / login falha
 
-- Conferir `PUBLIC_API_URL=https://api.dominio.com` no `env.api`
-- Front buildado com `https://api.dominio.com/...` nos env.front/admin
+- Conferir `PUBLIC_API_URL=https://api.dominio.com` e `PUBLIC_SITE_URL=https://dominio.com` no `env.api`
+- Front/admin buildados com paths relativos (`VITE_API_BASE=/api/supabase`) — **não** use URL absoluta da API no browser
 - HTTPS precisa estar ativo se URLs usam `https://`
 - Security Group: portas 80 e 443 abertas
 
@@ -412,6 +413,7 @@ git pull
 ./scripts/add-tenant.sh stewgaming stewgaming.com
 cp tenants/venuz/env.api tenants/stewgaming/env.api
 sed -i 's|PUBLIC_API_URL=.*|PUBLIC_API_URL=https://api.stewgaming.com|' tenants/stewgaming/env.api
+sed -i 's|PUBLIC_SITE_URL=.*|PUBLIC_SITE_URL=https://stewgaming.com|' tenants/stewgaming/env.api
 rm -f nginx/conf.d/ip-only.conf
 sed -e 's/___SLUG__/stewgaming/g' -e 's/___DOMAIN___/stewgaming.com/g' \
   nginx/conf.d/tenant.conf.template > nginx/conf.d/stewgaming.conf

@@ -54,6 +54,8 @@ const AVIATOR_API_ENABLED =
 /** Em dev local: não chama api.playfivers.com no game_launch (evita IP bloqueado). */
 const GAME_LAUNCH_MOCK = process.env.GAME_LAUNCH_MOCK === 'true';
 const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+/** URL do site jogador (iframe Aviator) — mesmo origin dos cookies HttpOnly (H7/M9). */
+const PUBLIC_SITE_URL = (process.env.PUBLIC_SITE_URL || PUBLIC_API_URL).replace(/\/$/, '');
 const PLAYFIVERS_UPSTREAM = (process.env.PLAYFIVERS_UPSTREAM_URL || 'https://api.playfivers.com').replace(/\/$/, '');
 /** Incremente ao alterar callback/webhook — visível em GET /health */
 const PLAYFIVER_WEBHOOK_VERSION = '2026-07-18-unified-v2';
@@ -1294,7 +1296,7 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
     // Aviator próprio — abre o clone local com carteira Supabase
     if (AVIATOR_GAME_ENABLED && isAviatorGameCode(game_code, provider)) {
       const gameSession = createAviatorGameSessionToken(user_code);
-      const launchUrl = buildAviatorLaunchUrl(PUBLIC_API_URL, {
+      const launchUrl = buildAviatorLaunchUrl(PUBLIC_SITE_URL, {
         userCode: user_code,
         lang: lang || 'pt',
         balance: user_balance ?? 0,
@@ -2572,7 +2574,7 @@ app.listen(PORT, () => {
   if (AVIATOR_GAME_ENABLED) {
     const pythonPort = Number(process.env.AVIATOR_PYTHON_PORT || 8001);
     startAviatorPythonServer(PORT, pythonPort);
-    console.log(`✈️  Aviator próprio ativo — jogo em ${PUBLIC_API_URL}/aviator/`);
+    console.log(`✈️  Aviator próprio ativo — jogo em ${PUBLIC_SITE_URL}/aviator/ (webhooks: ${PUBLIC_API_URL})`);
   } else {
     console.log('✈️  Aviator próprio desabilitado (AVIATOR_GAME_ENABLED=false)');
   }

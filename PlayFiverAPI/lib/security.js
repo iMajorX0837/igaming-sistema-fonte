@@ -341,17 +341,28 @@ function getPublicApiOrigin() {
   }
 }
 
-/** Lista efetiva: CORS_ORIGINS + origem de PUBLIC_API_URL (Aviator estático em api.*). */
+function getPublicSiteOrigin() {
+  const raw = (process.env.PUBLIC_SITE_URL || '').trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
+/** Lista efetiva: CORS_ORIGINS + origens de PUBLIC_API_URL e PUBLIC_SITE_URL. */
 function getAllowedOrigins() {
   const fromEnv = parseCorsOrigins() || [];
   if (!isProduction()) {
     return fromEnv;
   }
-  const publicOrigin = getPublicApiOrigin();
-  if (!publicOrigin || fromEnv.includes(publicOrigin)) {
-    return fromEnv;
+  const extras = [getPublicApiOrigin(), getPublicSiteOrigin()].filter(Boolean);
+  const merged = [...fromEnv];
+  for (const origin of extras) {
+    if (!merged.includes(origin)) merged.push(origin);
   }
-  return [...fromEnv, publicOrigin];
+  return merged;
 }
 
 const CORS_ALLOW_HEADERS =
