@@ -53,6 +53,21 @@ export function createSupabaseProxyRouter({
   const router = Router();
   const authIp = (req) => getClientIp(req) || 'unknown';
 
+  /**
+   * Error.message do AuthError do Supabase não é enumerável —
+   * res.json({ error }) chega no client sem message. Serializa explicitamente.
+   */
+  function serializeAuthError(error, fallback = 'Erro de autenticação') {
+    if (!error) return { message: fallback };
+    if (typeof error === 'string') return { message: error || fallback };
+    return {
+      message: error.message || fallback,
+      ...(error.status != null ? { status: error.status } : {}),
+      ...(error.code != null ? { code: error.code } : {}),
+      ...(error.name != null ? { name: error.name } : {}),
+    };
+  }
+
   const authSignInRateLimit = createRateLimiter({
     windowMs: 60_000,
     max: 20,
@@ -215,7 +230,10 @@ export function createSupabaseProxyRouter({
       });
 
       if (error) {
-        return res.status(401).json({ data: { user: null, session: null }, error });
+        return res.status(401).json({
+          data: { user: null, session: null },
+          error: serializeAuthError(error, 'Erro ao fazer login'),
+        });
       }
 
       const isAdminPanel = req.headers['x-client-info'] === 'admin-panel';
@@ -518,7 +536,10 @@ export function createSupabaseProxyRouter({
       });
 
       if (error) {
-        return res.status(400).json({ data: { user: null, session: null }, error });
+        return res.status(400).json({
+          data: { user: null, session: null },
+          error: serializeAuthError(error, 'Erro ao criar conta'),
+        });
       }
 
       if (data?.user && typeof dispatchWebhookEvent === 'function') {
@@ -608,9 +629,9 @@ export function createSupabaseProxyRouter({
     try {
       const refreshToken = extractRefreshToken(req);
       if (!refreshToken) {
-        return res.status(400).json({
+        return res.status(401).json({
           data: { session: null },
-          error: { message: 'refresh_token obrigatório' },
+          error: null,
         });
       }
 
@@ -620,7 +641,10 @@ export function createSupabaseProxyRouter({
 
       if (error) {
         clearAuthCookies(res, req);
-        return res.status(401).json({ data: { session: null }, error });
+        return res.status(401).json({
+          data: { session: null },
+          error: serializeAuthError(error, 'Erro ao renovar sessão'),
+        });
       }
 
       const oldToken = extractAccessToken(req);
@@ -675,7 +699,9 @@ export function createSupabaseProxyRouter({
       );
 
       if (error) {
-        return res.status(400).json({ error });
+        return res.status(400).json({
+          error: serializeAuthError(error, 'Erro ao atualizar usuário'),
+        });
       }
 
       try {

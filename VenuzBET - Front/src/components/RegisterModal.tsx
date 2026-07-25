@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
 import { resolveRegisterModalImageUrl } from '../lib/authModalImages';
+import { getAuthErrorMessage } from '../lib/authErrors';
 import AuthModalImage from './AuthModalImage';
 import { useModalAnimation } from '../hooks/useModalAnimation';
 
@@ -25,6 +26,8 @@ function modalInputStyle(fundo: string): React.CSSProperties {
 
 interface CpfHubResponse {
   success: boolean;
+  code?: string;
+  message?: string;
   data?: {
     cpf: string;
     name: string;
@@ -32,6 +35,38 @@ interface CpfHubResponse {
     month: number;
     year: number;
   };
+}
+
+function isValidCpf(value: string): boolean {
+  const cpf = value.replace(/\D/g, '');
+  if (cpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+  const calcDigit = (base: string, factorStart: number) => {
+    let sum = 0;
+    for (let i = 0; i < base.length; i += 1) {
+      sum += Number(base[i]) * (factorStart - i);
+    }
+    const mod = (sum * 10) % 11;
+    return mod === 10 ? 0 : mod;
+  };
+
+  const d1 = calcDigit(cpf.slice(0, 9), 10);
+  const d2 = calcDigit(cpf.slice(0, 10), 11);
+  return d1 === Number(cpf[9]) && d2 === Number(cpf[10]);
+}
+
+function mapCpfLookupError(data: CpfHubResponse): string {
+  if (data.code === 'cpf_in_use') {
+    return data.message || 'Este CPF já está cadastrado. Faça login ou recupere sua conta.';
+  }
+  if (data.code === 'cpf_invalid') {
+    return data.message || 'CPF inválido.';
+  }
+  if (data.message?.trim()) {
+    return data.message;
+  }
+  return 'CPF não encontrado ou inválido.';
 }
 
 function maskFullName(fullName: string): string {
@@ -134,6 +169,18 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       if (cpfDigits.length !== 11) return;
       if (lastLookupCpfRef.current === cpfDigits && cpfVerifiedRef.current) return;
 
+      // CPF inválido: nem chama a API
+      if (!isValidCpf(cpfDigits)) {
+        lastLookupCpfRef.current = '';
+        verifiedFullNameRef.current = '';
+        setCpfVerified(false);
+        setMaskedNameLine('');
+        setMaskedBirthLine('');
+        setCpfLookupError('CPF inválido.');
+        setCpfLookupLoading(false);
+        return;
+      }
+
       setCpfLookupLoading(true);
       setCpfLookupError('');
       try {
@@ -150,7 +197,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
           setCpfVerified(false);
           setMaskedNameLine('');
           setMaskedBirthLine('');
-          setCpfLookupError('CPF não encontrado ou inválido.');
+          setCpfLookupError(mapCpfLookupError(data));
         }
       } catch {
         lastLookupCpfRef.current = '';
@@ -247,7 +294,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setError('');
 
     if (!termsAccepted) {
-      setError('Você deve aceitar os termos e condições');
+      setError('Você precisa aceitar os termos e condições para continuar.');
       return;
     }
 
@@ -257,17 +304,43 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       return;
     }
 
+    const email = formData.email.trim();
+    const phoneClean = formData.phone.replace(/\D/g, '');
+    const password = formData.password;
+
+    if (!email) {
+      setError('Informe um e-mail válido para criar sua conta.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('E-mail inválido. Verifique o endereço digitado.');
+      return;
+    }
+    if (!phoneClean) {
+      setError('Informe seu telefone com DDD.');
+      return;
+    }
+    if (phoneClean.length < 10 || phoneClean.length > 11) {
+      setError('Telefone inválido. Use DDD + número (10 ou 11 dígitos).');
+      return;
+    }
+    if (!password) {
+      setError('Crie uma senha para proteger sua conta.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Remove formatação antes de enviar (apenas números)
-      const phoneClean = formData.phone.replace(/\D/g, '');
-      
       await register(
         cpfClean,
-        formData.email,
+        email,
         phoneClean,
-        formData.password,
+        password,
         referralCode || undefined,
         verifiedFullNameRef.current
       );
@@ -280,7 +353,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       onClose();
       onRegisterSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta');
+      setError(getAuthErrorMessage(err, 'Não foi possível criar sua conta. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -391,19 +464,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               </div>
             )}
             {cpfLookupError && !cpfVerified && (
-              <div className="space-y-2">
-                <p className="text-xs text-red-400">{cpfLookupError}</p>
-                {formData.cpf.replace(/\D/g, '').length === 11 && (
-                  <button
-                    type="button"
-                    disabled={cpfLookupLoading}
-                    onClick={() => void runCpfLookup(formData.cpf.replace(/\D/g, ''))}
-                    className="text-xs font-bold text-brand-light hover:text-brand-light disabled:opacity-40"
-                  >
-                    Tentar novamente
-                  </button>
-                )}
-              </div>
+              <p className="text-xs text-red-400">{cpfLookupError}</p>
             )}
 
             <div className="relative">

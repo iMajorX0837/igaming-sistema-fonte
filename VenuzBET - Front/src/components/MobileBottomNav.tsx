@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Menu, Trophy, Dices, Radio } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import { useHomeConfig } from '../hooks/useHomeConfig';
@@ -7,6 +6,16 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 interface MobileBottomNavProps {
   visible: boolean;
 }
+
+const ICONS = {
+  menu: '/assets/menu/menu.svg',
+  sport: '/assets/menu/sport.svg',
+  casino: '/assets/menu/casino.svg',
+  live: '/assets/menu/live.svg',
+  aviator: '/assets/menu/rocket.svg',
+} as const;
+
+const navIconClass = 'h-5 w-5 shrink-0 opacity-90 object-contain';
 
 export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
   const { config: homeConfig } = useHomeConfig();
@@ -77,9 +86,9 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Navegação principal"
     >
-      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl border px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: homeConfig.fundo, borderColor: 'var(--brand-primary)' }}>
+      <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: homeConfig.fundo }}>
         <button type="button" onClick={toggleMenu} className={`${itemBase} ${inactive}`} aria-label="Abrir ou fechar menu">
-          <Menu className="h-5 w-5 shrink-0 opacity-80" strokeWidth={2.25} />
+          <img src={ICONS.menu} alt="" className={navIconClass} width={20} height={20} />
           <span className={`${labelClass} font-semibold`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Menu
           </span>
@@ -91,7 +100,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           className={`${itemBase} ${isEsporte ? active : inactive}`}
           aria-current={isEsporte ? 'page' : undefined}
         >
-          <Trophy className={`h-5 w-5 shrink-0 ${isEsporte ? 'text-brand' : 'opacity-80'}`} strokeWidth={2} />
+          <img src={ICONS.sport} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Esporte
           </span>
@@ -100,21 +109,20 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
         <button
           type="button"
           onClick={() => go('/')}
-          className="-mt-5 mb-0.5 flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2 shadow-lg transition-transform active:scale-95"
+          className="-mt-6 mb-0.5 flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full shadow-lg transition-transform active:scale-95"
           style={{
             backgroundColor: 'var(--brand-primary)',
-            borderColor: '#9F6FFF',
             boxShadow: '0 4px 20px rgb(var(--brand-primary-rgb) / 0.45)',
           }}
           aria-current={isCasino ? 'page' : undefined}
           aria-label="Cassino — início"
         >
-          <Dices className="h-6 w-6 text-white" strokeWidth={2} />
+          <img src={ICONS.casino} alt="" className="h-[22px] w-[22px] shrink-0 object-contain" width={22} height={22} />
           <span
-            className="mt-0.5 text-[9px] font-black tracking-wide text-white"
+            className="mt-0.5 text-[10px] font-black tracking-wide text-white"
             style={{ fontFamily: 'Montserrat, sans-serif' }}
           >
-            CASSINO
+            Cassino
           </span>
         </button>
 
@@ -124,7 +132,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           className={`${itemBase} ${isLive ? active : inactive}`}
           aria-current={isLive ? 'page' : undefined}
         >
-          <Radio className={`h-5 w-5 shrink-0 ${isLive ? 'text-brand' : 'opacity-80'}`} strokeWidth={2} />
+          <img src={ICONS.live} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             Ao Vivo
           </span>
@@ -137,13 +145,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           className={`${itemBase} ${inactive} disabled:opacity-50`}
           aria-label="Abrir Aviator"
         >
-          <img
-            src="https://royal-images.s3.us-east-1.amazonaws.com/default/menu/aviator.svg"
-            alt=""
-            className="h-5 w-5 shrink-0 opacity-90"
-            width={20}
-            height={20}
-          />
+          <img src={ICONS.aviator} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
             {aviatorLoading ? '…' : 'Aviator'}
           </span>

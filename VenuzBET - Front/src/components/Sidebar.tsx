@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import {
   SIDEBAR_LANGUAGES,
@@ -14,12 +14,17 @@ import {
 } from '../hooks/useSidebarPromoCards';
 import { getSidebarMenuLabel, useSidebarMenu, type SidebarMenuItem } from '../hooks/useSidebarMenu';
 import { useSidebarConfig } from '../hooks/useSidebarConfig';
+import { useAuth } from '../contexts/AuthContext';
 import IconifyIcon from './IconifyIcon';
 import {
   getSidebarMenuItemHref,
   MENU_ICON_COLOR,
   SidebarMenuItemIcon,
 } from './SidebarMenuParts';
+
+function isCouponModalMenuItem(item: SidebarMenuItem): boolean {
+  return item.link_tipo === 'event' && item.action_value === 'openCouponModal';
+}
 
 const SIDEBAR_WIDTH_EXPANDED_PX = 279;
 const SIDEBAR_WIDTH_COLLAPSED_PX = 64;
@@ -210,6 +215,7 @@ function SidebarPromoCardContent({
 
 export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
   const { language, setLanguage } = useSidebarLanguage();
+  const { isAuthenticated } = useAuth();
   const [sectionsExpanded, setSectionsExpanded] = useState<Record<string, boolean>>({});
   const { cards: promoCards } = useSidebarPromoCards();
   const { config: sidebarConfig } = useSidebarConfig();
@@ -217,11 +223,21 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
     menuCategories,
     languageCategory,
     itemsByCategory,
-    collapsedMenuItems,
   } = useSidebarMenu();
 
   const navigate = useNavigate();
   const visiblePromoCards = promoCards.filter((card) => card.ativo);
+
+  // Cupom (openCouponModal) só aparece no menu para usuários logados
+  const visibleItemsByCategory = useMemo(() => {
+    if (isAuthenticated) return itemsByCategory;
+
+    const filtered: Record<string, SidebarMenuItem[]> = {};
+    for (const [slug, categoryItems] of Object.entries(itemsByCategory)) {
+      filtered[slug] = categoryItems.filter((item) => !isCouponModalMenuItem(item));
+    }
+    return filtered;
+  }, [itemsByCategory, isAuthenticated]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -319,7 +335,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
       }
     }, isOpen ? 50 : 0);
     return () => window.clearTimeout(timer);
-  }, [isOpen, language, sectionsExpanded, menuCategories, itemsByCategory]);
+  }, [isOpen, language, sectionsExpanded, menuCategories, visibleItemsByCategory]);
 
   return (
     <>
@@ -378,7 +394,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
                 onToggle={() => toggleSection(category.slug)}
               />
               <SidebarSectionBody isExpanded={sectionsExpanded[category.slug] ?? true}>
-                {(itemsByCategory[category.slug] || []).map((item) => (
+                {(visibleItemsByCategory[category.slug] || []).map((item) => (
                   <a
                     key={item.id}
                     href={getSidebarMenuItemHref(item)}
@@ -474,7 +490,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
 
           {menuCategories.map((category, categoryIndex) => (
             <div key={category.id} className="flex flex-col items-center gap-4">
-              {(itemsByCategory[category.slug] || []).map((item) => (
+              {(visibleItemsByCategory[category.slug] || []).map((item) => (
                 <a
                   key={item.id}
                   href={getSidebarMenuItemHref(item)}

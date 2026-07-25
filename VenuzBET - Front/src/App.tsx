@@ -33,6 +33,9 @@ import { resolveGameBySlug } from './utils/resolveGameBySlug';
 import { captureTrackingParams } from './lib/trackingParams';
 import MetaPixelTracker from './components/MetaPixelTracker';
 import { normalizeInternalHref } from './lib/cmsLink';
+import { isLiveSupportHref, openLiveSupportWhatsapp } from './lib/liveSupport';
+import { useFooterConfig } from './hooks/useFooterConfig';
+import LiveSupportRedirect from './components/LiveSupportRedirect';
 
 export interface GameInfo {
   name: string;
@@ -158,6 +161,7 @@ function GameRoute() {
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { config: footerConfig } = useFooterConfig();
   const [selectedGame, setSelectedGame] = useState<GameInfo | null>(null);
   const [isCouponOpen, setIsCouponOpen] = useState(false);
 
@@ -207,11 +211,19 @@ function AppContent() {
             const url = new URL(trimmed);
             if (url.origin !== window.location.origin) return;
             e.preventDefault();
+            if (isLiveSupportHref(url.pathname)) {
+              openLiveSupportWhatsapp(footerConfig.whatsapp.url);
+              return;
+            }
             navigate(`${url.pathname}${url.search}${url.hash}`);
             return;
           }
 
           e.preventDefault();
+          if (isLiveSupportHref(trimmed)) {
+            openLiveSupportWhatsapp(footerConfig.whatsapp.url);
+            return;
+          }
           navigate(normalizeInternalHref(trimmed));
           return;
         }
@@ -221,7 +233,7 @@ function AppContent() {
 
     document.addEventListener('click', handleLinkClick);
     return () => document.removeEventListener('click', handleLinkClick);
-  }, [navigate]);
+  }, [navigate, footerConfig.whatsapp.url]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-300 font-sans">
@@ -252,6 +264,7 @@ function AppContent() {
           <Route path="/help/promotions" element={<PromotionsPage onBack={() => navigate('/')} />} />
           <Route path="/help/promotions/:promotionId" element={<PromotionDetailPage />} />
           <Route path="/help/mobile" element={<MobileAppPage onBack={() => navigate('/')} />} />
+          <Route path="/help/support" element={<LiveSupportRedirect />} />
           <Route path="/help/referral" element={<ReferralPage />} />
           <Route path="/help/vip" element={<VipLevelsPage />} />
           <Route path="/profile" element={<ProfilePage onBack={() => navigate('/')} />} />

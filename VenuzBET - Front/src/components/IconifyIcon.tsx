@@ -15,6 +15,10 @@ export default function IconifyIcon({ icon, className = '', style }: IconifyIcon
 
     let mounted = true;
 
+    // Limpa leftovers: Iconify.scan() substitui o host por <svg>, então
+    // remover só a referência do host deixa o SVG órfão e duplica no remount.
+    container.replaceChildren();
+
     const host = document.createElement('span');
     host.className = 'iconify';
     host.setAttribute('data-icon', icon);
@@ -29,9 +33,7 @@ export default function IconifyIcon({ icon, className = '', style }: IconifyIcon
     return () => {
       mounted = false;
       window.clearTimeout(timer);
-      if (host.parentNode === container) {
-        container.removeChild(host);
-      }
+      container.replaceChildren();
     };
   }, [icon]);
 

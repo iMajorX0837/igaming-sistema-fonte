@@ -2,17 +2,73 @@ import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
+import LoginModal from './LoginModal';
+import RegisterModal from './RegisterModal';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useUserProfileData } from '../hooks/useUserProfileData';
 import { useBetHistory } from '../hooks/useBetHistory';
+import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import type { BetHistoryItem, UserProfileData } from '../lib/userProfileCache';
 import LoadingScreen from './LoadingScreen';
 import { appPageContainerClass } from '../constants/homeLayout';
 
 interface ProfilePageProps {
   onBack: () => void;
+}
+
+function ProfileLoginRequired({ onLogin }: { onLogin: () => void }) {
+  return (
+    <div className="relative min-h-[320px] md:min-h-[420px] flex flex-col items-center justify-center gap-4 md:gap-6 px-4 py-12">
+      <span
+        className="iconify i-solar:shield-warning-bold-duotone"
+        data-icon="solar:shield-warning-bold-duotone"
+        aria-hidden="true"
+        style={{ fontSize: '45px' }}
+      />
+      <p className="text-white text-lg md:text-2xl font-bold text-center px-2">
+        Você precisa estar logado para acessar esta página.
+      </p>
+
+      <button
+        type="button"
+        onClick={onLogin}
+        className="relative isolate overflow-hidden rounded-lg text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 flex items-center justify-center"
+        style={{
+          backgroundColor: 'var(--brand-primary)',
+          minWidth: '156px',
+          height: '48px',
+          paddingInline: '18px',
+          boxShadow:
+            '0 0 14px rgb(var(--brand-primary-rgb) / 0.48), 0 0 28px rgb(var(--brand-primary-rgb) / 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+        }}
+      >
+        <div className="sidebar-promo-bloom-layer" aria-hidden="true">
+          <span
+            className="sidebar-promo-bloom sidebar-promo-bloom-1"
+            style={{ backgroundColor: '#C084FC' }}
+          />
+          <span
+            className="sidebar-promo-bloom sidebar-promo-bloom-2"
+            style={{ backgroundColor: '#C084FC' }}
+          />
+          <span
+            className="sidebar-promo-bloom sidebar-promo-bloom-3"
+            style={{ backgroundColor: '#C084FC' }}
+          />
+        </div>
+        <span className="relative z-10 flex items-center gap-2">
+          <span
+            className="iconify i-solar:login-3-broken"
+            data-icon="solar:login-3-broken"
+            aria-hidden="true"
+            style={{ fontSize: '24px' }}
+          />
+          Entrar agora
+        </span>
+      </button>
+    </div>
+  );
 }
 
 const PROFILE_TABS = [
@@ -84,7 +140,7 @@ function BetHistoryMobileCard({
 }
 
 export default function ProfilePage({ onBack }: ProfilePageProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const profileInputBg = `color-mix(in srgb, ${homeConfig.fundo} 90%, white)`;
   const profileRowAltBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
@@ -97,29 +153,29 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
-  const { userData, isLoading: isLoadingUserData, updateUserData } = useUserProfileData(
-    activeTab === 'minha-conta'
+  const { userData, isLoading: isLoadingUserData } = useUserProfileData(
+    isAuthenticated && activeTab === 'minha-conta'
   );
   const { betHistory, isLoading: isLoadingHistory } = useBetHistory(
     selectedPeriod,
-    activeTab === 'historico'
+    isAuthenticated && activeTab === 'historico'
   );
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState('');
-  const [isSavingName, setIsSavingName] = useState(false);
   const itemsPerPage = 10;
 
   // Garante que o Iconify escaneia os ícones após renderizar
   useEffect(() => {
-    if ((window as any).Iconify) {
-      (window as any).Iconify.scan();
-    }
-  });
+    const timer = window.setTimeout(() => {
+      (window as Window & { Iconify?: { scan: () => void } }).Iconify?.scan();
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [isAuthenticated, activeTab]);
 
   // Função para formatar CPF (XXX.XXX.XXX-XX)
   const formatCPF = (cpf: string | null): string => {
@@ -155,46 +211,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
   const fullNameFromRow = (u: UserProfileData) =>
     (u.usuario_nome && u.usuario_nome.trim()) || (u.nome && u.nome.trim()) || '';
-
-  // Função para iniciar edição do nome
-  const handleStartEditName = () => {
-    setEditedName(fullNameFromRow(userData));
-    setIsEditingName(true);
-  };
-
-  // Função para cancelar edição do nome
-  const handleCancelEditName = () => {
-    setIsEditingName(false);
-    setEditedName('');
-  };
-
-  // Função para salvar o nome
-  const handleSaveName = async () => {
-    if (!isAuthenticated || !user) return;
-
-    setIsSavingName(true);
-    try {
-      const trimmed = editedName.trim() || null;
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ usuario_nome: trimmed, nome: trimmed })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Erro ao salvar nome:', error);
-        alert('Erro ao salvar nome. Tente novamente.');
-        return;
-      }
-
-      updateUserData({ usuario_nome: trimmed, nome: trimmed });
-      setIsEditingName(false);
-    } catch (error) {
-      console.error('Erro ao salvar nome:', error);
-      alert('Erro ao salvar nome. Tente novamente.');
-    } finally {
-      setIsSavingName(false);
-    }
-  };
 
   const totalPages = Math.ceil(betHistory.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -237,7 +253,11 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
               </div>
 
               <div className="flex-1 min-w-0 max-md:pt-1">
-                {activeTab === 'minha-conta' && (
+                {!isAuthenticated && (
+                  <ProfileLoginRequired onLogin={() => setIsLoginOpen(true)} />
+                )}
+
+                {isAuthenticated && activeTab === 'minha-conta' && (
                   <div className="space-y-3">
                     <div>
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Dados da conta</h1>
@@ -253,53 +273,13 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                               <User className="w-4 h-4 text-white" />
                             </div>
-                            {isEditingName ? (
-                              <>
-                                <input
-                                  type="text"
-                                  value={editedName}
-                                  onChange={(e) => setEditedName(e.target.value)}
-                                  className="w-full h-11 pl-10 pr-24 border border-brand rounded-lg text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
-                                  style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
-                                  autoFocus
-                                />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                                  <button
-                                    onClick={handleSaveName}
-                                    disabled={isSavingName}
-                                    className="p-1.5 rounded hover:bg-brand/20 transition-colors disabled:opacity-50"
-                                    title="Salvar"
-                                  >
-                                    <span className="iconify" data-icon="mdi:check" aria-hidden="true" style={{ fontSize: '18px', color: 'var(--brand-primary)' }}></span>
-                                  </button>
-                                  <button
-                                    onClick={handleCancelEditName}
-                                    disabled={isSavingName}
-                                    className="p-1.5 rounded hover:bg-red-500/20 transition-colors disabled:opacity-50"
-                                    title="Cancelar"
-                                  >
-                                    <span className="iconify" data-icon="mdi:close" aria-hidden="true" style={{ fontSize: '18px', color: '#ef4444' }}></span>
-                                  </button>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <input
-                                  type="text"
-                                  value={isLoadingUserData ? 'Carregando...' : formatName(fullNameFromRow(userData) || null)}
-                                  readOnly
-                                  className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
-                                  style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
-                                />
-                                <button
-                                  onClick={handleStartEditName}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-brand/20 transition-colors"
-                                  title="Editar nome"
-                                >
-                                  <span className="iconify" data-icon="mdi:pencil" aria-hidden="true" style={{ fontSize: '16px', color: 'var(--brand-primary)' }}></span>
-                                </button>
-                              </>
-                            )}
+                            <input
+                              type="text"
+                              value={isLoadingUserData ? 'Carregando...' : formatName(fullNameFromRow(userData) || null)}
+                              readOnly
+                              className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
+                              style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
+                            />
                           </div>
                         </div>
 
@@ -448,7 +428,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                   </div>
                 )}
 
-                {activeTab === 'seguranca' && (
+                {isAuthenticated && activeTab === 'seguranca' && (
                   <div className="space-y-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Segurança e login</h1>
@@ -600,7 +580,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     )}
 
-                    <div className={`${profileSectionClass} md:border-t`} style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">Autenticação de dois fatores (2FA)</h3>
@@ -610,7 +590,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       </div>
                     </div>
 
-                    <div className={`${profileSectionClass} max-md:mb-0 md:border-t`} style={{ borderColor: 'var(--brand-primary)' }}>
+                    <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <h3 className="text-white font-semibold mb-0.5">Contas Redes Sociais</h3>
@@ -622,7 +602,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                   </div>
                 )}
 
-                {activeTab === 'historico' && (
+                {isAuthenticated && activeTab === 'historico' && (
                   <div className="space-y-4 md:space-y-6">
                     <div>
                       <h1 className="text-white text-xl md:text-2xl font-bold mb-2">Histórico de apostas</h1>
@@ -811,7 +791,8 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                   </div>
                 )}
 
-                {(activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
+                {isAuthenticated &&
+                  (activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
                   <div className="p-6 md:p-8 text-center max-md:rounded-xl max-md:border max-md:border-white/10">
                     <p className="text-slate-400 text-base md:text-lg">Em construção</p>
                   </div>
@@ -824,6 +805,24 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
         <Footer containerClassName="w-full" />
       </div>
+
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onSwitchToRegister={() => {
+          setIsLoginOpen(false);
+          window.setTimeout(() => setIsRegisterOpen(true), MODAL_ANIM_MS);
+        }}
+      />
+
+      <RegisterModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onSwitchToLogin={() => {
+          setIsRegisterOpen(false);
+          window.setTimeout(() => setIsLoginOpen(true), MODAL_ANIM_MS);
+        }}
+      />
     </AppPageScaffold>
   );
 }

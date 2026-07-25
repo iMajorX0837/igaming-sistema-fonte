@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
 import { resolveLoginModalImageUrl } from '../lib/authModalImages';
+import { getAuthErrorMessage } from '../lib/authErrors';
 import AuthModalImage from './AuthModalImage';
 import { useModalAnimation } from '../hooks/useModalAnimation';
 
@@ -47,14 +48,39 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (!email && !password) {
+      setError('Informe seu e-mail e senha para continuar.');
+      return;
+    }
+    if (!email) {
+      setError('Informe o e-mail da sua conta.');
+      return;
+    }
+    if (!password) {
+      setError('Informe sua senha.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('E-mail inválido. Verifique o endereço digitado.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(formData.email, formData.password);
+      await login(email, password);
       setFormData({ email: '', password: '' });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao fazer login');
+      setError(getAuthErrorMessage(err, 'Não foi possível fazer login. Tente novamente.'));
     } finally {
       setLoading(false);
     }

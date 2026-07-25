@@ -14,9 +14,10 @@ import { SIDEBAR_WIDTH_COLLAPSED_PX, SIDEBAR_WIDTH_EXPANDED_PX } from './Sidebar
 import { supabase } from '../lib/supabase';
 import { getVipImageUrl } from '../lib/vip';
 import { appPageContainerClass } from '../constants/homeLayout';
-import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
+import { useAuthModalsConfig, useFooterConfig } from '../contexts/SiteConfigContext';
 import { preloadRegisterModalImage } from '../lib/authModalImages';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
+import { openLiveSupportWhatsapp } from '../lib/liveSupport';
 
 const accountMenuItemClass =
   'flex items-center gap-3 px-4 py-1.5 text-sm text-[#CBD5E1] transition-colors duration-200 hover:text-white hover:no-underline';
@@ -61,6 +62,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     (proximoNivel ? getVipImageUrl(proximoNivel.grupo) : null);
   const proximoCor = proximoNivel?.cor || 'rgb(255, 146, 17)';
   const { config: authModalsConfig } = useAuthModalsConfig();
+  const { config: footerConfig } = useFooterConfig();
   const autoRegisterOpenedRef = useRef(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -104,7 +106,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
 
     let cancelled = false;
     const openRegisterModal = () => {
-      if (cancelled || autoRegisterOpenedRef.current) return;
+      if (cancelled || autoRegisterOpenedRef.current || isAuthenticated) return;
       autoRegisterOpenedRef.current = true;
       setIsRegisterOpen(true);
     };
@@ -117,6 +119,12 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
       window.clearTimeout(fallbackTimer);
     };
   }, [authLoading, isAuthenticated, authModalsConfig]);
+
+  useEffect(() => {
+    if (isAuthenticated && isRegisterOpen) {
+      setIsRegisterOpen(false);
+    }
+  }, [isAuthenticated, isRegisterOpen]);
 
   // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {
@@ -419,13 +427,20 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                         </svg>
                         <span>{copy.appDownload}</span>
                       </a>
-                      <a href="/help/support" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openLiveSupportWhatsapp(footerConfig.whatsapp.url);
+                          setIsAccountMenuOpen(false);
+                        }}
+                        className={accountMenuButtonClass}
+                      >
                         <svg className="w-5 h-5 shrink-0" viewBox="0 0 640 512" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                           <path d="M640 191.1v191.1c0 35.25-28.75 63.1-64 63.1h-32v54.24c0 7.998-9.125 12.62-15.5 7.873l-82.75-62.12L319.1 447.1C284.7 447.1 256 419.2 256 383.1v-31.98l96-.002c52.88 0 96-43.12 96-95.99V128h128C611.3 128 640 156.7 640 191.1z" fill="currentColor" />
                           <path d="M352 0H64C28.75 0 0 28.75 0 63.1V256C0 291.2 28.75 320 64 320l32 .0098v54.25c0 7.998 9.125 12.62 15.5 7.875l82.75-62.12L352 319.9c35.25 .125 64-28.68 64-63.92V63.1C416 28.75 387.3 0 352 0z" fill="currentColor" opacity="0.4" />
                         </svg>
                         <span>{copy.liveSupport}</span>
-                      </a>
+                      </button>
                       <div className="border-t border-white/10 my-1.5"></div>
                       <button
                         onClick={() => { handleLogout(); setIsAccountMenuOpen(false); }}

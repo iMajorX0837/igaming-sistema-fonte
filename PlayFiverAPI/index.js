@@ -799,9 +799,9 @@ app.use(
   })
 );
 
-// CPF Hub — chaves ficam no servidor
+// CPF Hub — chaves ficam no servidor; valida CPF inválido/em uso antes da API externa
 const cpfHubApiKeys = parseCpfHubApiKeys(process.env.CPFHUB_API_KEY);
-app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys }));
+app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys, supabase }));
 
 app.use(
   '/api/webhooks',

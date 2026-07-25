@@ -14420,7 +14420,7 @@ BEGIN
     RETURN;
   END IF;
 
-  IF public.get_current_user_referral_code() IS DISTINCT FROM TRIM(p_referral_code) THEN
+  IF TRIM(COALESCE(public.get_current_user_referral_code(), '')) IS DISTINCT FROM TRIM(p_referral_code) THEN
     RAISE EXCEPTION 'Acesso negado';
   END IF;
 END;
@@ -14435,18 +14435,48 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_code TEXT;
+  v_deposito_min NUMERIC;
+  v_global_min NUMERIC;
 BEGIN
   PERFORM public._assert_referral_code_caller(referral_code_param);
 
-  IF referral_code_param IS NULL OR TRIM(referral_code_param) = '' THEN
+  v_code := TRIM(referral_code_param);
+  IF v_code IS NULL OR v_code = '' THEN
     RETURN 0;
   END IF;
+
+  SELECT COALESCE(sc.indicacao_deposito_minimo, 50)
+  INTO v_global_min
+  FROM public.site_config sc
+  WHERE sc.id = 1;
+
+  v_global_min := COALESCE(v_global_min, 50);
+
+  SELECT COALESCE(u.indicacao_deposito_minimo_custom, v_global_min)
+  INTO v_deposito_min
+  FROM public.usuarios u
+  WHERE u.link_indicação = v_code
+  LIMIT 1;
+
+  v_deposito_min := COALESCE(v_deposito_min, v_global_min, 50);
 
   RETURN (
     SELECT COUNT(*)::INT
     FROM public.usuarios u
-    WHERE u.indicado_por = referral_code_param
-      AND COALESCE(u.indicacao_recompensa_paga, false) = true
+    WHERE u.indicado_por = v_code
+      AND (
+        COALESCE(u.indicacao_recompensa_paga, false) = true
+        OR COALESCE((
+          SELECT d.valor
+          FROM public.depositos d
+          WHERE d.usuario_id = u.id
+            AND d.status = 'aprovado'
+          ORDER BY COALESCE(d.data_hora, d.created_at) ASC
+          LIMIT 1
+        ), 0) >= v_deposito_min
+      )
   );
 END;
 $$;
@@ -14457,18 +14487,60 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_code TEXT;
+  v_deposito_min NUMERIC;
+  v_recompensa NUMERIC;
+  v_global_min NUMERIC;
+  v_global_recompensa NUMERIC;
 BEGIN
   PERFORM public._assert_referral_code_caller(p_referral_code);
 
-  IF p_referral_code IS NULL OR TRIM(p_referral_code) = '' THEN
+  v_code := TRIM(p_referral_code);
+  IF v_code IS NULL OR v_code = '' THEN
     RETURN 0;
   END IF;
 
+  SELECT
+    COALESCE(sc.indicacao_recompensa, 0),
+    COALESCE(sc.indicacao_deposito_minimo, 50)
+  INTO v_global_recompensa, v_global_min
+  FROM public.site_config sc
+  WHERE sc.id = 1;
+
+  v_global_recompensa := COALESCE(v_global_recompensa, 0);
+  v_global_min := COALESCE(v_global_min, 50);
+
+  SELECT
+    COALESCE(u.indicacao_recompensa_custom, v_global_recompensa),
+    COALESCE(u.indicacao_deposito_minimo_custom, v_global_min)
+  INTO v_recompensa, v_deposito_min
+  FROM public.usuarios u
+  WHERE u.link_indicação = v_code
+  LIMIT 1;
+
+  v_recompensa := COALESCE(v_recompensa, v_global_recompensa, 0);
+  v_deposito_min := COALESCE(v_deposito_min, v_global_min, 50);
+
   RETURN COALESCE((
-    SELECT SUM(COALESCE(u.indicacao_recompensa_valor_pago, 0))
+    SELECT SUM(
+      CASE
+        WHEN COALESCE(u.indicacao_recompensa_paga, false) THEN
+          COALESCE(u.indicacao_recompensa_valor_pago, v_recompensa, 0)
+        WHEN COALESCE((
+          SELECT d.valor
+          FROM public.depositos d
+          WHERE d.usuario_id = u.id
+            AND d.status = 'aprovado'
+          ORDER BY COALESCE(d.data_hora, d.created_at) ASC
+          LIMIT 1
+        ), 0) >= v_deposito_min THEN
+          v_recompensa
+        ELSE 0
+      END
+    )
     FROM public.usuarios u
-    WHERE u.indicado_por = p_referral_code
-      AND COALESCE(u.indicacao_recompensa_paga, false) = true
+    WHERE u.indicado_por = v_code
   ), 0);
 END;
 $$;
@@ -14477,10 +14549,10 @@ GRANT EXECUTE ON FUNCTION public.count_qualified_referrals(TEXT) TO authenticate
 GRANT EXECUTE ON FUNCTION public.calcular_ganhos_indicacao(TEXT) TO authenticated;
 
 COMMENT ON FUNCTION public.count_qualified_referrals(TEXT) IS
-  'H8: conta indicados qualificados; só o dono do código ou admin.';
+  'Indicados com 1º depósito aprovado >= mínimo (ou recompensa já paga). H8: só dono do código ou admin.';
 
 COMMENT ON FUNCTION public.calcular_ganhos_indicacao(TEXT) IS
-  'H8: soma ganhos de indicação; só o dono do código ou admin.';
+  'Soma ganhos de indicação (pagos + qualificados com 1º depósito >= mínimo). H8: só dono do código ou admin.';
 
 -- =============================================================================
 -- Patch M8 — webhooks: secret não acessível via JWT admin (só service_role / API)

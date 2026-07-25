@@ -492,11 +492,14 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
   async function ensureValidSession(): Promise<boolean> {
     const session = readSession();
+    // Sem sessão em memória = visitante ou validateSession() ainda não rodou.
+    // Auth real vai nos cookies HttpOnly; não chamar /auth/refresh à toa.
     if (!hasSessionUser(session)) {
-      const validated = await performSessionRefresh();
-      return validated !== null;
+      return false;
     }
-    if (!sessionNeedsRefresh(session)) return true;
+    if (!sessionNeedsRefresh(session)) {
+      return true;
+    }
     return (await performSessionRefresh()) !== null;
   }
 
@@ -580,7 +583,19 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   const auth = {
     /** Lê sessão local; renova o token automaticamente se estiver perto de expirar. */
     async getSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
-      await ensureValidSession();
+      if (!hasSessionUser(readSession())) {
+        const response = await apiFetch('/auth/session');
+        const payload = await response.json();
+        if (payload.data?.session?.user) {
+          writeSession({
+            ...(readSession() ?? {}),
+            ...payload.data.session,
+            user: payload.data.session.user,
+          });
+        }
+      } else if (sessionNeedsRefresh(readSession())) {
+        await performSessionRefresh();
+      }
       return { data: { session: readSession() }, error: null };
     },
 
@@ -630,10 +645,16 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
         method: 'POST',
         body: JSON.stringify(params),
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
 
-      if (payload.error) {
-        return { data: { user: null, session: null }, error: payload.error };
+      if (payload.error || !response.ok) {
+        return {
+          data: { user: null, session: null },
+          error: payload.error ?? {
+            message: payload.message || 'Erro ao fazer login',
+            status: response.status,
+          },
+        };
       }
 
       if (payload.data?.session?.user) {
@@ -649,10 +670,16 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
         method: 'POST',
         body: JSON.stringify(params),
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
 
-      if (payload.error) {
-        return { data: { user: null, session: null }, error: payload.error };
+      if (payload.error || !response.ok) {
+        return {
+          data: { user: null, session: null },
+          error: payload.error ?? {
+            message: payload.message || 'Erro ao criar conta',
+            status: response.status,
+          },
+        };
       }
 
       if (payload.data?.session?.user) {

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import { clearUserProfileCaches } from '../lib/userProfileCache';
 import { getTrackingParamsForSignup } from '../lib/trackingParams';
+import { mapAuthError } from '../lib/authErrors';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
@@ -33,23 +34,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
       if (session?.user) {
         setUser(mapSupabaseUserToUser(session.user));
-      } else {
+      } else if (event !== 'INITIAL_SESSION') {
         clearUserProfileCaches();
         setUser(null);
       }
-      setLoading(false);
+
+      // INITIAL_SESSION dispara com memória vazia (cookies HttpOnly) — aguarda validateSession.
+      if (event !== 'INITIAL_SESSION') {
+        setLoading(false);
+      }
     });
 
     void supabase.auth.validateSession().finally(() => {
-      setLoading(false);
+      if (mounted) setLoading(false);
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -63,21 +73,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    if (!email || !password) {
-      throw new Error('Email e senha são obrigatórios');
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      throw new Error('Informe seu e-mail e senha para continuar.');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      throw new Error('E-mail inválido. Verifique o endereço digitado.');
+    }
+
+    if (password.length < 6) {
+      throw new Error('A senha deve ter pelo menos 6 caracteres.');
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: trimmedEmail,
       password,
     });
 
     if (error) {
-      throw new Error(error.message || 'Erro ao fazer login');
+      throw new Error(mapAuthError(error, 'Não foi possível fazer login. Tente novamente.'));
     }
 
     if (!data.session?.user) {
-      throw new Error('Sessão não iniciada. Tente novamente.');
+      throw new Error('Não foi possível iniciar a sessão. Tente novamente.');
     }
 
     if (data.user) {
@@ -93,25 +112,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     referralCode?: string,
     usuarioNome?: string
   ) => {
-    if (!cpf || !email || !phone || !password) {
-      throw new Error('Todos os campos são obrigatórios');
+    const trimmedEmail = email.trim();
+    const cpfDigits = cpf.replace(/\D/g, '');
+    const phoneDigits = phone.replace(/\D/g, '');
+
+    if (!cpfDigits || !trimmedEmail || !phoneDigits || !password) {
+      throw new Error('Preencha todos os campos para criar sua conta.');
+    }
+
+    if (cpfDigits.length !== 11) {
+      throw new Error('CPF inválido. Digite os 11 números corretamente.');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      throw new Error('E-mail inválido. Verifique o endereço digitado.');
+    }
+
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      throw new Error('Telefone inválido. Use DDD + número (10 ou 11 dígitos).');
+    }
+
+    if (password.length < 6) {
+      throw new Error('A senha deve ter pelo menos 6 caracteres.');
     }
 
     // Extrai o usuario do email (parte antes do @)
     // Exemplo: pedro-ferreira@gmail.com -> pedro-ferreira
-    const usuario = email.split('@')[0];
+    const usuario = trimmedEmail.split('@')[0];
 
     const trimmedNome = usuarioNome?.trim() || '';
     const tracking = getTrackingParamsForSignup();
 
     // Criar usuário no Supabase
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: trimmedEmail,
       password,
       options: {
         data: {
-          cpf,
-          phone,
+          cpf: cpfDigits,
+          phone: phoneDigits,
           usuario,
           referral_code: referralCode || null,
           ...(trimmedNome ? { usuario_nome: trimmedNome } : {}),
@@ -121,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      throw new Error(error.message || 'Erro ao criar conta');
+      throw new Error(mapAuthError(error, 'Não foi possível criar sua conta. Tente novamente.'));
     }
 
     if (data.user) {

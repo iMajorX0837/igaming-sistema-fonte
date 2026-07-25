@@ -49,7 +49,7 @@ export default function AuthModalImage({
         alt={alt}
         className={`${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading="eager"
-        fetchPriority="high"
+        fetchpriority="high"
         decoding="async"
         onLoad={() => setLoaded(true)}
       />
