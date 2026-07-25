@@ -266,7 +266,23 @@ git commit -m "descricao da mudanca"
 git push
 ```
 
-### Na EC2
+### Na EC2 (deploy completo — use sempre)
+
+```bash
+cd /opt/venuzbet/deploy && ./scripts/deploy-tenant.sh
+```
+
+Tenant padrão: **stewgaming**. Outro tenant: `./scripts/deploy-tenant.sh zorbybet`
+
+Rebuild sem cache Docker (só se `package.json` / Dockerfile mudou):
+
+```bash
+NO_CACHE=1 ./scripts/deploy-tenant.sh stewgaming
+```
+
+O script faz: `git pull` → build API → build front/admin → recreate `api-stewgaming` + `nginx` → healthcheck.
+
+### Deploy manual (equivalente)
 
 ```bash
 cd /opt/venuzbet

@@ -43,6 +43,12 @@ cp "$API_LOCAL" "$OUT"
 # Produção + domínio do tenant
 sed -i "s|^PUBLIC_API_URL=.*|PUBLIC_API_URL=https://api.$DOMAIN|" "$OUT"
 
+if grep -q '^PUBLIC_SITE_URL=' "$OUT"; then
+  sed -i "s|^PUBLIC_SITE_URL=.*|PUBLIC_SITE_URL=https://$DOMAIN|" "$OUT"
+else
+  echo "PUBLIC_SITE_URL=https://$DOMAIN" >> "$OUT"
+fi
+
 if grep -q '^NODE_ENV=' "$OUT"; then
   sed -i 's|^NODE_ENV=.*|NODE_ENV=production|' "$OUT"
 else
