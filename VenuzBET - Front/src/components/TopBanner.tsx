@@ -1,6 +1,8 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTopBannerConfig } from '../hooks/useTopBannerConfig';
+import { normalizeCmsLink, openCmsLink } from '../lib/cmsLink';
 
 const DISMISS_KEY = 'venuz-top-banner-dismissed-v1';
 
@@ -24,6 +26,8 @@ function persistDismissed() {
 export default function TopBanner() {
   const { config } = useTopBannerConfig();
   const [isDismissed, setIsDismissed] = useState(readDismissed);
+  const navigate = useNavigate();
+  const buttonLink = config.botao_href ? normalizeCmsLink(config.botao_href) : null;
 
   if (!config.ativo || isDismissed) return null;
 
@@ -35,9 +39,10 @@ export default function TopBanner() {
       <div className="flex items-center gap-1.5">
         {config.emoji ? <span className="text-base flex-shrink-0">{config.emoji}</span> : null}
         <span className="text-sm sm:text-base font-normal text-white">{config.mensagem}</span>
-        {config.botao_texto ? (
-          <a
-            href={config.botao_href}
+        {config.botao_texto && buttonLink?.href ? (
+          <button
+            type="button"
+            onClick={() => openCmsLink(buttonLink.href, buttonLink.link_tipo, navigate)}
             className="px-2.5 py-1 rounded-lg text-xs transition-colors duration-200 flex-shrink-0 whitespace-nowrap ml-1 hover:opacity-90"
             style={{
               backgroundColor: config.botao_cor_fundo,
@@ -47,17 +52,17 @@ export default function TopBanner() {
             }}
           >
             {config.botao_texto}
-          </a>
+          </button>
         ) : null}
       </div>
-
       {config.permitir_fechar ? (
         <button
+          type="button"
           onClick={() => {
-            setIsDismissed(true);
             persistDismissed();
+            setIsDismissed(true);
           }}
-          className="text-white hover:opacity-70 transition-opacity duration-200 flex-shrink-0 absolute right-3"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors"
           aria-label="Fechar banner"
         >
           <X className="w-4 h-4" />

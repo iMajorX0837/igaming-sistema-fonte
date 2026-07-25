@@ -126,7 +126,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
           .from('usuarios')
           .select('saldo')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Erro ao buscar saldo:', error);

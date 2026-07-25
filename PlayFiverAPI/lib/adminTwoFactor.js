@@ -4,9 +4,14 @@ import QRCode from 'qrcode';
 
 const ISSUER = 'VenuzBET Admin';
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+/** Sessão elevada (2FA ok no painel) — acompanha vida típica do access_token. */
+const ELEVATION_TTL_MS = 60 * 60 * 1000;
 
 /** @type {Map<string, { session: object; expires: number }>} */
 const pendingChallenges = new Map();
+
+/** @type {Map<string, number>} tokenHash -> expiresAt */
+const elevatedAdminTokens = new Map();
 
 function cleanupChallenges() {
   const now = Date.now();
@@ -15,6 +20,19 @@ function cleanupChallenges() {
       pendingChallenges.delete(id);
     }
   }
+}
+
+function cleanupElevations() {
+  const now = Date.now();
+  for (const [hash, expires] of elevatedAdminTokens.entries()) {
+    if (expires <= now) {
+      elevatedAdminTokens.delete(hash);
+    }
+  }
+}
+
+function hashToken(accessToken) {
+  return crypto.createHash('sha256').update(String(accessToken)).digest('hex');
 }
 
 export function generateTotpSecret() {
@@ -71,4 +89,30 @@ export function consume2FAChallenge(challengeToken) {
     pendingChallenges.delete(challengeToken);
   }
   return session;
+}
+
+/** Marca access_token como elevado (liberado para rotas/admin RPCs). */
+export function markAdminSessionElevated(accessToken, ttlMs = ELEVATION_TTL_MS) {
+  if (!accessToken) return;
+  cleanupElevations();
+  elevatedAdminTokens.set(hashToken(accessToken), Date.now() + ttlMs);
+}
+
+export function isAdminSessionElevated(accessToken) {
+  if (!accessToken) return false;
+  cleanupElevations();
+  const expires = elevatedAdminTokens.get(hashToken(accessToken));
+  if (!expires) return false;
+  if (expires <= Date.now()) {
+    elevatedAdminTokens.delete(hashToken(accessToken));
+    return false;
+  }
+  return true;
+}
+
+/** Ao renovar JWT, preserva elevação se o token antigo era elevado. */
+export function transferAdminSessionElevation(oldAccessToken, newAccessToken) {
+  if (!oldAccessToken || !newAccessToken) return;
+  if (!isAdminSessionElevated(oldAccessToken)) return;
+  markAdminSessionElevated(newAccessToken);
 }

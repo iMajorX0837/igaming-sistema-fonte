@@ -28,14 +28,14 @@ interface FreeBonusListResponse {
   data?: FreeBonusItem[];
 }
 
-async function getAccessToken(): Promise<string | null> {
+async function ensureAuthenticated(): Promise<boolean> {
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  return !!data.session?.user;
 }
 
 export async function listFreeBonuses(userCode: string): Promise<FreeBonusItem[]> {
-  const accessToken = await getAccessToken();
-  if (!accessToken) {
+  const authed = await ensureAuthenticated();
+  if (!authed) {
     console.error('listFreeBonuses: usuário não autenticado');
     return [];
   }
@@ -45,9 +45,9 @@ export async function listFreeBonuses(userCode: string): Promise<FreeBonusItem[]
 
   const response = await fetch(url, {
     method: 'GET',
+    credentials: 'include',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${accessToken}`,
     },
   });
 
@@ -75,16 +75,16 @@ export async function grantPrizeWheelBonus(params: {
   rounds: number;
   cupomUsoId: string;
 }): Promise<GrantFreeBonusResult> {
-  const accessToken = await getAccessToken();
-  if (!accessToken) {
+  const authed = await ensureAuthenticated();
+  if (!authed) {
     return { ok: false, msg: 'Faça login para ativar as rodadas grátis.' };
   }
 
   const response = await fetch(PRIZE_WHEEL_GRANT_URL, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
       user_code: params.userCode,

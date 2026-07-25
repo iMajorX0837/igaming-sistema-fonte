@@ -101,19 +101,22 @@ export default function EditUsuarioModal({ usuarioId, isOpen, onClose, onUpdate 
     
     try {
       setSaving(true);
-      const { error } = await supabase
-        .from('usuarios')
-        .update({
-          nome: formNome,
-          email: formEmail,
-          cpf: formCPF,
-          telefone: formTelefone,
-          cargo: formCargo,
-        })
-        .eq('id', selectedUsuario.id);
+      const { data, error } = await supabase.rpc('atualizar_perfil_usuario_admin', {
+        p_usuario_id: selectedUsuario.id,
+        p_nome: formNome,
+        p_email: formEmail,
+        p_cpf: formCPF,
+        p_telefone: formTelefone,
+        p_cargo: formCargo,
+      });
 
       if (error) {
         showToast(`Erro ao salvar: ${error.message}`, 'error');
+        return;
+      }
+
+      if (data && data.ok === false) {
+        showToast(`Erro ao salvar: ${data.error || 'Falha ao atualizar'}`, 'error');
         return;
       }
 

@@ -299,7 +299,7 @@ export default function WalletPage() {
           .from('usuarios')
           .select('saldo')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Erro ao buscar saldo:', error);
@@ -434,7 +434,16 @@ export default function WalletPage() {
   const withdrawalsFormatted = saques.map(saque => ({
     id: saque.id,
     valor: formatCurrency(saque.valor),
-    status: saque.status === 'aprovado' ? 'Aprovado' : saque.status === 'rejeitado' ? 'Rejeitado' : 'Pendente',
+    status:
+      saque.status === 'aprovado'
+        ? 'Aprovado'
+        : saque.status === 'rejeitado'
+          ? 'Rejeitado'
+          : saque.status === 'falhou'
+            ? 'Falhou'
+            : saque.status === 'processando'
+              ? 'Processando'
+              : 'Pendente',
     data: formatDate(saque.data_hora),
   }));
 

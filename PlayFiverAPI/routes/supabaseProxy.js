@@ -5,9 +5,23 @@ import { maybeDispatchDepositPaidFromRpc } from '../lib/depositWebhooks.js';
 import {
   BLOCKED_USER_RPCS,
   getQueryTableAndOperation,
+  isAdminOnlyRpcName,
   isBlockedUserTableWrite,
+  PUBLIC_ANON_RPCS,
+  PUBLIC_ANON_SELECT_TABLES,
+  sanitizeAdminUpdateUserAttributes,
 } from '../lib/proxySecurity.js';
-import { createRateLimiter } from '../lib/security.js';
+import { createRateLimiter, getClientIp } from '../lib/security.js';
+import { getAuthUser as resolveAuthUser } from '../lib/auth.js';
+import {
+  clearAuthCookies,
+  extractAccessToken,
+  extractRefreshToken,
+  isAdminClient,
+  sanitizeAuthPayload,
+  sanitizeSessionForClient,
+  setAuthCookies,
+} from '../lib/authCookies.js';
 import {
   buildOtpAuthUrl,
   buildQrDataUrl,
@@ -15,6 +29,9 @@ import {
   create2FAChallenge,
   generateTotpSecret,
   get2FAChallenge,
+  isAdminSessionElevated,
+  markAdminSessionElevated,
+  transferAdminSessionElevation,
   verifyTotpCode,
 } from '../lib/adminTwoFactor.js';
 
@@ -34,7 +51,46 @@ export function createSupabaseProxyRouter({
   dispatchWebhookEvent,
 }) {
   const router = Router();
-  const authSignInRateLimit = createRateLimiter({ windowMs: 60_000, max: 20 });
+  const authIp = (req) => getClientIp(req) || 'unknown';
+
+  const authSignInRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 20,
+    keyFn: (req) => {
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      return email ? `signin:${authIp(req)}:${email}` : `signin:${authIp(req)}`;
+    },
+  });
+
+  const authSignUpRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 10,
+    keyFn: (req) => {
+      const email = String(req.body?.email || '').trim().toLowerCase();
+      return email ? `signup:${authIp(req)}:${email}` : `signup:${authIp(req)}`;
+    },
+  });
+
+  const auth2FAVerifyRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 10,
+    keyFn: (req) => {
+      const challenge = String(req.body?.challengeToken || '').slice(0, 48);
+      return challenge ? `2fa:${authIp(req)}:${challenge}` : `2fa:${authIp(req)}`;
+    },
+  });
+
+  const authRefreshRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 30,
+    keyFn: (req) => `refresh:${authIp(req)}`,
+  });
+
+  const proxyDataRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 180,
+    keyFn: (req) => `proxy:${authIp(req)}`,
+  });
 
   const authClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -78,30 +134,13 @@ export function createSupabaseProxyRouter({
     return headers;
   }
 
-  async function getAuthUser(req) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return null;
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      return null;
-    }
-
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) {
-      return null;
-    }
-
-    return { user: data.user, token };
+  async function getAuthUser(req, options) {
+    return resolveAuthUser(supabase, req, options);
   }
 
   function getClientForRequest(req) {
     const extraHeaders = extractExtraHeaders(req);
-    const authHeader = req.headers.authorization;
-    const token =
-      authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+    const token = extractAccessToken(req);
 
     if (token) {
       return createUserClient(token, extraHeaders);
@@ -141,9 +180,18 @@ export function createSupabaseProxyRouter({
       return null;
     }
 
-    const cargo = await getUserCargo(auth.user.id);
-    if (cargo !== 'admin') {
+    const record = await getAdmin2FARecord(auth.user.id);
+    if (record?.cargo !== 'admin') {
       res.status(403).json({ data: null, error: { message: 'Acesso negado' } });
+      return null;
+    }
+
+    // Com 2FA ativo, só sessão elevada (login no painel + TOTP) acessa APIs admin.
+    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token)) {
+      res.status(403).json({
+        data: null,
+        error: { message: '2FA necessário. Entre pelo painel administrativo.' },
+      });
       return null;
     }
 
@@ -172,31 +220,45 @@ export function createSupabaseProxyRouter({
 
       const isAdminPanel = req.headers['x-client-info'] === 'admin-panel';
 
-      if (isAdminPanel && data?.user?.id) {
+      if (data?.user?.id) {
         const record = await getAdmin2FARecord(data.user.id);
 
-        if (record?.cargo !== 'admin') {
-          return res.status(403).json({
-            data: { user: null, session: null },
-            error: { message: 'Esta conta não possui permissões de administrador' },
-          });
-        }
+        // Painel admin: só conta admin; 2FA obrigatório se ativo.
+        if (isAdminPanel) {
+          if (record?.cargo !== 'admin') {
+            return res.status(403).json({
+              data: { user: null, session: null },
+              error: { message: 'Esta conta não possui permissões de administrador' },
+            });
+          }
 
-        if (record.two_factor_enabled && record.totp_secret) {
-          const challengeToken = create2FAChallenge(data);
-          return res.json({
-            data: {
-              user: data.user,
-              session: null,
-              requires2FA: true,
-              challengeToken,
-            },
-            error: null,
-          });
+          if (record.two_factor_enabled && record.totp_secret) {
+            const challengeToken = create2FAChallenge(data);
+            return res.json({
+              data: {
+                user: data.user,
+                session: null,
+                requires2FA: true,
+                challengeToken,
+              },
+              error: null,
+            });
+          }
+
+          // Admin sem 2FA no painel: eleva a sessão para APIs admin.
+          if (data.session?.access_token) {
+            markAdminSessionElevated(data.session.access_token);
+          }
         }
+        // Front (ou qualquer cliente sem header admin-panel):
+        // admin entra normalmente como jogador — SEM exigir 2FA e SEM elevação.
       }
 
-      res.json({ data, error: null });
+      if (data?.session?.access_token) {
+        setAuthCookies(res, req, data.session);
+      }
+
+      res.json({ data: sanitizeAuthPayload(data), error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-in:', err);
       res.status(500).json({
@@ -207,7 +269,7 @@ export function createSupabaseProxyRouter({
   });
 
   /** POST /api/supabase/auth/2fa/verify-login */
-  router.post('/auth/2fa/verify-login', async (req, res) => {
+  router.post('/auth/2fa/verify-login', auth2FAVerifyRateLimit, async (req, res) => {
     try {
       const { challengeToken, code } = req.body ?? {};
       if (!challengeToken || !code) {
@@ -242,11 +304,15 @@ export function createSupabaseProxyRouter({
       }
 
       consume2FAChallenge(challengeToken);
+      if (pendingSession.session?.access_token) {
+        markAdminSessionElevated(pendingSession.session.access_token);
+        setAuthCookies(res, req, pendingSession.session);
+      }
       res.json({
-        data: {
+        data: sanitizeAuthPayload({
           user: pendingSession.user,
           session: pendingSession.session,
-        },
+        }),
         error: null,
       });
     } catch (err) {
@@ -435,7 +501,7 @@ export function createSupabaseProxyRouter({
   });
 
   /** POST /api/supabase/auth/sign-up */
-  router.post('/auth/sign-up', async (req, res) => {
+  router.post('/auth/sign-up', authSignUpRateLimit, async (req, res) => {
     try {
       const { email, password, options } = req.body ?? {};
       if (!email || !password) {
@@ -476,7 +542,11 @@ export function createSupabaseProxyRouter({
         });
       }
 
-      res.json({ data, error: null });
+      if (data?.session?.access_token) {
+        setAuthCookies(res, req, data.session);
+      }
+
+      res.json({ data: sanitizeAuthPayload(data), error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-up:', err);
       res.status(500).json({
@@ -494,6 +564,7 @@ export function createSupabaseProxyRouter({
         const userClient = createUserClient(auth.token);
         await userClient.auth.signOut();
       }
+      clearAuthCookies(res, req);
       res.json({ error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-out:', err);
@@ -514,17 +585,15 @@ export function createSupabaseProxyRouter({
 
       if (error || !data?.session) {
         return res.json({
-          data: {
-            session: {
-              access_token: auth.token,
-              user: auth.user,
-            },
-          },
+          data: { session: sanitizeSessionForClient({ user: auth.user }) },
           error: null,
         });
       }
 
-      res.json({ data, error: null });
+      res.json({
+        data: { session: sanitizeSessionForClient(data.session) },
+        error: null,
+      });
     } catch (err) {
       console.error('[supabase-proxy] session:', err);
       res.status(500).json({
@@ -535,9 +604,9 @@ export function createSupabaseProxyRouter({
   });
 
   /** POST /api/supabase/auth/refresh */
-  router.post('/auth/refresh', async (req, res) => {
+  router.post('/auth/refresh', authRefreshRateLimit, async (req, res) => {
     try {
-      const refreshToken = req.body?.refresh_token;
+      const refreshToken = extractRefreshToken(req);
       if (!refreshToken) {
         return res.status(400).json({
           data: { session: null },
@@ -550,10 +619,20 @@ export function createSupabaseProxyRouter({
       });
 
       if (error) {
+        clearAuthCookies(res, req);
         return res.status(401).json({ data: { session: null }, error });
       }
 
-      res.json({ data, error: null });
+      const oldToken = extractAccessToken(req);
+      if (oldToken && data?.session?.access_token) {
+        transferAdminSessionElevation(oldToken, data.session.access_token);
+      }
+
+      if (data?.session?.access_token) {
+        setAuthCookies(res, req, data.session);
+      }
+
+      res.json({ data: sanitizeAuthPayload(data), error: null });
     } catch (err) {
       console.error('[supabase-proxy] refresh:', err);
       res.status(500).json({
@@ -566,6 +645,10 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/admin/update-user */
   router.post('/auth/admin/update-user', async (req, res) => {
     try {
+      if (!isAdminClient(req)) {
+        return res.status(404).json({ error: { message: 'Não encontrado' } });
+      }
+
       const auth = await requireAdminUser(req, res);
       if (!auth) return;
 
@@ -576,18 +659,36 @@ export function createSupabaseProxyRouter({
       }
 
       const { userId, attributes } = req.body ?? {};
-      if (!userId) {
+      if (!userId || typeof userId !== 'string') {
         return res.status(400).json({ error: { message: 'userId obrigatório' } });
+      }
+
+      const sanitized = sanitizeAdminUpdateUserAttributes(attributes);
+      if (!sanitized.ok) {
+        return res.status(400).json({ error: { message: sanitized.error } });
       }
 
       const serviceClient = createServiceClient();
       const { data, error } = await serviceClient.auth.admin.updateUserById(
         userId,
-        attributes ?? {}
+        sanitized.attributes
       );
 
       if (error) {
         return res.status(400).json({ error });
+      }
+
+      try {
+        const adminClient = createUserClient(auth.token, extractExtraHeaders(req));
+        await adminClient.rpc('registrar_admin_log', {
+          p_acao: 'Alterar senha Auth (admin)',
+          p_detalhes: `Usuario alvo: ${userId}`,
+          p_status: 'sucesso',
+          p_categoria: 'usuarios',
+          p_metadata: { target_user_id: userId, fields: ['password'] },
+        });
+      } catch (logErr) {
+        console.warn('[supabase-proxy] admin update-user log:', logErr);
       }
 
       res.json({ data, error: null });
@@ -598,30 +699,58 @@ export function createSupabaseProxyRouter({
   });
 
   async function assertProxyAllowed(req, res, { rpcName, spec } = {}) {
-    const auth = await getAuthUser(req);
-    if (!auth) {
-      return true;
-    }
+    const { table, operation } = getQueryTableAndOperation(spec ?? {});
+    const effectiveRpc =
+      rpcName ||
+      (spec?.operation === 'rpc' && typeof spec.function === 'string' ? spec.function : null);
 
-    const cargo = await getUserCargo(auth.user.id);
-    if (cargo === 'admin') {
-      return true;
-    }
-
-    if (rpcName && BLOCKED_USER_RPCS.has(rpcName)) {
+    // Deny-list de tabelas — todos os callers (anon, user, admin elevado).
+    if (table && operation && isBlockedUserTableWrite(table, operation)) {
       res.status(403).json({
         data: null,
-        error: { message: 'Operação não permitida' },
+        error: { message: 'Operação não permitida nesta tabela' },
         count: null,
       });
       return false;
     }
 
-    const { table, operation } = getQueryTableAndOperation(spec ?? {});
-    if (table && operation && isBlockedUserTableWrite(table, operation)) {
+    const auth = await getAuthUser(req);
+
+    if (!auth) {
+      if (effectiveRpc) {
+        if (PUBLIC_ANON_RPCS.has(effectiveRpc)) return true;
+        res.status(401).json({
+          data: null,
+          error: { message: 'Não autenticado' },
+          count: null,
+        });
+        return false;
+      }
+      if (table && operation === 'select' && PUBLIC_ANON_SELECT_TABLES.has(table.toLowerCase())) {
+        return true;
+      }
+      res.status(401).json({
+        data: null,
+        error: { message: 'Não autenticado' },
+        count: null,
+      });
+      return false;
+    }
+
+    const record = await getAdmin2FARecord(auth.user.id);
+    const isAdmin = record?.cargo === 'admin';
+    const needsElevation = !!(isAdmin && record.two_factor_enabled && record.totp_secret);
+    const elevated = isAdminSessionElevated(auth.token);
+
+    // Admin elevado (ou sem 2FA): bypass deny-list de RPCs.
+    if (isAdmin && (!needsElevation || elevated)) {
+      return true;
+    }
+
+    if (effectiveRpc && (BLOCKED_USER_RPCS.has(effectiveRpc) || isAdminOnlyRpcName(effectiveRpc))) {
       res.status(403).json({
         data: null,
-        error: { message: 'Operação não permitida nesta tabela' },
+        error: { message: 'Operação não permitida' },
         count: null,
       });
       return false;
@@ -714,12 +843,12 @@ export function createSupabaseProxyRouter({
   }
 
   /** Rotas legíveis no DevTools → Network (último segmento = tabela, RPC ou hint) */
-  router.post('/query', handleTableQuery);
-  router.post('/rpc/:name', handleRpc);
+  router.post('/query', proxyDataRateLimit, handleTableQuery);
+  router.post('/rpc/:name', proxyDataRateLimit, handleRpc);
 
   for (const op of ['select', 'insert', 'update', 'delete', 'upsert']) {
-    router.post(`/${op}/:table`, handleTableQuery);
-    router.post(`/${op}/:table/:label`, handleTableQuery);
+    router.post(`/${op}/:table`, proxyDataRateLimit, handleTableQuery);
+    router.post(`/${op}/:table/:label`, proxyDataRateLimit, handleTableQuery);
   }
 
   return router;

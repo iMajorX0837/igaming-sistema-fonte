@@ -476,7 +476,7 @@ export default function GamePage({
           .from('usuarios')
           .select('saldo, email')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('Erro ao buscar saldo:', error);
@@ -518,25 +518,21 @@ export default function GamePage({
         throw new Error('Erro ao buscar dados do usuário');
       }
 
-      // Usar o saldo atualizado diretamente da consulta
-      const currentBalance = parseFloat(userData.saldo) || 0;
-      
       // Usar email do usuário como identificador na Play Fiver
       const userCode = userData.email || user.email || 'venuzbet';
 
       // Mesmo origin: em dev o Vite repassa para PlayFiverAPI local (VITE_GAME_LAUNCH_PROXY).
       const gameLaunchUrl = import.meta.env.VITE_GAME_LAUNCH_URL?.trim() || '/api/game_launch';
       const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
+      if (!sessionData.session?.user) {
         throw new Error('Sessão expirada. Faça login novamente.');
       }
 
       const response = await fetch(gameLaunchUrl, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           user_code: userCode,
@@ -547,8 +543,6 @@ export default function GamePage({
             isSportGameCode(gameCode) ||
             isLiveProviderName(gameProvider) ||
             isOfficialSpribeGameCode(gameCode),
-          user_balance: currentBalance,
-          user_rtp: 70,
           lang: 'pt',
         }),
       });

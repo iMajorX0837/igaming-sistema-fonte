@@ -49,13 +49,15 @@ interface StatsSaques {
   falhou_valor: number;
 }
 
-type StatusFilter = 'todos' | 'pendente' | 'aprovado' | 'rejeitado' | 'falhou';
+type StatusFilter = 'todos' | 'pendente' | 'processando' | 'aprovado' | 'rejeitado' | 'falhou';
+
 type PeriodoFilter = 'todos' | 'hoje' | 'ontem' | '7dias' | '30dias' | 'mes';
 
 const ITEMS_PER_PAGE = 11;
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'pendente', label: 'Pendentes' },
+  { key: 'processando', label: 'Processando' },
   { key: 'aprovado', label: 'Aprovados' },
   { key: 'rejeitado', label: 'Rejeitados' },
   { key: 'falhou', label: 'Falhados' },
@@ -101,6 +103,7 @@ const getStatusDisplay = (status: string) => {
   const map: Record<string, string> = {
     aprovado: 'Aprovado',
     pendente: 'Pendente',
+    processando: 'Processando',
     rejeitado: 'Rejeitado',
     falhou: 'Falhou',
   };
@@ -113,6 +116,8 @@ const getStatusBadge = (status: string) => {
       return 'bg-admin-success/12 text-admin-success border-admin-success/20';
     case 'pendente':
       return 'bg-admin-warning/12 text-admin-warning border-admin-warning/20';
+    case 'processando':
+      return 'bg-sky-500/12 text-sky-300 border-sky-500/25';
     case 'rejeitado':
       return 'bg-admin-danger/12 text-admin-danger border-admin-danger/20';
     case 'falhou':
@@ -463,6 +468,26 @@ export default function SaquesPage() {
                                 Recusar
                               </button>
                             </>
+                          )}
+                          {saque.status === 'processando' && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  !window.confirm(
+                                    'Marcar como falhou? Só use se o PIX NÃO foi pago no gateway. O saldo será devolvido.'
+                                  )
+                                ) {
+                                  return;
+                                }
+                                void handleStatusUpdate(saque.id, 'falhou');
+                              }}
+                              disabled={actionLoading === saque.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 text-xs font-medium disabled:opacity-50"
+                              title="Marcar falha (devolver saldo se PIX não saiu)"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Marcar falhou
+                            </button>
                           )}
                         </div>
                       </td>

@@ -76,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(error.message || 'Erro ao fazer login');
     }
 
+    if (!data.session?.user) {
+      throw new Error('Sessão não iniciada. Tente novamente.');
+    }
+
     if (data.user) {
       setUser(mapSupabaseUserToUser(data.user));
     }

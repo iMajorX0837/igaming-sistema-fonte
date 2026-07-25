@@ -1302,10 +1302,8 @@ CREATE POLICY "Usuários podem ver apenas suas próprias transações de jogos"
   FOR SELECT
   USING (auth.uid() = usuario_id);
 
-CREATE POLICY "Permitir inserção de transações via service role"
-  ON public.transacoes_jogos
-  FOR INSERT
-  WITH CHECK (true);
+-- C4: sem policy de INSERT para clientes — writes so service_role / SECURITY DEFINER
+-- (policy antiga "Permitir inserção via service role" tinha WITH CHECK (true) e era explorável)
 
 -- aviator_rounds
 DROP POLICY IF EXISTS "Todos podem ver rodadas do Aviator" ON public.aviator_rounds;
@@ -12082,10 +12080,9 @@ ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhook_deliveries ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS webhooks_admin_all ON public.webhooks;
-CREATE POLICY webhooks_admin_all ON public.webhooks
-  FOR ALL TO authenticated
-  USING (public.is_user_admin())
-  WITH CHECK (public.is_user_admin());
+-- M8: sem acesso JWT à tabela webhooks; CRUD via PlayFiverAPI /api/webhooks (service_role)
+REVOKE ALL ON TABLE public.webhooks FROM anon;
+REVOKE ALL ON TABLE public.webhooks FROM authenticated;
 
 DROP POLICY IF EXISTS webhook_deliveries_admin_select ON public.webhook_deliveries;
 CREATE POLICY webhook_deliveries_admin_select ON public.webhook_deliveries
@@ -12173,7 +12170,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON TABLE public.webhooks IS 'Webhooks configuráveis pelo admin para eventos do sistema';
+COMMENT ON TABLE public.webhooks IS 'M8: CRUD admin via PlayFiverAPI /api/webhooks (service_role). secret_key nunca no browser.';
 COMMENT ON TABLE public.webhook_deliveries IS 'Log de entregas de webhooks (debug e auditoria)';
 
 -- =============================================================================
@@ -12833,3 +12830,1664 @@ COMMENT ON COLUMN public.integration_secrets.payment_gateway_withdraw IS 'Gatewa
 -- Promover admin apos criar conta:
 --   UPDATE public.usuarios SET cargo = 'admin' WHERE email = 'seu@email.com';
 -- =============================================================================
+
+-- =============================================================================
+-- Patch C1 — Saque atômico (débito + insert na mesma transação)
+-- Execute no SQL Editor do Supabase (produção/staging).
+-- Seguro com a API/front já atualizados para rpc solicitar_saque.
+-- =============================================================================
+
+-- 1) Flags de ledger no saque
+ALTER TABLE public.saques
+  ADD COLUMN IF NOT EXISTS saldo_debitado BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE public.saques
+  ADD COLUMN IF NOT EXISTS saldo_reembolsado BOOLEAN NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN public.saques.saldo_debitado IS
+  'true se o saldo foi debitado ao criar o saque; rejeição só reembolsa se true';
+
+COMMENT ON COLUMN public.saques.saldo_reembolsado IS
+  'true após devolver o saldo (rejeitado/falhou); evita double refund';
+
+-- Saques pendentes legados (fluxo antigo insert+RPC): assumir que já debitaram
+UPDATE public.saques
+SET saldo_debitado = true
+WHERE status = 'pendente'
+  AND saldo_debitado = false;
+
+-- 2) RPC atômica: valida + debita + cria pendente
+CREATE OR REPLACE FUNCTION public.solicitar_saque(
+  p_valor NUMERIC,
+  p_key TEXT,
+  p_chave TEXT,
+  p_origem TEXT DEFAULT 'pix'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID;
+  v_saldo NUMERIC;
+  v_rollover NUMERIC;
+  v_min NUMERIC;
+  v_max NUMERIC;
+  v_limite_dia INT;
+  v_count_dia INT;
+  v_key TEXT;
+  v_chave TEXT;
+  v_origem TEXT;
+  v_saque_id UUID;
+  v_novo_saldo NUMERIC;
+BEGIN
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'not_authenticated');
+  END IF;
+
+  v_key := lower(trim(COALESCE(p_key, '')));
+  v_chave := trim(COALESCE(p_chave, ''));
+  v_origem := lower(trim(COALESCE(p_origem, 'pix')));
+
+  IF v_origem IS DISTINCT FROM 'pix' THEN
+    RETURN json_build_object('success', false, 'error', 'origem_invalida');
+  END IF;
+
+  IF v_key NOT IN ('email', 'cpf', 'cnpj', 'telefone', 'chave aleatória') THEN
+    RETURN json_build_object('success', false, 'error', 'tipo_chave_invalido');
+  END IF;
+
+  IF v_chave = '' THEN
+    RETURN json_build_object('success', false, 'error', 'chave_obrigatoria');
+  END IF;
+
+  IF p_valor IS NULL OR p_valor <= 0 THEN
+    RETURN json_build_object('success', false, 'error', 'valor_invalido');
+  END IF;
+
+  SELECT COALESCE(saque_minimo, 50), COALESCE(saque_maximo, 1000000), COALESCE(saques_diarios_permitidos, 1)
+  INTO v_min, v_max, v_limite_dia
+  FROM public.site_config
+  WHERE id = 1;
+
+  v_min := COALESCE(v_min, 50);
+  v_max := COALESCE(v_max, 1000000);
+  v_limite_dia := COALESCE(v_limite_dia, 1);
+
+  IF p_valor < v_min THEN
+    RETURN json_build_object('success', false, 'error', format('Valor mínimo de saque: R$ %s', v_min));
+  END IF;
+
+  IF p_valor > v_max THEN
+    RETURN json_build_object('success', false, 'error', format('Valor máximo de saque: R$ %s', v_max));
+  END IF;
+
+  SELECT COUNT(*)::INT
+  INTO v_count_dia
+  FROM public.saques
+  WHERE usuario_id = v_uid
+    AND (data_hora AT TIME ZONE 'America/Sao_Paulo')::date =
+        (NOW() AT TIME ZONE 'America/Sao_Paulo')::date;
+
+  IF v_count_dia >= v_limite_dia THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', format('Limite diário de saques atingido. Máximo de %s saque(s) por dia.', v_limite_dia)
+    );
+  END IF;
+
+  SELECT COALESCE(saldo, 0), COALESCE(rollover_pendente, 0)
+  INTO v_saldo, v_rollover
+  FROM public.usuarios
+  WHERE id = v_uid
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'Usuário não encontrado');
+  END IF;
+
+  IF v_rollover > 0.009 THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', format(
+        'Rollover pendente: aposte mais R$ %s antes de sacar.',
+        trim(to_char(v_rollover, 'FM999G999G990D00'))
+      )
+    );
+  END IF;
+
+  IF v_saldo < p_valor THEN
+    RETURN json_build_object(
+      'success', false,
+      'error', 'Saldo insuficiente',
+      'saldo_atual', v_saldo
+    );
+  END IF;
+
+  v_novo_saldo := round((v_saldo - p_valor)::numeric, 2);
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET saldo = v_novo_saldo
+  WHERE id = v_uid;
+
+  INSERT INTO public.saques (
+    usuario_id,
+    valor,
+    status,
+    key,
+    chave,
+    origem,
+    saldo_debitado,
+    saldo_reembolsado
+  )
+  VALUES (
+    v_uid,
+    p_valor,
+    'pendente',
+    v_key,
+    v_chave,
+    'pix',
+    true,
+    false
+  )
+  RETURNING id INTO v_saque_id;
+
+  RETURN json_build_object(
+    'success', true,
+    'saque_id', v_saque_id,
+    'saldo_anterior', v_saldo,
+    'saldo_atual', v_novo_saldo,
+    'valor_saque', p_valor
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.solicitar_saque(NUMERIC, TEXT, TEXT, TEXT) IS
+  'Cria saque pendente e debita saldo na mesma transação. Único caminho permitido para usuários.';
+
+REVOKE ALL ON FUNCTION public.solicitar_saque(NUMERIC, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.solicitar_saque(NUMERIC, TEXT, TEXT, TEXT) TO authenticated;
+
+-- 3) Refund só se houve débito e ainda não reembolsou
+CREATE OR REPLACE FUNCTION public.handle_saque_rejeitado()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status IN ('rejeitado', 'falhou')
+     AND OLD.status = 'pendente'
+     AND COALESCE(OLD.saldo_debitado, false) = true
+     AND COALESCE(OLD.saldo_reembolsado, false) = false
+  THEN
+    PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+    UPDATE public.usuarios
+    SET saldo = COALESCE(saldo, 0) + NEW.valor
+    WHERE id = NEW.usuario_id;
+
+    NEW.saldo_reembolsado := true;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- BEFORE para poder setar saldo_reembolsado em NEW
+DROP TRIGGER IF EXISTS devolver_valor_saque_rejeitado ON public.saques;
+CREATE TRIGGER devolver_valor_saque_rejeitado
+  BEFORE UPDATE OF status ON public.saques
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION public.handle_saque_rejeitado();
+
+-- 4) Bloqueia INSERT direto por authenticated (só via solicitar_saque / service_role)
+DROP POLICY IF EXISTS "Usuários podem inserir apenas seus próprios saques" ON public.saques;
+DROP POLICY IF EXISTS "saques_insert_own" ON public.saques;
+
+-- 5) Revoga debito avulso (nao pode mais debitar sem criar saque)
+-- IMPORTANTE: em Postgres o EXECUTE costuma estar em PUBLIC.
+REVOKE ALL ON FUNCTION public.subtrair_saldo_saque(UUID, NUMERIC) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.subtrair_saldo_saque(UUID, NUMERIC) FROM anon;
+REVOKE ALL ON FUNCTION public.subtrair_saldo_saque(UUID, NUMERIC) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.subtrair_saldo_saque(UUID, NUMERIC) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.subtrair_saldo_saque(
+  p_usuario_id UUID,
+  p_valor_saque NUMERIC
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF current_user NOT IN ('postgres', 'supabase_admin', 'service_role') THEN
+    RETURN json_build_object('success', false, 'error', 'forbidden');
+  END IF;
+
+  RETURN json_build_object(
+    'success', false,
+    'error', 'deprecated_use_solicitar_saque'
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public.subtrair_saldo_saque(UUID, NUMERIC) IS
+  'Deprecated. Use solicitar_saque. Bloqueado para clientes.';
+
+-- =============================================================================
+
+-- =============================================================================
+-- Patch C2 — Bloqueia self-update de rollover / indicacao / flags sensiveis
+-- Execute no SQL Editor do Supabase.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.protect_usuario_sensitive_columns()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_setting('app.skip_usuario_guard', true) = 'true' THEN
+    RETURN NEW;
+  END IF;
+
+  IF current_user IN ('postgres', 'supabase_admin', 'service_role') THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.saldo IS DISTINCT FROM OLD.saldo THEN
+    RAISE EXCEPTION 'Alteracao de saldo nao permitida';
+  END IF;
+
+  IF NEW.cargo IS DISTINCT FROM OLD.cargo THEN
+    RAISE EXCEPTION 'Alteracao de cargo nao permitida';
+  END IF;
+
+  IF NEW.vip_nivel IS DISTINCT FROM OLD.vip_nivel THEN
+    RAISE EXCEPTION 'Alteracao de VIP nao permitida';
+  END IF;
+
+  IF NEW.total_depositado IS DISTINCT FROM OLD.total_depositado THEN
+    RAISE EXCEPTION 'Alteracao de total depositado nao permitida';
+  END IF;
+
+  IF NEW.two_factor_enabled IS DISTINCT FROM OLD.two_factor_enabled THEN
+    RAISE EXCEPTION 'Alteracao de 2FA nao permitida';
+  END IF;
+
+  IF NEW.totp_secret IS DISTINCT FROM OLD.totp_secret THEN
+    RAISE EXCEPTION 'Alteracao de 2FA nao permitida';
+  END IF;
+
+  IF NEW.totp_pending_secret IS DISTINCT FROM OLD.totp_pending_secret THEN
+    RAISE EXCEPTION 'Alteracao de 2FA nao permitida';
+  END IF;
+
+  -- C2: rollover
+  IF NEW.rollover_pendente IS DISTINCT FROM OLD.rollover_pendente THEN
+    RAISE EXCEPTION 'Alteracao de rollover nao permitida';
+  END IF;
+
+  IF NEW.rollover_meta IS DISTINCT FROM OLD.rollover_meta THEN
+    RAISE EXCEPTION 'Alteracao de rollover nao permitida';
+  END IF;
+
+  IF NEW.rollover_inicio IS DISTINCT FROM OLD.rollover_inicio THEN
+    RAISE EXCEPTION 'Alteracao de rollover nao permitida';
+  END IF;
+
+  -- C2: indicacao
+  IF NEW.indicacao_recompensa_custom IS DISTINCT FROM OLD.indicacao_recompensa_custom THEN
+    RAISE EXCEPTION 'Alteracao de indicacao nao permitida';
+  END IF;
+
+  IF NEW.indicacao_deposito_minimo_custom IS DISTINCT FROM OLD.indicacao_deposito_minimo_custom THEN
+    RAISE EXCEPTION 'Alteracao de indicacao nao permitida';
+  END IF;
+
+  IF NEW.indicacao_recompensa_paga IS DISTINCT FROM OLD.indicacao_recompensa_paga THEN
+    RAISE EXCEPTION 'Alteracao de indicacao nao permitida';
+  END IF;
+
+  IF NEW.indicacao_recompensa_valor_pago IS DISTINCT FROM OLD.indicacao_recompensa_valor_pago THEN
+    RAISE EXCEPTION 'Alteracao de indicacao nao permitida';
+  END IF;
+
+  IF NEW.indicado_por IS DISTINCT FROM OLD.indicado_por THEN
+    RAISE EXCEPTION 'Alteracao de indicacao nao permitida';
+  END IF;
+
+  IF NEW.link_indicação IS DISTINCT FROM OLD.link_indicação THEN
+    RAISE EXCEPTION 'Alteracao de link de indicacao nao permitida';
+  END IF;
+
+  -- Flags / identidade sensivel
+  IF NEW.ativo IS DISTINCT FROM OLD.ativo THEN
+    RAISE EXCEPTION 'Alteracao de status nao permitida';
+  END IF;
+
+  IF NEW.verificado IS DISTINCT FROM OLD.verificado THEN
+    RAISE EXCEPTION 'Alteracao de verificacao nao permitida';
+  END IF;
+
+  IF NEW.kyc_status IS DISTINCT FROM OLD.kyc_status THEN
+    RAISE EXCEPTION 'Alteracao de KYC nao permitida';
+  END IF;
+
+  IF NEW.email IS DISTINCT FROM OLD.email THEN
+    RAISE EXCEPTION 'Alteracao de email nao permitida';
+  END IF;
+
+  IF NEW.cpf IS DISTINCT FROM OLD.cpf THEN
+    RAISE EXCEPTION 'Alteracao de CPF nao permitida';
+  END IF;
+
+  IF NEW.playfiver_user_code IS DISTINCT FROM OLD.playfiver_user_code THEN
+    RAISE EXCEPTION 'Alteracao de codigo de jogo nao permitida';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS protect_usuario_sensitive_columns ON public.usuarios;
+CREATE TRIGGER protect_usuario_sensitive_columns
+  BEFORE UPDATE ON public.usuarios
+  FOR EACH ROW
+  EXECUTE FUNCTION public.protect_usuario_sensitive_columns();
+
+COMMENT ON FUNCTION public.protect_usuario_sensitive_columns() IS
+  'Bloqueia UPDATE sensivel para clientes. Bypass: app.skip_usuario_guard ou roles postgres/supabase_admin/service_role.';
+
+-- RPCs de sistema/admin: setam skip antes de tocar colunas protegidas
+CREATE OR REPLACE FUNCTION public.aplicar_rollover_deposito(
+  p_usuario_id UUID,
+  p_valor NUMERIC
+)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_multiplicador NUMERIC;
+  v_incremento NUMERIC;
+  v_novo_pendente NUMERIC;
+  v_meta_atual NUMERIC;
+  v_pendente_atual NUMERIC;
+BEGIN
+  IF p_usuario_id IS NULL OR COALESCE(p_valor, 0) <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  SELECT COALESCE(rollover_padrao, 0)
+  INTO v_multiplicador
+  FROM public.site_config
+  WHERE id = 1;
+
+  v_multiplicador := COALESCE(v_multiplicador, 0);
+  IF v_multiplicador <= 0 THEN
+    RETURN 0;
+  END IF;
+
+  v_incremento := ROUND(p_valor * v_multiplicador, 2);
+
+  SELECT COALESCE(rollover_meta, 0), COALESCE(rollover_pendente, 0)
+  INTO v_meta_atual, v_pendente_atual
+  FROM public.usuarios
+  WHERE id = p_usuario_id;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET
+    rollover_pendente = COALESCE(rollover_pendente, 0) + v_incremento,
+    rollover_meta = COALESCE(rollover_meta, 0) + v_incremento,
+    rollover_inicio = CASE
+      WHEN COALESCE(v_meta_atual, 0) <= 0.009 AND COALESCE(v_pendente_atual, 0) <= 0.009 THEN NOW()
+      ELSE rollover_inicio
+    END
+  WHERE id = p_usuario_id
+  RETURNING rollover_pendente INTO v_novo_pendente;
+
+  RETURN COALESCE(v_novo_pendente, 0);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.abater_rollover_aposta()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_valor_aposta NUMERIC;
+BEGIN
+  v_valor_aposta := COALESCE(NEW.valor, 0);
+  IF v_valor_aposta <= 0 OR NEW.usuario_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET rollover_pendente = GREATEST(0, COALESCE(rollover_pendente, 0) - v_valor_aposta)
+  WHERE id = NEW.usuario_id
+    AND COALESCE(rollover_pendente, 0) > 0;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.atualizar_indicacao_usuario_admin(
+  p_usuario_id UUID,
+  p_usar_padrao_plataforma BOOLEAN DEFAULT false,
+  p_recompensa NUMERIC DEFAULT NULL,
+  p_deposito_minimo NUMERIC DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_recompensa NUMERIC;
+  v_deposito_min NUMERIC;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.usuarios WHERE id = p_usuario_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'Usuario nao encontrado');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  IF COALESCE(p_usar_padrao_plataforma, false) THEN
+    UPDATE public.usuarios
+    SET
+      indicacao_recompensa_custom = NULL,
+      indicacao_deposito_minimo_custom = NULL,
+      updated_at = NOW()
+    WHERE id = p_usuario_id;
+
+    RETURN json_build_object('ok', true, 'usa_padrao_plataforma', true);
+  END IF;
+
+  IF p_recompensa IS NULL OR p_deposito_minimo IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Informe recompensa e deposito minimo.');
+  END IF;
+
+  v_recompensa := COALESCE(p_recompensa, 0);
+  v_deposito_min := COALESCE(p_deposito_minimo, 0);
+
+  IF v_recompensa < 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'Recompensa nao pode ser negativa.');
+  END IF;
+
+  IF v_deposito_min < 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'Deposito minimo nao pode ser negativo.');
+  END IF;
+
+  UPDATE public.usuarios
+  SET
+    indicacao_recompensa_custom = v_recompensa,
+    indicacao_deposito_minimo_custom = v_deposito_min,
+    updated_at = NOW()
+  WHERE id = p_usuario_id;
+
+  RETURN json_build_object(
+    'ok', true,
+    'recompensa_custom', v_recompensa,
+    'deposito_minimo_custom', v_deposito_min,
+    'usa_padrao_plataforma', false
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.aplicar_rollover_usuario_admin(
+  p_usuario_id UUID,
+  p_valor NUMERIC
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_valor NUMERIC;
+  v_meta_atual NUMERIC;
+  v_pendente_atual NUMERIC;
+  v_novo_pendente NUMERIC;
+  v_nova_meta NUMERIC;
+  v_nome TEXT;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  v_valor := ROUND(COALESCE(p_valor, 0), 2);
+  IF v_valor <= 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'Informe um valor maior que zero.');
+  END IF;
+
+  SELECT
+    COALESCE(rollover_meta, 0),
+    COALESCE(rollover_pendente, 0),
+    COALESCE(
+      NULLIF(TRIM(usuario_nome), ''),
+      NULLIF(TRIM(nome), ''),
+      NULLIF(TRIM(usuario), ''),
+      split_part(email, '@', 1)
+    )
+  INTO v_meta_atual, v_pendente_atual, v_nome
+  FROM public.usuarios
+  WHERE id = p_usuario_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'Usuario nao encontrado');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET
+    rollover_pendente = COALESCE(rollover_pendente, 0) + v_valor,
+    rollover_meta = COALESCE(rollover_meta, 0) + v_valor,
+    rollover_inicio = CASE
+      WHEN COALESCE(v_meta_atual, 0) <= 0.009 AND COALESCE(v_pendente_atual, 0) <= 0.009 THEN NOW()
+      ELSE rollover_inicio
+    END,
+    updated_at = NOW()
+  WHERE id = p_usuario_id
+  RETURNING rollover_pendente, rollover_meta
+  INTO v_novo_pendente, v_nova_meta;
+
+  PERFORM public.registrar_admin_log(
+    'Rollover aplicado ao usuario',
+    format('Usuario: %s | Valor adicionado: R$ %s | Novo pendente: R$ %s', COALESCE(v_nome, p_usuario_id::text), v_valor, v_novo_pendente),
+    'sucesso',
+    'usuarios',
+    jsonb_build_object(
+      'usuario_id', p_usuario_id,
+      'valor_adicionado', v_valor,
+      'rollover_pendente', v_novo_pendente,
+      'rollover_meta', v_nova_meta
+    )
+  );
+
+  RETURN json_build_object(
+    'ok', true,
+    'rollover_pendente', v_novo_pendente,
+    'rollover_meta', v_nova_meta
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.desativar_rollover_usuario_admin(p_usuario_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_nome TEXT;
+  v_pendente NUMERIC;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  SELECT
+    COALESCE(rollover_pendente, 0),
+    COALESCE(
+      NULLIF(TRIM(usuario_nome), ''),
+      NULLIF(TRIM(nome), ''),
+      NULLIF(TRIM(usuario), ''),
+      split_part(email, '@', 1)
+    )
+  INTO v_pendente, v_nome
+  FROM public.usuarios
+  WHERE id = p_usuario_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'Usuario nao encontrado');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET
+    rollover_pendente = 0,
+    rollover_meta = 0,
+    rollover_inicio = NULL,
+    updated_at = NOW()
+  WHERE id = p_usuario_id;
+
+  PERFORM public.registrar_admin_log(
+    'Rollover desativado',
+    format('Usuario: %s | Pendente removido: R$ %s', COALESCE(v_nome, p_usuario_id::text), v_pendente),
+    'sucesso',
+    'usuarios',
+    jsonb_build_object(
+      'usuario_id', p_usuario_id,
+      'rollover_removido', v_pendente
+    )
+  );
+
+  RETURN json_build_object('ok', true);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.atualizar_perfil_usuario_admin(
+  p_usuario_id UUID,
+  p_nome TEXT DEFAULT NULL,
+  p_email TEXT DEFAULT NULL,
+  p_cpf TEXT DEFAULT NULL,
+  p_telefone TEXT DEFAULT NULL,
+  p_data_nascimento DATE DEFAULT NULL,
+  p_pais TEXT DEFAULT NULL,
+  p_cargo TEXT DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.usuarios WHERE id = p_usuario_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'Usuario nao encontrado');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET
+    nome = COALESCE(NULLIF(TRIM(p_nome), ''), nome),
+    usuario_nome = COALESCE(NULLIF(TRIM(p_nome), ''), usuario_nome),
+    email = COALESCE(NULLIF(TRIM(p_email), ''), email),
+    cpf = COALESCE(NULLIF(TRIM(p_cpf), ''), cpf),
+    telefone = COALESCE(NULLIF(TRIM(p_telefone), ''), telefone),
+    data_nascimento = COALESCE(p_data_nascimento, data_nascimento),
+    pais = COALESCE(NULLIF(TRIM(p_pais), ''), pais),
+    cargo = COALESCE(NULLIF(TRIM(p_cargo), ''), cargo),
+    updated_at = NOW()
+  WHERE id = p_usuario_id;
+
+  RETURN json_build_object('ok', true);
+END;
+$$;
+
+-- =============================================================================
+-- Patch C3 — Fecha RLS aberta do Aviator (USING true)
+-- Execute no SQL Editor do Supabase.
+--
+-- service_role bypassa RLS no Supabase — nao precisa de policy "FOR ALL USING (true)".
+-- Clientes (anon/authenticated) so podem SELECT (historico); writes so via API.
+-- =============================================================================
+
+-- aviator_rounds: remove write aberto
+DROP POLICY IF EXISTS "Apenas service role pode criar/atualizar rodadas" ON public.aviator_rounds;
+DROP POLICY IF EXISTS "Service role gerencia aviator_rounds" ON public.aviator_rounds;
+
+-- Mantem SELECT publico (historico de rodadas)
+DROP POLICY IF EXISTS "Todos podem ver rodadas do Aviator" ON public.aviator_rounds;
+CREATE POLICY "Todos podem ver rodadas do Aviator"
+  ON public.aviator_rounds
+  FOR SELECT
+  USING (true);
+
+-- aviator_bets: remove FOR ALL aberto + INSERT de usuario (fabricar cashout)
+DROP POLICY IF EXISTS "Service role pode gerenciar todas as apostas" ON public.aviator_bets;
+DROP POLICY IF EXISTS "Usuarios podem criar suas proprias apostas" ON public.aviator_bets;
+DROP POLICY IF EXISTS "Usuários podem criar suas próprias apostas" ON public.aviator_bets;
+
+DROP POLICY IF EXISTS "Usuarios podem ver apenas suas proprias apostas" ON public.aviator_bets;
+DROP POLICY IF EXISTS "Usuários podem ver apenas suas próprias apostas" ON public.aviator_bets;
+CREATE POLICY "Usuarios podem ver apenas suas proprias apostas"
+  ON public.aviator_bets
+  FOR SELECT
+  USING (auth.uid() = usuario_id OR public.is_user_admin());
+
+-- aviator_velas: remove INSERT aberto
+DROP POLICY IF EXISTS "Service role pode inserir velas" ON public.aviator_velas;
+DROP POLICY IF EXISTS "Service role gerencia aviator_velas" ON public.aviator_velas;
+
+DROP POLICY IF EXISTS "Todos podem ver velas do Aviator" ON public.aviator_velas;
+CREATE POLICY "Todos podem ver velas do Aviator"
+  ON public.aviator_velas
+  FOR SELECT
+  USING (true);
+
+-- Garante RLS ligado
+ALTER TABLE public.aviator_rounds ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aviator_bets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.aviator_velas ENABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- Patch H4 — Saque: status processando antes do PIX (anti double-pay)
+-- Execute no SQL Editor do Supabase.
+-- =============================================================================
+
+ALTER TABLE public.saques DROP CONSTRAINT IF EXISTS saques_status_check;
+ALTER TABLE public.saques
+  ADD CONSTRAINT saques_status_check
+  CHECK (status IN ('aprovado', 'rejeitado', 'pendente', 'falhou', 'processando'));
+
+COMMENT ON CONSTRAINT saques_status_check ON public.saques IS
+  'pendente=aguardando; processando=PIX em andamento; aprovado/rejeitado/falhou=final';
+
+-- Refund tambem quando falha apos claim processando (sem pagar de novo)
+CREATE OR REPLACE FUNCTION public.handle_saque_rejeitado()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status IN ('rejeitado', 'falhou')
+     AND OLD.status IN ('pendente', 'processando')
+     AND COALESCE(OLD.saldo_debitado, false) = true
+     AND COALESCE(OLD.saldo_reembolsado, false) = false
+  THEN
+    PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+    UPDATE public.usuarios
+    SET saldo = COALESCE(saldo, 0) + NEW.valor
+    WHERE id = NEW.usuario_id;
+
+    NEW.saldo_reembolsado := true;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS devolver_valor_saque_rejeitado ON public.saques;
+CREATE TRIGGER devolver_valor_saque_rejeitado
+  BEFORE UPDATE OF status ON public.saques
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status)
+  EXECUTE FUNCTION public.handle_saque_rejeitado();
+
+-- Admin pode rejeitar/falhar saque preso em processando; aprovado so via API de approve
+CREATE OR REPLACE FUNCTION public.atualizar_status_saque_admin(
+  p_saque_id UUID,
+  p_status TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_status TEXT;
+  v_dep_status TEXT;
+  v_valor NUMERIC;
+  v_usuario_email TEXT;
+BEGIN
+  IF NOT public.is_user_admin() THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+
+  v_status := LOWER(TRIM(p_status));
+
+  IF v_status NOT IN ('rejeitado', 'falhou') THEN
+    RETURN json_build_object(
+      'ok', false,
+      'error', 'Use a API de aprovacao para aprovar. Aqui so rejeitado/falhou.'
+    );
+  END IF;
+
+  SELECT s.status, s.valor, u.email
+  INTO v_dep_status, v_valor, v_usuario_email
+  FROM public.saques s
+  LEFT JOIN public.usuarios u ON u.id = s.usuario_id
+  WHERE s.id = p_saque_id
+  FOR UPDATE OF s;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'Saque nao encontrado');
+  END IF;
+
+  IF v_dep_status NOT IN ('pendente', 'processando') THEN
+    RETURN json_build_object('ok', false, 'error', 'Apenas saques pendentes/processando podem ser alterados');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.saques
+  SET status = v_status, updated_at = NOW()
+  WHERE id = p_saque_id;
+
+  BEGIN
+    PERFORM public.registrar_admin_log(
+      'Alterar status de saque',
+      format('Saque %s: %s → %s | Valor: R$ %s | Usuario: %s', p_saque_id, v_dep_status, v_status, v_valor, COALESCE(v_usuario_email, '—')),
+      'sucesso',
+      'saque',
+      jsonb_build_object('saque_id', p_saque_id, 'status_anterior', v_dep_status, 'status_novo', v_status, 'valor', v_valor)
+    );
+  EXCEPTION
+    WHEN undefined_function THEN NULL;
+    WHEN undefined_table THEN NULL;
+  END;
+
+  RETURN json_build_object('ok', true);
+END;
+$$;
+
+-- =============================================================================
+
+-- =============================================================================
+-- Patch C5 (+ H2) — Callback PlayFiver atômico (anti double-spend)
+-- Execute no SQL Editor do Supabase.
+--
+-- - INSERT txn_id + UPDATE saldo na mesma transação
+-- - ON CONFLICT (txn_id) = idempotente (não credita de novo)
+-- - Saldo sempre = saldo_db + win - bet (ignora user_after_balance no app)
+-- GRANT só service_role (API).
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.processar_callback_playfiver(
+  p_email TEXT,
+  p_txn_id TEXT,
+  p_bet NUMERIC,
+  p_win NUMERIC,
+  p_jogo TEXT DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_email TEXT;
+  v_txn TEXT;
+  v_bet NUMERIC;
+  v_win NUMERIC;
+  v_usuario_id UUID;
+  v_saldo NUMERIC;
+  v_novo_saldo NUMERIC;
+  v_debit NUMERIC;
+  v_inserted_id UUID;
+  v_jogo TEXT;
+  v_tipo TEXT;
+  v_owner UUID;
+BEGIN
+  v_email := lower(trim(COALESCE(p_email, '')));
+  v_txn := trim(COALESCE(p_txn_id, ''));
+  v_bet := ROUND(COALESCE(p_bet, 0)::numeric, 2);
+  v_win := ROUND(COALESCE(p_win, 0)::numeric, 2);
+
+  IF v_email = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_USER', 'balance', 0);
+  END IF;
+
+  IF v_txn = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_TXN', 'balance', 0);
+  END IF;
+
+  IF v_bet < 0 OR v_win < 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_AMOUNT', 'balance', 0);
+  END IF;
+
+  -- Trava o usuário (serializa callbacks concorrentes)
+  SELECT id, COALESCE(saldo, 0)
+  INTO v_usuario_id, v_saldo
+  FROM public.usuarios
+  WHERE lower(trim(email)) = v_email
+  LIMIT 1
+  FOR UPDATE;
+
+  IF v_usuario_id IS NULL THEN
+    SELECT id, COALESCE(saldo, 0)
+    INTO v_usuario_id, v_saldo
+    FROM public.usuarios
+    WHERE email ILIKE v_email
+    LIMIT 1
+    FOR UPDATE;
+  END IF;
+
+  IF v_usuario_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_USER', 'balance', 0);
+  END IF;
+
+  -- 1) Claim idempotente ANTES do débito (retry não pode falhar por saldo)
+  v_jogo := NULLIF(trim(COALESCE(p_jogo, '')), '');
+  IF v_jogo IS NULL THEN
+    v_jogo := 'Jogo';
+  END IF;
+  v_tipo := CASE WHEN v_win > 0 THEN 'Ganhou' ELSE 'Perdeu' END;
+
+  INSERT INTO public.transacoes_jogos (
+    usuario_id, txn_id, tipo, jogo, valor, retorno, status, com_bonus, data
+  )
+  VALUES (
+    v_usuario_id,
+    v_txn,
+    v_tipo,
+    v_jogo,
+    v_bet,
+    CASE WHEN v_win > 0 THEN v_win ELSE 0 END,
+    'Finalizado',
+    'Não',
+    TIMEZONE('utc'::text, NOW())
+  )
+  ON CONFLICT (txn_id) DO NOTHING
+  RETURNING id INTO v_inserted_id;
+
+  IF v_inserted_id IS NULL THEN
+    SELECT usuario_id INTO v_owner
+    FROM public.transacoes_jogos
+    WHERE txn_id = v_txn
+    LIMIT 1;
+
+    IF v_owner IS DISTINCT FROM v_usuario_id THEN
+      RETURN json_build_object(
+        'ok', false,
+        'error', 'TXN_OWNER_MISMATCH',
+        'balance', ROUND(v_saldo, 2)
+      );
+    END IF;
+
+    SELECT COALESCE(saldo, 0) INTO v_saldo
+    FROM public.usuarios
+    WHERE id = v_usuario_id;
+
+    RETURN json_build_object(
+      'ok', true,
+      'duplicate', true,
+      'balance', ROUND(v_saldo, 2),
+      'usuario_id', v_usuario_id
+    );
+  END IF;
+
+  -- 2) Só quem ganhou o claim aplica saldo
+  v_debit := GREATEST(0, ROUND(v_bet - v_win, 2));
+  v_novo_saldo := ROUND(v_saldo + v_win - v_bet, 2);
+
+  IF (v_debit > 0 AND v_saldo + 0.000001 < v_debit) OR v_novo_saldo < 0 THEN
+    -- Rollback do INSERT (+ trigger de rollover) via subtransação
+    RAISE EXCEPTION 'INSUFFICIENT_USER_FUNDS' USING ERRCODE = 'P0001';
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET saldo = v_novo_saldo,
+      updated_at = NOW()
+  WHERE id = v_usuario_id;
+
+  RETURN json_build_object(
+    'ok', true,
+    'duplicate', false,
+    'balance', v_novo_saldo,
+    'saldo_anterior', ROUND(v_saldo, 2),
+    'usuario_id', v_usuario_id,
+    'transacao_id', v_inserted_id
+  );
+EXCEPTION
+  WHEN raise_exception THEN
+    IF SQLERRM = 'INSUFFICIENT_USER_FUNDS' THEN
+      RETURN json_build_object(
+        'ok', false,
+        'error', 'INSUFFICIENT_USER_FUNDS',
+        'balance', ROUND(COALESCE(v_saldo, 0), 2)
+      );
+    END IF;
+    RAISE;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.processar_callback_playfiver(TEXT, TEXT, NUMERIC, NUMERIC, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.processar_callback_playfiver(TEXT, TEXT, NUMERIC, NUMERIC, TEXT) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.processar_callback_playfiver(TEXT, TEXT, NUMERIC, NUMERIC, TEXT) TO service_role;
+
+COMMENT ON FUNCTION public.processar_callback_playfiver(TEXT, TEXT, NUMERIC, NUMERIC, TEXT) IS
+  'C5: aplica bet/win do webhook PlayFiver com idempotencia por txn_id (service_role only).';
+
+-- =============================================================================
+-- Patch H3 — Aviator wallet atômico (anti race / double credit)
+-- Execute no SQL Editor do Supabase.
+--
+-- debit/credit/refund: FOR UPDATE + saldo atômico
+-- credit/refund/perda: idempotência por txn_id (ON CONFLICT)
+-- GRANT só service_role (API Aviator).
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public._aviator_resolve_usuario(p_email TEXT)
+RETURNS TABLE (usuario_id UUID, saldo NUMERIC)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_email TEXT;
+BEGIN
+  v_email := lower(trim(COALESCE(p_email, '')));
+  IF v_email = '' THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT u.id, COALESCE(u.saldo, 0)
+  FROM public.usuarios u
+  WHERE lower(trim(u.email)) = v_email
+  LIMIT 1
+  FOR UPDATE;
+
+  IF FOUND THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT u.id, COALESCE(u.saldo, 0)
+  FROM public.usuarios u
+  WHERE u.email ILIKE v_email
+  LIMIT 1
+  FOR UPDATE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.aviator_debit_saldo(
+  p_email TEXT,
+  p_valor NUMERIC,
+  p_txn_id TEXT DEFAULT NULL
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_usuario_id UUID;
+  v_saldo NUMERIC;
+  v_valor NUMERIC;
+  v_txn TEXT;
+  v_novo NUMERIC;
+  v_inserted UUID;
+  v_owner UUID;
+BEGIN
+  v_valor := ROUND(COALESCE(p_valor, 0)::numeric, 2);
+  v_txn := NULLIF(trim(COALESCE(p_txn_id, '')), '');
+
+  IF v_valor <= 0 THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_AMOUNT', 'balance', 0);
+  END IF;
+
+  SELECT r.usuario_id, r.saldo
+  INTO v_usuario_id, v_saldo
+  FROM public._aviator_resolve_usuario(p_email) r;
+
+  IF v_usuario_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_USER', 'balance', 0);
+  END IF;
+
+  IF v_txn IS NOT NULL THEN
+    INSERT INTO public.transacoes_jogos (
+      usuario_id, txn_id, tipo, jogo, valor, retorno, status, com_bonus, data
+    )
+    VALUES (
+      v_usuario_id, v_txn, 'Perdeu', 'Aviator', 0, 0, 'Finalizado', 'Não',
+      TIMEZONE('utc'::text, NOW())
+    )
+    ON CONFLICT (txn_id) DO NOTHING
+    RETURNING id INTO v_inserted;
+
+    IF v_inserted IS NULL THEN
+      SELECT usuario_id INTO v_owner
+      FROM public.transacoes_jogos
+      WHERE txn_id = v_txn
+      LIMIT 1;
+
+      IF v_owner IS DISTINCT FROM v_usuario_id THEN
+        RETURN json_build_object('ok', false, 'error', 'TXN_OWNER_MISMATCH', 'balance', ROUND(v_saldo, 2));
+      END IF;
+
+      SELECT COALESCE(saldo, 0) INTO v_saldo FROM public.usuarios WHERE id = v_usuario_id;
+      RETURN json_build_object(
+        'ok', true, 'duplicate', true,
+        'balance', ROUND(v_saldo, 2),
+        'usuario_id', v_usuario_id
+      );
+    END IF;
+  END IF;
+
+  IF v_saldo + 0.000001 < v_valor THEN
+    IF v_txn IS NOT NULL THEN
+      DELETE FROM public.transacoes_jogos WHERE txn_id = v_txn AND valor = 0;
+    END IF;
+    RETURN json_build_object(
+      'ok', false, 'error', 'INSUFFICIENT_FUNDS',
+      'balance', ROUND(v_saldo, 2)
+    );
+  END IF;
+
+  v_novo := ROUND(v_saldo - v_valor, 2);
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+  UPDATE public.usuarios
+  SET saldo = v_novo, updated_at = NOW()
+  WHERE id = v_usuario_id;
+
+  RETURN json_build_object(
+    'ok', true, 'duplicate', false,
+    'balance', v_novo,
+    'saldo_anterior', ROUND(v_saldo, 2),
+    'usuario_id', v_usuario_id
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.aviator_creditar_saldo(
+  p_email TEXT,
+  p_valor NUMERIC,
+  p_txn_id TEXT,
+  p_bet_valor NUMERIC DEFAULT 0,
+  p_tipo TEXT DEFAULT 'Ganhou'
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_usuario_id UUID;
+  v_saldo NUMERIC;
+  v_valor NUMERIC;
+  v_bet NUMERIC;
+  v_txn TEXT;
+  v_tipo TEXT;
+  v_novo NUMERIC;
+  v_inserted UUID;
+  v_owner UUID;
+BEGIN
+  v_valor := ROUND(COALESCE(p_valor, 0)::numeric, 2);
+  v_bet := ROUND(COALESCE(p_bet_valor, 0)::numeric, 2);
+  v_txn := trim(COALESCE(p_txn_id, ''));
+  v_tipo := CASE WHEN lower(trim(COALESCE(p_tipo, ''))) = 'perdeu' THEN 'Perdeu' ELSE 'Ganhou' END;
+
+  IF v_valor <= 0 OR v_txn = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_AMOUNT', 'balance', 0);
+  END IF;
+
+  SELECT r.usuario_id, r.saldo
+  INTO v_usuario_id, v_saldo
+  FROM public._aviator_resolve_usuario(p_email) r;
+
+  IF v_usuario_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_USER', 'balance', 0);
+  END IF;
+
+  INSERT INTO public.transacoes_jogos (
+    usuario_id, txn_id, tipo, jogo, valor, retorno, status, com_bonus, data
+  )
+  VALUES (
+    v_usuario_id, v_txn, v_tipo, 'Aviator', v_bet,
+    CASE WHEN v_tipo = 'Ganhou' THEN v_valor ELSE 0 END,
+    'Finalizado', 'Não', TIMEZONE('utc'::text, NOW())
+  )
+  ON CONFLICT (txn_id) DO NOTHING
+  RETURNING id INTO v_inserted;
+
+  IF v_inserted IS NULL THEN
+    SELECT usuario_id INTO v_owner
+    FROM public.transacoes_jogos
+    WHERE txn_id = v_txn
+    LIMIT 1;
+
+    IF v_owner IS DISTINCT FROM v_usuario_id THEN
+      RETURN json_build_object('ok', false, 'error', 'TXN_OWNER_MISMATCH', 'balance', ROUND(v_saldo, 2));
+    END IF;
+
+    SELECT COALESCE(saldo, 0) INTO v_saldo FROM public.usuarios WHERE id = v_usuario_id;
+    RETURN json_build_object(
+      'ok', true, 'duplicate', true,
+      'balance', ROUND(v_saldo, 2),
+      'usuario_id', v_usuario_id
+    );
+  END IF;
+
+  v_novo := ROUND(v_saldo + v_valor, 2);
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+  UPDATE public.usuarios
+  SET saldo = v_novo, updated_at = NOW()
+  WHERE id = v_usuario_id;
+
+  RETURN json_build_object(
+    'ok', true, 'duplicate', false,
+    'balance', v_novo,
+    'saldo_anterior', ROUND(v_saldo, 2),
+    'usuario_id', v_usuario_id,
+    'transacao_id', v_inserted
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.aviator_reembolsar_saldo(
+  p_email TEXT,
+  p_valor NUMERIC,
+  p_txn_id TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN public.aviator_creditar_saldo(p_email, p_valor, p_txn_id, 0, 'Ganhou');
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.aviator_registrar_perda(
+  p_email TEXT,
+  p_txn_id TEXT,
+  p_bet_valor NUMERIC
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_usuario_id UUID;
+  v_saldo NUMERIC;
+  v_bet NUMERIC;
+  v_txn TEXT;
+  v_inserted UUID;
+  v_owner UUID;
+BEGIN
+  v_bet := ROUND(COALESCE(p_bet_valor, 0)::numeric, 2);
+  v_txn := trim(COALESCE(p_txn_id, ''));
+
+  IF v_bet <= 0 OR v_txn = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_AMOUNT');
+  END IF;
+
+  SELECT r.usuario_id, r.saldo
+  INTO v_usuario_id, v_saldo
+  FROM public._aviator_resolve_usuario(p_email) r;
+
+  IF v_usuario_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'INVALID_USER');
+  END IF;
+
+  INSERT INTO public.transacoes_jogos (
+    usuario_id, txn_id, tipo, jogo, valor, retorno, status, com_bonus, data
+  )
+  VALUES (
+    v_usuario_id, v_txn, 'Perdeu', 'Aviator', v_bet, 0,
+    'Finalizado', 'Não', TIMEZONE('utc'::text, NOW())
+  )
+  ON CONFLICT (txn_id) DO NOTHING
+  RETURNING id INTO v_inserted;
+
+  IF v_inserted IS NULL THEN
+    SELECT usuario_id INTO v_owner
+    FROM public.transacoes_jogos
+    WHERE txn_id = v_txn
+    LIMIT 1;
+
+    IF v_owner IS DISTINCT FROM v_usuario_id THEN
+      RETURN json_build_object('ok', false, 'error', 'TXN_OWNER_MISMATCH');
+    END IF;
+
+    RETURN json_build_object('ok', true, 'duplicate', true, 'usuario_id', v_usuario_id);
+  END IF;
+
+  RETURN json_build_object(
+    'ok', true, 'duplicate', false,
+    'usuario_id', v_usuario_id,
+    'transacao_id', v_inserted
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._aviator_resolve_usuario(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.aviator_debit_saldo(TEXT, NUMERIC, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.aviator_creditar_saldo(TEXT, NUMERIC, TEXT, NUMERIC, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.aviator_reembolsar_saldo(TEXT, NUMERIC, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.aviator_registrar_perda(TEXT, TEXT, NUMERIC) FROM PUBLIC;
+
+REVOKE ALL ON FUNCTION public._aviator_resolve_usuario(TEXT) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION public.aviator_debit_saldo(TEXT, NUMERIC, TEXT) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION public.aviator_creditar_saldo(TEXT, NUMERIC, TEXT, NUMERIC, TEXT) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION public.aviator_reembolsar_saldo(TEXT, NUMERIC, TEXT) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION public.aviator_registrar_perda(TEXT, TEXT, NUMERIC) FROM anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public._aviator_resolve_usuario(TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.aviator_debit_saldo(TEXT, NUMERIC, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.aviator_creditar_saldo(TEXT, NUMERIC, TEXT, NUMERIC, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.aviator_reembolsar_saldo(TEXT, NUMERIC, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.aviator_registrar_perda(TEXT, TEXT, NUMERIC) TO service_role;
+
+COMMENT ON FUNCTION public.aviator_debit_saldo(TEXT, NUMERIC, TEXT) IS
+  'H3: débito Aviator atômico com idempotência opcional por txn_id (service_role).';
+
+-- =============================================================================
+-- Patch H5 — processar_recompensa_indicacao (anti double-pay + só service_role)
+-- Fonte: deploy/patch_h5_processar_recompensa_indicacao.sql
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.processar_recompensa_indicacao(
+  p_usuario_indicado_id UUID,
+  p_deposito_id UUID,
+  p_valor_deposito NUMERIC
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_indicado_por TEXT;
+  v_ja_paga BOOLEAN;
+  v_recompensa NUMERIC;
+  v_deposito_min NUMERIC;
+  v_global_recompensa NUMERIC;
+  v_global_deposito_min NUMERIC;
+  v_referrer_id UUID;
+  v_aprovados INT;
+  v_claimed UUID;
+BEGIN
+  IF p_usuario_indicado_id IS NULL THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'usuario_invalido');
+  END IF;
+
+  SELECT u.indicado_por, COALESCE(u.indicacao_recompensa_paga, false)
+  INTO v_indicado_por, v_ja_paga
+  FROM public.usuarios u
+  WHERE u.id = p_usuario_indicado_id
+  FOR UPDATE;
+
+  IF NOT FOUND OR v_indicado_por IS NULL OR TRIM(v_indicado_por) = '' OR v_ja_paga THEN
+    RETURN json_build_object('ok', true, 'aplicada', false);
+  END IF;
+
+  SELECT
+    COALESCE(sc.indicacao_recompensa, 0),
+    COALESCE(sc.indicacao_deposito_minimo, 50)
+  INTO v_global_recompensa, v_global_deposito_min
+  FROM public.site_config sc
+  WHERE sc.id = 1;
+
+  v_global_recompensa := COALESCE(v_global_recompensa, 0);
+  v_global_deposito_min := COALESCE(v_global_deposito_min, 0);
+
+  SELECT u.id
+  INTO v_referrer_id
+  FROM public.usuarios u
+  WHERE u.link_indicação = v_indicado_por
+  LIMIT 1;
+
+  IF v_referrer_id IS NULL OR v_referrer_id = p_usuario_indicado_id THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'indicador_invalido');
+  END IF;
+
+  SELECT
+    COALESCE(u.indicacao_recompensa_custom, v_global_recompensa),
+    COALESCE(u.indicacao_deposito_minimo_custom, v_global_deposito_min)
+  INTO v_recompensa, v_deposito_min
+  FROM public.usuarios u
+  WHERE u.id = v_referrer_id;
+
+  v_recompensa := COALESCE(v_recompensa, 0);
+  v_deposito_min := COALESCE(v_deposito_min, 0);
+
+  IF v_recompensa <= 0 THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'desativada');
+  END IF;
+
+  SELECT COUNT(*)::INT
+  INTO v_aprovados
+  FROM public.depositos d
+  WHERE d.usuario_id = p_usuario_indicado_id
+    AND d.status = 'aprovado';
+
+  IF COALESCE(v_aprovados, 0) != 1 THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'nao_primeiro_deposito');
+  END IF;
+
+  IF COALESCE(p_valor_deposito, 0) < v_deposito_min THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'deposito_insuficiente');
+  END IF;
+
+  UPDATE public.usuarios
+  SET
+    indicacao_recompensa_paga = true,
+    indicacao_recompensa_valor_pago = v_recompensa
+  WHERE id = p_usuario_indicado_id
+    AND COALESCE(indicacao_recompensa_paga, false) = false
+  RETURNING id INTO v_claimed;
+
+  IF v_claimed IS NULL THEN
+    RETURN json_build_object('ok', true, 'aplicada', false, 'motivo', 'ja_paga');
+  END IF;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+
+  UPDATE public.usuarios
+  SET saldo = COALESCE(saldo, 0) + v_recompensa
+  WHERE id = v_referrer_id;
+
+  RETURN json_build_object(
+    'ok', true,
+    'aplicada', true,
+    'indicador_id', v_referrer_id,
+    'valor', v_recompensa,
+    'deposito_id', p_deposito_id
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.confirmar_deposito_pix_pago_server(
+  p_deposito_id UUID,
+  p_usuario_id UUID,
+  p_gateway_check_id TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_valor NUMERIC;
+  v_status TEXT;
+  v_usuario_id UUID;
+  v_gateway_check_id TEXT;
+  v_vip JSON;
+  v_nivel INT;
+  v_total NUMERIC;
+  v_rollover NUMERIC;
+  v_indicacao JSON;
+BEGIN
+  IF current_user NOT IN ('postgres', 'supabase_admin', 'service_role') THEN
+    RETURN json_build_object('ok', false, 'error', 'forbidden');
+  END IF;
+
+  IF p_gateway_check_id IS NULL OR btrim(p_gateway_check_id) = '' THEN
+    RETURN json_build_object('ok', false, 'error', 'gateway_check_required');
+  END IF;
+
+  SELECT usuario_id, valor, status, gateway_check_id
+  INTO v_usuario_id, v_valor, v_status, v_gateway_check_id
+  FROM public.depositos
+  WHERE id = p_deposito_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN json_build_object('ok', false, 'error', 'deposit_not_found');
+  END IF;
+
+  IF v_usuario_id IS DISTINCT FROM p_usuario_id THEN
+    RETURN json_build_object('ok', false, 'error', 'forbidden');
+  END IF;
+
+  IF v_gateway_check_id IS NULL OR v_gateway_check_id <> btrim(p_gateway_check_id) THEN
+    RETURN json_build_object('ok', false, 'error', 'gateway_mismatch');
+  END IF;
+
+  IF v_status = 'aprovado' THEN
+    SELECT vip_nivel, total_depositado INTO v_nivel, v_total
+    FROM public.usuarios WHERE id = v_usuario_id;
+
+    RETURN json_build_object(
+      'ok', true,
+      'already', true,
+      'vip_nivel', COALESCE(v_nivel, 1),
+      'total_depositado', COALESCE(v_total, 0),
+      'subiu_nivel', false,
+      'bonus_upgrade', 0
+    );
+  END IF;
+
+  IF v_status <> 'pendente' THEN
+    RETURN json_build_object('ok', false, 'error', 'invalid_status');
+  END IF;
+
+  UPDATE public.depositos
+  SET status = 'aprovado', updated_at = NOW()
+  WHERE id = p_deposito_id;
+
+  PERFORM set_config('app.skip_usuario_guard', 'true', true);
+  UPDATE public.usuarios
+  SET saldo = saldo + v_valor
+  WHERE id = v_usuario_id;
+
+  v_vip := public.processar_vip_deposito(v_usuario_id, p_deposito_id, v_valor);
+  v_rollover := public.aplicar_rollover_deposito(v_usuario_id, v_valor);
+  v_indicacao := public.processar_recompensa_indicacao(v_usuario_id, p_deposito_id, v_valor);
+
+  RETURN (json_build_object(
+    'ok', true,
+    'already', false,
+    'rollover_pendente', COALESCE(v_rollover, 0),
+    'indicacao', v_indicacao
+  )::jsonb || COALESCE(v_vip, '{}'::json)::jsonb)::json;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.processar_recompensa_indicacao(UUID, UUID, NUMERIC) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.processar_recompensa_indicacao(UUID, UUID, NUMERIC) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.processar_recompensa_indicacao(UUID, UUID, NUMERIC) TO service_role;
+
+COMMENT ON FUNCTION public.processar_recompensa_indicacao(UUID, UUID, NUMERIC) IS
+  'H5: recompensa de indicação atômica; invocável só via service_role ou funções internas SECURITY DEFINER.';
+
+-- =============================================================================
+-- Patch H8 — Fecha vazamento de PII de indicados (RLS usuarios SELECT)
+-- Fonte: deploy/patch_h8_indicados_rls.sql
+-- =============================================================================
+
+DROP POLICY IF EXISTS "Usuários podem ver seus dados e indicações" ON public.usuarios;
+
+CREATE POLICY "Usuários podem ver apenas seus próprios dados"
+  ON public.usuarios
+  FOR SELECT
+  USING (
+    auth.uid() = id
+    OR public.is_user_admin()
+  );
+
+COMMENT ON POLICY "Usuários podem ver apenas seus próprios dados" ON public.usuarios IS
+  'H8: usuário comum não lê linha de indicados; agregados via obter_indicacao_config_usuario.';
+
+CREATE OR REPLACE FUNCTION public._assert_referral_code_caller(p_referral_code TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_referral_code IS NULL OR TRIM(p_referral_code) = '' THEN
+    RETURN;
+  END IF;
+
+  IF public.is_user_admin() THEN
+    RETURN;
+  END IF;
+
+  IF public.get_current_user_referral_code() IS DISTINCT FROM TRIM(p_referral_code) THEN
+    RAISE EXCEPTION 'Acesso negado';
+  END IF;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._assert_referral_code_caller(TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._assert_referral_code_caller(TEXT) FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.count_qualified_referrals(referral_code_param TEXT)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public._assert_referral_code_caller(referral_code_param);
+
+  IF referral_code_param IS NULL OR TRIM(referral_code_param) = '' THEN
+    RETURN 0;
+  END IF;
+
+  RETURN (
+    SELECT COUNT(*)::INT
+    FROM public.usuarios u
+    WHERE u.indicado_por = referral_code_param
+      AND COALESCE(u.indicacao_recompensa_paga, false) = true
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.calcular_ganhos_indicacao(p_referral_code TEXT)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public._assert_referral_code_caller(p_referral_code);
+
+  IF p_referral_code IS NULL OR TRIM(p_referral_code) = '' THEN
+    RETURN 0;
+  END IF;
+
+  RETURN COALESCE((
+    SELECT SUM(COALESCE(u.indicacao_recompensa_valor_pago, 0))
+    FROM public.usuarios u
+    WHERE u.indicado_por = p_referral_code
+      AND COALESCE(u.indicacao_recompensa_paga, false) = true
+  ), 0);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.count_qualified_referrals(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.calcular_ganhos_indicacao(TEXT) TO authenticated;
+
+COMMENT ON FUNCTION public.count_qualified_referrals(TEXT) IS
+  'H8: conta indicados qualificados; só o dono do código ou admin.';
+
+COMMENT ON FUNCTION public.calcular_ganhos_indicacao(TEXT) IS
+  'H8: soma ganhos de indicação; só o dono do código ou admin.';
+
+-- =============================================================================
+-- Patch M8 — webhooks: secret não acessível via JWT admin (só service_role / API)
+-- =============================================================================
+
+REVOKE ALL ON TABLE public.webhooks FROM anon;
+REVOKE ALL ON TABLE public.webhooks FROM authenticated;
+
+COMMENT ON TABLE public.webhooks IS
+  'M8: CRUD admin via PlayFiverAPI /api/webhooks (service_role). secret_key nunca no browser.';

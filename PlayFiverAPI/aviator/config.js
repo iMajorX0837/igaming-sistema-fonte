@@ -1,5 +1,8 @@
 /** Serviço de configuração RTP do Aviator (Supabase + cache). */
 
+import { extractAccessToken } from '../lib/authCookies.js';
+import { isAdminSessionElevated } from '../lib/adminTwoFactor.js';
+
 const CACHE_TTL_MS = 3_000;
 
 const DEFAULT_ENGINE = {
@@ -77,10 +80,7 @@ export function createAviatorConfig(supabase) {
   }
 
   async function validateAdminBearer(req) {
-    const auth = req.headers.authorization;
-    if (!auth?.startsWith('Bearer ')) return false;
-
-    const token = auth.slice(7).trim();
+    const token = extractAccessToken(req, { preferAdmin: true });
     if (!token) return false;
 
     try {
@@ -89,12 +89,21 @@ export function createAviatorConfig(supabase) {
 
       const { data: usuario, error: userError } = await supabase
         .from('usuarios')
-        .select('cargo')
+        .select('cargo, two_factor_enabled, totp_secret')
         .eq('id', data.user.id)
         .maybeSingle();
 
-      if (userError || !usuario) return false;
-      return usuario.cargo === 'admin';
+      if (userError || !usuario || usuario.cargo !== 'admin') return false;
+
+      if (
+        usuario.two_factor_enabled &&
+        usuario.totp_secret &&
+        !isAdminSessionElevated(token)
+      ) {
+        return false;
+      }
+
+      return true;
     } catch {
       return false;
     }

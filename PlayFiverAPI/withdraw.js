@@ -1,15 +1,21 @@
 import { Router } from 'express';
-import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import {
   createPixWithdraw,
   mapPixKeyType,
   getWithdrawPaymentGateway,
 } from './lib/paymentGateway.js';
-import { getMisticPayWebhookSecret } from './misticpay.js';
+import {
+  buildMisticPayWithdrawWebhookUrl,
+  getMisticPayWebhookSecret,
+  validateMisticPayWebhookAuth,
+  verifyMisticPayWithdrawWebhookStatus,
+} from './misticpay.js';
 import { getBspayWebhookSecret, validateBspayWebhookSignature } from './bspay.js';
 import { getVeopagWebhookSecret, validateVeopagWebhookSignature } from './veopag.js';
 import { dispatchWithdrawApprovedWebhook } from './lib/withdrawWebhooks.js';
+import { isAdminSessionElevated } from './lib/adminTwoFactor.js';
+import { extractAccessToken } from './lib/authCookies.js';
 
 /**
  * @param {{
@@ -30,12 +36,11 @@ export function createWithdrawRouter({
   const router = Router();
 
   async function requireAdmin(req, res, next) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const token = extractAccessToken(req, { preferAdmin: true });
+    if (!token) {
       return res.status(401).json({ ok: false, message: 'Não autenticado' });
     }
 
-    const token = authHeader.slice(7).trim();
     const { data: userData, error: userError } = await supabase.auth.getUser(token);
     if (userError || !userData?.user) {
       return res.status(401).json({ ok: false, message: 'Sessão inválida' });
@@ -49,6 +54,23 @@ export function createWithdrawRouter({
     const { data: cargo, error: cargoError } = await userClient.rpc('get_user_cargo');
     if (cargoError || cargo !== 'admin') {
       return res.status(403).json({ ok: false, message: 'Acesso negado' });
+    }
+
+    const { data: adminRow } = await supabase
+      .from('usuarios')
+      .select('two_factor_enabled, totp_secret')
+      .eq('id', userData.user.id)
+      .maybeSingle();
+
+    if (
+      adminRow?.two_factor_enabled &&
+      adminRow?.totp_secret &&
+      !isAdminSessionElevated(token)
+    ) {
+      return res.status(403).json({
+        ok: false,
+        message: '2FA necessário. Entre pelo painel administrativo.',
+      });
     }
 
     req.adminUser = userData.user;
@@ -82,12 +104,16 @@ export function createWithdrawRouter({
   /**
    * POST /api/withdraw/approve
    * Aprova saque pendente e envia PIX via gateway ativo.
+   * Ordem segura: pendente → processando → gateway → aprovado|falhou
+   * (evita double-pay se o update falhar depois do PIX).
    */
   router.post('/approve', requireAdmin, async (req, res) => {
     const saqueId = req.body?.saque_id ?? req.body?.saqueId;
     if (!saqueId) {
       return res.status(400).json({ ok: false, message: 'saque_id é obrigatório' });
     }
+
+    let claimed = false;
 
     try {
       const { data: saque, error: saqueError } = await supabase
@@ -105,6 +131,13 @@ export function createWithdrawRouter({
         return res.status(404).json({ ok: false, message: 'Saque não encontrado' });
       }
 
+      if (saque.status === 'processando') {
+        return res.status(409).json({
+          ok: false,
+          message: 'Saque já está em processamento. Aguarde ou marque como falhou se necessário.',
+        });
+      }
+
       if (saque.status !== 'pendente') {
         return res.status(409).json({
           ok: false,
@@ -118,7 +151,6 @@ export function createWithdrawRouter({
       }
 
       const origem = String(saque.origem ?? 'pix').toLowerCase();
-      let gatewayResult = null;
       const activeGateway = await getWithdrawPaymentGateway();
 
       if (origem === 'pix' || !saque.origem) {
@@ -128,15 +160,51 @@ export function createWithdrawRouter({
             message: 'Saque sem chave PIX cadastrada.',
           });
         }
+      }
 
+      // 1) Claim atômico — só um admin/request segue para o gateway
+      const { data: claimedRow, error: claimError } = await supabase
+        .from('saques')
+        .update({
+          status: 'processando',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', saqueId)
+        .eq('status', 'pendente')
+        .select('id, usuario_id, valor, key, chave, origem')
+        .maybeSingle();
+
+      if (claimError) {
+        console.error('withdraw/approve claim:', claimError);
+        return res.status(500).json({ ok: false, message: 'Erro ao reservar saque para pagamento.' });
+      }
+
+      if (!claimedRow) {
+        return res.status(409).json({
+          ok: false,
+          message: 'Saque já foi processado por outro administrador.',
+        });
+      }
+
+      claimed = true;
+
+      // 2) Gateway (só depois do claim)
+      let gatewayResult = null;
+      if (origem === 'pix' || !saque.origem) {
         const webhookBase = (publicApiUrl || '').replace(/\/$/, '');
         const webhookPaths = {
           bspay: '/api/withdraw/bspay/webhook',
           veopag: '/api/withdraw/veopag/webhook',
-          misticpay: '/api/withdraw/misticpay/webhook',
+          misticpay: null,
         };
-        const webhookPath = webhookPaths[activeGateway] ?? webhookPaths.misticpay;
-        const postbackUrl = webhookBase ? `${webhookBase}${webhookPath}` : undefined;
+        let postbackUrl;
+        if (activeGateway === 'misticpay') {
+          const misticSecret = await getMisticPayWebhookSecret();
+          postbackUrl = buildMisticPayWithdrawWebhookUrl(webhookBase, misticSecret);
+        } else {
+          const webhookPath = webhookPaths[activeGateway];
+          postbackUrl = webhookBase && webhookPath ? `${webhookBase}${webhookPath}` : undefined;
+        }
 
         let receiverName;
         let receiverDocument;
@@ -163,6 +231,7 @@ export function createWithdrawRouter({
         });
       }
 
+      // 3) Commit aprovado (só a partir de processando)
       const { data: updated, error: updateError } = await supabase
         .from('saques')
         .update({
@@ -173,17 +242,30 @@ export function createWithdrawRouter({
           updated_at: new Date().toISOString(),
         })
         .eq('id', saqueId)
-        .eq('status', 'pendente')
+        .eq('status', 'processando')
         .select('id, usuario_id, valor, key, chave')
         .maybeSingle();
 
       if (updateError) {
-        console.error('withdraw/approve update:', updateError);
+        console.error('withdraw/approve update aprovado:', updateError);
+        // PIX pode ter sido enviado — grava ids e deixa processando para auditoria
+        if (gatewayResult) {
+          await supabase
+            .from('saques')
+            .update({
+              misticpay_job_id: gatewayResult.jobId ?? null,
+              misticpay_transaction_id: gatewayResult.transactionId ?? null,
+              misticpay_status: gatewayResult.status ?? null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', saqueId)
+            .eq('status', 'processando');
+        }
         return res.status(500).json({
           ok: false,
           message:
             gatewayResult != null
-              ? 'Pagamento enviado ao gateway, mas falhou ao atualizar o saque. Verifique no painel e no gateway.'
+              ? 'Pagamento enviado ao gateway, mas falhou ao confirmar no banco. Saque ficou em processando — não aprove de novo; confira no gateway.'
               : 'Erro ao atualizar status do saque.',
         });
       }
@@ -191,7 +273,7 @@ export function createWithdrawRouter({
       if (!updated) {
         return res.status(409).json({
           ok: false,
-          message: 'Saque já foi processado por outro administrador.',
+          message: 'Saque saiu de processando durante a confirmação. Verifique o status atual.',
         });
       }
 
@@ -240,6 +322,23 @@ export function createWithdrawRouter({
       });
     } catch (error) {
       console.error('❌ withdraw/approve:', error);
+
+      // Gateway falhou depois do claim → marca falhou (trigger devolve saldo se debitado)
+      if (claimed) {
+        try {
+          await supabase
+            .from('saques')
+            .update({
+              status: 'falhou',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', saqueId)
+            .eq('status', 'processando');
+        } catch (failErr) {
+          console.error('withdraw/approve mark falhou:', failErr);
+        }
+      }
+
       return res.status(502).json({
         ok: false,
         message:
@@ -248,7 +347,7 @@ export function createWithdrawRouter({
     }
   });
 
-  async function handleWithdrawGatewayWebhook(req, res, { gateway }) {
+  async function handleWithdrawGatewayWebhook(req, res, { gateway, urlToken } = {}) {
     try {
       const webhookSecret =
         gateway === 'bspay'
@@ -280,21 +379,13 @@ export function createWithdrawRouter({
           return res.status(401).json({ ok: false, message: 'Não autorizado' });
         }
       } else {
-        const provided = String(
-          req.headers['x-misticpay-secret'] ||
-            req.headers['x-webhook-secret'] ||
-            req.body?.secret ||
-            '',
-        );
-        let valid = false;
-        try {
-          valid = crypto.timingSafeEqual(
-            Buffer.from(provided),
-            Buffer.from(String(webhookSecret)),
-          );
-        } catch {
-          valid = false;
-        }
+        const rawBody = typeof req.rawBody === 'string' ? req.rawBody : JSON.stringify(req.body ?? {});
+        const valid = validateMisticPayWebhookAuth({
+          rawBody,
+          headers: req.headers,
+          secret: webhookSecret,
+          urlToken,
+        });
         if (!valid) {
           return res.status(401).json({ ok: false, message: 'Não autorizado' });
         }
@@ -360,13 +451,27 @@ export function createWithdrawRouter({
         event.includes('withdrawal.failed') ||
         status === 'FAILED';
 
-      if (isFailure && saque.status === 'aprovado') {
+      if (isFailure && (saque.status === 'aprovado' || saque.status === 'processando')) {
+        if (gateway === 'misticpay' && transactionId) {
+          const verified = await verifyMisticPayWithdrawWebhookStatus(transactionId, {
+            expectFailure: true,
+          });
+          if (!verified) {
+            console.warn(`withdraw/${gateway}/webhook: status remoto divergente`, {
+              transactionId,
+              status,
+            });
+            return res.status(409).json({ ok: false, message: 'Status não confirmado no gateway' });
+          }
+        }
+
         updates.status = 'falhou';
+        const fromStatus = saque.status;
         const { data: updatedSaque, error: updateError } = await supabase
           .from('saques')
           .update(updates)
           .eq('id', saque.id)
-          .eq('status', 'aprovado')
+          .eq('status', fromStatus)
           .select('id')
           .maybeSingle();
 
@@ -375,7 +480,9 @@ export function createWithdrawRouter({
           return res.status(500).json({ ok: false });
         }
 
-        if (updatedSaque) {
+        // aprovado→falhou: trigger nao reembolsa (so pendente/processando); webhook devolve.
+        // processando→falhou: trigger handle_saque_rejeitado devolve o saldo.
+        if (updatedSaque && fromStatus === 'aprovado') {
           try {
             await refundWithdrawBalance(saque.usuario_id, saque.valor);
           } catch (refundError) {
@@ -396,8 +503,19 @@ export function createWithdrawRouter({
   }
 
   /**
+   * POST /api/withdraw/misticpay/webhook/:token
+   * Callback MisticPay — token opaco na URL (M5).
+   */
+  router.post('/misticpay/webhook/:token', async (req, res) => {
+    return handleWithdrawGatewayWebhook(req, res, {
+      gateway: 'misticpay',
+      urlToken: req.params.token,
+    });
+  });
+
+  /**
    * POST /api/withdraw/misticpay/webhook
-   * Callback opcional da MisticPay sobre status do saque PIX.
+   * Legado — exige HMAC ou header; URL sem token não aceita secret no body.
    */
   router.post('/misticpay/webhook', async (req, res) => {
     return handleWithdrawGatewayWebhook(req, res, { gateway: 'misticpay' });

@@ -1,5 +1,101 @@
+import crypto from 'crypto';
 import { getMisticPayConfigService } from './lib/misticpayConfig.js';
 import { enrichPixQrImage } from './lib/pixQrCode.js';
+
+const WEBHOOK_FRESHNESS_SEC = 300;
+
+const MISTICPAY_FAILURE_STATES = [
+  'FALHOU',
+  'FAILED',
+  'CANCELLED',
+  'CANCELED',
+  'REJECTED',
+  'REJEITADO',
+  'ERROR',
+];
+
+export function isMisticPayFailureState(state) {
+  const normalized = String(state ?? '').toUpperCase();
+  if (!normalized) return false;
+  return MISTICPAY_FAILURE_STATES.some((s) => normalized.includes(s));
+}
+
+/** Token opaco na URL do webhook (MisticPay não assina HMAC). */
+export function deriveMisticPayWebhookToken(secret) {
+  const value = String(secret ?? '').trim();
+  if (!value) return '';
+  return crypto.createHmac('sha256', value).update('misticpay-withdraw-v1').digest('hex').slice(0, 32);
+}
+
+export function buildMisticPayWithdrawWebhookUrl(publicApiUrl, secret) {
+  const base = String(publicApiUrl ?? '').replace(/\/$/, '');
+  const token = deriveMisticPayWebhookToken(secret);
+  if (!base || !token) return undefined;
+  return `${base}/api/withdraw/misticpay/webhook/${token}`;
+}
+
+/**
+ * Autentica webhook MisticPay:
+ * 1) HMAC + timestamp (integrações internas / futuro)
+ * 2) token na URL (produção — MisticPay chama projectWebhook completa)
+ * 3) header x-misticpay-secret (legado; secret no body é ignorado — M5)
+ */
+export function validateMisticPayWebhookAuth({ rawBody, headers, secret, urlToken }) {
+  const key = String(secret ?? '').trim();
+  if (!key) return false;
+
+  const body = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody ?? {});
+
+  const sig = String(headers['x-webhook-signature'] ?? headers['x-misticpay-signature'] ?? '');
+  const ts = String(headers['x-webhook-timestamp'] ?? headers['x-misticpay-timestamp'] ?? '');
+  if (sig && ts) {
+    const tsNum = Number(ts);
+    if (!Number.isFinite(tsNum)) return false;
+    if (Math.abs(Math.floor(Date.now() / 1000) - tsNum) > WEBHOOK_FRESHNESS_SEC) return false;
+
+    const expected = crypto.createHmac('sha256', key).update(`${ts}.${body}`).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
+    } catch {
+      return false;
+    }
+  }
+
+  const expectedToken = deriveMisticPayWebhookToken(key);
+  const providedToken = String(urlToken ?? '').trim();
+  if (providedToken && expectedToken) {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(providedToken), Buffer.from(expectedToken));
+    } catch {
+      return false;
+    }
+  }
+
+  const headerSecret = String(headers['x-misticpay-secret'] ?? headers['x-webhook-secret'] ?? '');
+  if (!headerSecret) return false;
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(key));
+  } catch {
+    return false;
+  }
+}
+
+/** Confirma status na MisticPay antes de aplicar falha/reembolso (anti-replay). */
+export async function verifyMisticPayWithdrawWebhookStatus(transactionId, { expectFailure = false } = {}) {
+  const id = transactionId != null ? String(transactionId).trim() : '';
+  if (!id) return false;
+
+  const check = await checkMisticPayTransaction(id);
+  const state = String(check.transactionState ?? '').toUpperCase();
+  if (!state) return false;
+
+  if (expectFailure) {
+    return isMisticPayFailureState(state);
+  }
+
+  return !isMisticPayFailureState(state);
+}
 
 async function getMisticPayRuntime() {
   const config = await getMisticPayConfigService().getConfig();

@@ -1,13 +1,47 @@
 import crypto from 'crypto';
+import { getAviatorGameSessionCookie } from './authCookies.js';
 
 export function isProduction() {
   return process.env.NODE_ENV === 'production';
 }
 
+function isTrustProxyEnabled() {
+  const value = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
+
+function normalizeIp(ip) {
+  if (!ip) return '';
+  const value = String(ip).trim();
+  if (value.startsWith('::ffff:')) return value.slice(7);
+  return value;
+}
+
+/**
+ * IP do cliente para rate limit / logs.
+ * Sem TRUST_PROXY: ignora X-Forwarded-For (evita spoof direto no Node).
+ * Com TRUST_PROXY=true (nginx/cloudflare na frente): usa primeiro hop de X-Forwarded-For.
+ */
 export function getClientIp(req) {
+  const socketIp = normalizeIp(req.socket?.remoteAddress || '');
+
+  if (!isTrustProxyEnabled()) {
+    return socketIp;
+  }
+
   const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) return String(forwarded).split(',')[0].trim();
-  return req.socket?.remoteAddress || '';
+  if (forwarded) {
+    const hops = String(forwarded)
+      .split(',')
+      .map((hop) => normalizeIp(hop.trim()))
+      .filter(Boolean);
+    if (hops.length > 0) return hops[0];
+  }
+
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) return normalizeIp(String(realIp));
+
+  return socketIp;
 }
 
 export function isLocalhostRequest(req) {
@@ -81,7 +115,7 @@ export function extractAviatorGameSessionAuth(req) {
   const token =
     req.headers['x-game-session'] ||
     req.headers['X-Game-Session'] ||
-    req.query?.gs_token ||
+    getAviatorGameSessionCookie(req) ||
     req.body?.game_session;
 
   const accountEmail = String(
@@ -228,24 +262,29 @@ export function describePlayFiverWebhookRejection(req) {
 }
 
 export function validateInternalApiSecret(req) {
-  const secret = (
-    process.env.INTERNAL_API_SECRET ||
-    process.env.AVIATOR_INTERNAL_SECRET ||
-    ''
-  ).trim();
+  const secret = String(process.env.INTERNAL_API_SECRET || '').trim();
   if (!secret) return false;
 
   const provided =
     req.headers['x-internal-api-secret'] ||
     req.headers['X-Internal-Api-Secret'];
-  return provided === secret;
+  if (!provided || typeof provided !== 'string') return false;
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
+  } catch {
+    return false;
+  }
 }
 
-export function createRateLimiter({ windowMs = 60_000, max = 10 } = {}) {
+export function createRateLimiter({ windowMs = 60_000, max = 10, keyFn } = {}) {
   const hits = new Map();
 
   return (req, res, next) => {
-    const key = getClientIp(req) || 'unknown';
+    const key =
+      typeof keyFn === 'function'
+        ? keyFn(req)
+        : getClientIp(req) || 'unknown';
     const now = Date.now();
     const bucket = hits.get(key) ?? { count: 0, resetAt: now + windowMs };
 
@@ -258,6 +297,7 @@ export function createRateLimiter({ windowMs = 60_000, max = 10 } = {}) {
     hits.set(key, bucket);
 
     if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
       return res.status(429).json({
         success: false,
         message: 'Muitas requisições. Tente novamente em instantes.',
@@ -277,6 +317,20 @@ function parseCorsOrigins() {
     .filter(Boolean);
 }
 
+function isDevLocalOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const { hostname } = new URL(origin);
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.localhost')
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getPublicApiOrigin() {
   const raw = (process.env.PUBLIC_API_URL || '').trim();
   if (!raw) return null;
@@ -290,7 +344,6 @@ function getPublicApiOrigin() {
 /** Lista efetiva: CORS_ORIGINS + origem de PUBLIC_API_URL (Aviator estático em api.*). */
 function getAllowedOrigins() {
   const fromEnv = parseCorsOrigins() || [];
-  // Em dev, lista vazia = CORS permissivo (localhost:5173, etc.)
   if (!isProduction()) {
     return fromEnv;
   }
@@ -301,45 +354,53 @@ function getAllowedOrigins() {
   return [...fromEnv, publicOrigin];
 }
 
+const CORS_ALLOW_HEADERS =
+  'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-Game-Session, X-Client-Info';
+
+function rejectCorsOrigin(req, res) {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(403);
+  }
+  return res.status(403).json({ ok: false, message: 'Origem não permitida' });
+}
+
 export function createCorsMiddleware() {
   const allowedOrigins = getAllowedOrigins();
 
   return (req, res, next) => {
     const origin = req.headers.origin;
-    let allowOrigin = '*';
 
-    if (allowedOrigins?.length) {
-      if (origin && allowedOrigins.includes(origin)) {
-        allowOrigin = origin;
-      } else if (!origin) {
-        allowOrigin = allowedOrigins[0];
-      } else {
-        if (req.method === 'OPTIONS') {
-          return res.sendStatus(403);
-        }
-        return res.status(403).json({ ok: false, message: 'Origem não permitida' });
+    if (!origin) {
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
       }
-    } else if (origin) {
-      if (isProduction()) {
-        if (req.method === 'OPTIONS') {
-          return res.sendStatus(403);
-        }
-        return res.status(403).json({ ok: false, message: 'Origem não permitida' });
+      return next();
+    }
+
+    let allowOrigin = null;
+
+    if (allowedOrigins.length) {
+      if (!allowedOrigins.includes(origin)) {
+        return rejectCorsOrigin(req, res);
       }
       allowOrigin = origin;
+    } else if (!isProduction() && isDevLocalOrigin(origin)) {
+      allowOrigin = origin;
+    } else if (isProduction()) {
+      return rejectCorsOrigin(req, res);
+    } else {
+      return rejectCorsOrigin(req, res);
     }
 
     res.header('Access-Control-Allow-Origin', allowOrigin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-Game-Session'
-    );
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS);
     res.header('Access-Control-Max-Age', '86400');
 
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.sendStatus(204);
     }
 
     return next();
@@ -354,7 +415,13 @@ export function assertProductionSecrets() {
     ['PLAYFIVER_AGENT_TOKEN', process.env.PLAYFIVER_AGENT_TOKEN],
     ['PLAYFIVER_SECRET_KEY', process.env.PLAYFIVER_SECRET_KEY],
     ['AVIATOR_INTERNAL_SECRET', process.env.AVIATOR_INTERNAL_SECRET],
+    ['INTERNAL_API_SECRET', process.env.INTERNAL_API_SECRET],
   ];
+
+  if (process.env.AVIATOR_API_ENABLED === 'true') {
+    console.error('❌ AVIATOR_API_ENABLED=true não é permitido em produção (use /aviator/wallet)');
+    process.exit(1);
+  }
 
   const missing = required.filter(([, value]) => !String(value || '').trim()).map(([name]) => name);
 

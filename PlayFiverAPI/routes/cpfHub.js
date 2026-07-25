@@ -2,39 +2,20 @@ import { Router } from 'express';
 import { createRateLimiter } from '../lib/security.js';
 
 /**
+ * Consulta CPF no cadastro (RegisterModal) — sem JWT; chaves CPF Hub ficam no servidor.
+ * Rate limit por IP reduz abuso (M2 aceito: não revalidar CPF de terceiros pós-login).
+ *
  * @param {{
  *   apiKeys: string[];
- *   supabase: import('@supabase/supabase-js').SupabaseClient;
  * }} deps
  */
-export function createCpfHubRouter({ apiKeys, supabase }) {
+export function createCpfHubRouter({ apiKeys }) {
   const router = Router();
-  const rateLimit = createRateLimiter({ windowMs: 60_000, max: 8 });
+  const rateLimit = createRateLimiter({ windowMs: 60_000, max: 10 });
 
-  async function requireAuth(req, res) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      res.status(401).json({ success: false, message: 'Faça login para consultar CPF.' });
-      return null;
-    }
-
-    const token = authHeader.slice(7).trim();
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) {
-      res.status(401).json({ success: false, message: 'Sessão inválida.' });
-      return null;
-    }
-
-    return data.user;
-  }
-
-  /** GET /api/cpfhub/cpf/:cpf — consulta CPF (chaves ficam no servidor) */
+  /** GET /api/cpfhub/cpf/:cpf — validação no fluxo de registro */
   router.get('/cpf/:cpf', rateLimit, async (req, res) => {
     try {
-      if (!(await requireAuth(req, res))) {
-        return;
-      }
-
       const cpf = String(req.params.cpf ?? '').replace(/\D/g, '');
       if (cpf.length !== 11) {
         return res.status(400).json({ success: false, message: 'CPF inválido' });

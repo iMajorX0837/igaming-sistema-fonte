@@ -1,14 +1,14 @@
+import { adminApiFetch } from './adminApiFetch';
+
 function apiBase() {
   // Dev: Vite proxy (vite.config.ts). Prod: nginx admin.*/aviator → API.
   return '';
 }
 
-async function authHeaders() {
+async function ensureAdminSession() {
   const { supabase } = await import('./supabase');
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('Sessão expirada. Faça login novamente.');
-  return { Authorization: `Bearer ${token}` };
+  if (!data.session?.user) throw new Error('Sessão expirada. Faça login novamente.');
 }
 
 export interface AviatorScheduleEntry {
@@ -47,8 +47,8 @@ export interface AviatorRtpPreview {
 }
 
 export async function fetchAviatorRtpPreview(): Promise<AviatorRtpPreview> {
-  const headers = await authHeaders();
-  const res = await fetch(`${apiBase()}/aviator/admin/rtp-preview`, { headers });
+  await ensureAdminSession();
+  const res = await adminApiFetch(`${apiBase()}/aviator/admin/rtp-preview`);
   const body = await res.json();
   if (!res.ok) {
     throw new Error(body?.error || 'Falha ao carregar preview RTP');
@@ -57,13 +57,9 @@ export async function fetchAviatorRtpPreview(): Promise<AviatorRtpPreview> {
 }
 
 export async function invalidateAviatorQueue() {
-  const headers = {
-    ...(await authHeaders()),
-    'Content-Type': 'application/json',
-  };
-  const res = await fetch(`${apiBase()}/aviator/admin/invalidate-queue`, {
+  await ensureAdminSession();
+  const res = await adminApiFetch(`${apiBase()}/aviator/admin/invalidate-queue`, {
     method: 'POST',
-    headers,
     body: '{}',
   });
   const body = await res.json();

@@ -429,7 +429,6 @@
     let retailId = +searchParams.get("retailid");
     let apiVersion = searchParams.get("version");
     let currency = searchParams.get("currency") || "BRL";
-    let gameSession = searchParams.get("gs_token") || "";
 
 
     let enterGameConfig = {
@@ -444,7 +443,6 @@
       retailId: retailId,
       apiVersion: apiVersion,
       currency: currency,
-      gameSession: gameSession,
       localMode: true
     };
     window["enterGameConfig"] = enterGameConfig;

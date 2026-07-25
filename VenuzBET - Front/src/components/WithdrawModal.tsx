@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
+import { useUserProfileData } from '../hooks/useUserProfileData';
+import type { UserProfileData } from '../lib/userProfileCache';
 import SiteLogo from './SiteLogo';
 import Notification from './Notification';
 
@@ -15,22 +17,37 @@ const pixOptions = [
   { id: 'email', label: 'Email', icon: 'email' },
   { id: 'cpf', label: 'CPF', icon: 'cpf' },
   { id: 'phone', label: 'Telefone', icon: 'phone' },
-  { id: 'random', label: 'Chave Aleatória', icon: 'random' },
 ];
 
 const MODAL_ANIM_MS = 320;
 
+function getPixKeyForType(
+  type: string,
+  profile: UserProfileData,
+  fallbackEmail?: string
+): string {
+  switch (type) {
+    case 'Email':
+      return profile.email || fallbackEmail || '';
+    case 'CPF':
+      return (profile.cpf || '').replace(/\D/g, '');
+    case 'Telefone':
+      return (profile.telefone || '').replace(/\D/g, '').replace(/^55/, '');
+    default:
+      return '';
+  }
+}
+
 export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { config } = usePlataformaConfig();
+  const { userData } = useUserProfileData(isOpen);
   const minWithdraw = config.saque_minimo;
   const maxWithdraw = config.saque_maximo;
-  const dailyWithdrawLimit = config.saques_diarios_permitidos;
   const [amount, setAmount] = useState('50');
   const [pixType, setPixType] = useState('Email');
-  const [pixKey, setPixKey] = useState('contato.brent@gmail.com');
+  const [pixKey, setPixKey] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [availableBalance, setAvailableBalance] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +61,6 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
   const resetModalUiState = useCallback(() => {
     setIsDropdownOpen(false);
-    setSearchTerm('');
     setError(null);
     setSuccess(false);
     setIsSubmitting(false);
@@ -116,12 +132,18 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         setError(null);
         setSuccess(false);
         setAmount(String(minWithdraw));
+        setPixType('Email');
       }
       prevIsOpenRef.current = true;
     } else {
       prevIsOpenRef.current = false;
     }
   }, [isOpen, fetchSaldo, fetchRollover, minWithdraw]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPixKey(getPixKeyForType(pixType, userData, user?.email));
+  }, [isOpen, pixType, userData, user?.email]);
 
   useEffect(() => {
     if (isOpen) {
@@ -153,10 +175,6 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredOptions = pixOptions.filter(opt =>
-    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const getIcon = (iconType: string) => {
     switch (iconType) {
       case 'email':
@@ -177,12 +195,6 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         return (
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
-          </svg>
-        );
-      case 'random':
-        return (
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0119.8-4.3M22 12.5a10 10 0 01-19.8 4.2" />
           </svg>
         );
       default:
@@ -309,106 +321,36 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         throw new Error('Saldo insuficiente para realizar este saque');
       }
 
-      // Validar limite diário de saques
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const { count: saquesHoje, error: countError } = await supabase
-        .from('saques')
-        .select('id', { count: 'exact', head: true })
-        .eq('usuario_id', user.id)
-        .gte('data_hora', startOfDay.toISOString());
-
-      if (countError) {
-        throw new Error(countError.message || 'Erro ao verificar limite diário de saques');
-      }
-
-      if ((saquesHoje ?? 0) >= dailyWithdrawLimit) {
-        throw new Error(
-          `Limite diário de saques atingido. Máximo de ${dailyWithdrawLimit} saque(s) por dia.`
-        );
-      }
-
-      // Mapear o tipo de chave PIX para o formato do banco
       const mapPixTypeToKey = (type: string): string => {
         const typeMap: { [key: string]: string } = {
-          'Email': 'email',
-          'CPF': 'cpf',
-          'Telefone': 'telefone',
-          'Chave Aleatória': 'chave aleatória'
+          Email: 'email',
+          CPF: 'cpf',
+          Telefone: 'telefone',
         };
         return typeMap[type] || 'email';
       };
 
-      // Criar registro de saque na tabela saques
-      const { data: saqueData, error: saqueError } = await supabase
-        .from('saques')
-        .insert({
-          usuario_id: user.id,
-          valor: valorSaque,
-          status: 'pendente', // Inicia como pendente, pode ser aprovado depois
-          key: mapPixTypeToKey(pixType),
-          chave: pixKey.trim(),
-        })
-        .select()
-        .single();
+      // Débito + insert pendente na mesma transação (RPC atômica)
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('solicitar_saque', {
+        p_valor: valorSaque,
+        p_key: mapPixTypeToKey(pixType),
+        p_chave: pixKey.trim(),
+        p_origem: 'pix',
+      });
 
-      if (saqueError) {
-        const msg = saqueError.message || '';
-        if (msg.includes('Limite diário de saques') || msg.includes('Rollover pendente')) {
-          throw new Error(msg);
-        }
-        throw new Error(msg || 'Erro ao criar solicitação de saque');
+      if (rpcError) {
+        throw new Error(rpcError.message || 'Erro ao processar saque');
       }
 
-      // Atualizar saldo do usuário usando função RPC (bypassa RLS)
-      const { data: rpcResult, error: saldoError } = await supabase
-        .rpc('subtrair_saldo_saque', {
-          p_usuario_id: user.id,
-          p_valor_saque: valorSaque
-        });
-
-      if (saldoError) {
-        console.error('Erro ao atualizar saldo via RPC:', saldoError);
-        // Se falhar ao atualizar o saldo, tentar deletar o saque criado
-        await supabase
-          .from('saques')
-          .delete()
-          .eq('id', saqueData.id);
-        
-        throw new Error(saldoError.message || 'Erro ao atualizar saldo');
-      }
-
-      // Verificar se a função RPC retornou sucesso
       if (!rpcResult || !rpcResult.success) {
-        console.error('Função RPC não retornou sucesso:', rpcResult);
-        // Se não retornou sucesso, tentar deletar o saque criado
-        await supabase
-          .from('saques')
-          .delete()
-          .eq('id', saqueData.id);
-        
-        throw new Error(rpcResult?.error || 'Erro ao atualizar saldo');
+        throw new Error(rpcResult?.error || 'Erro ao processar saque');
       }
 
-      console.log('Saldo atualizado com sucesso via RPC:', rpcResult);
-
-      setSuccess(true);
-      
-      // Atualizar o saldo local com o valor retornado da função RPC
-      const saldoAtualizado = parseFloat(rpcResult.saldo_atual) || (saldoAtual - valorSaque);
+      const saldoAtualizado =
+        parseFloat(rpcResult.saldo_atual) || saldoAtual - valorSaque;
       setAvailableBalance(saldoAtualizado);
-      
-      // Limpar formulário
-      setAmount('100');
-      setPixKey('contato.brent@gmail.com');
-      
-      // Fechar modal após 2 segundos
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-        fetchSaldo(); // Recarregar saldo
-      }, 2000);
+      void fetchSaldo();
+      onClose();
 
     } catch (err: any) {
       console.error('Erro ao processar saque:', err);
@@ -525,10 +467,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsDropdownOpen(!isDropdownOpen);
-                        setSearchTerm('');
-                      }}
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                       disabled={isSubmitting}
                       className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all text-left disabled:opacity-50"
                     >
@@ -546,24 +485,14 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
                     {isDropdownOpen && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-[#181923] border-2 border-brand rounded-lg shadow-xl z-[60] overflow-hidden">
-                        <div className="p-2 border-b border-slate-700">
-                          <input
-                            type="text"
-                            placeholder="Buscar..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-8 pl-3 pr-3 rounded bg-[#181923] border border-brand/30 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-brand"
-                          />
-                        </div>
                         <div className="max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-brand scrollbar-track-slate-800 hover:scrollbar-thumb-brand/70">
-                          {filteredOptions.map((option) => (
+                          {pixOptions.map((option) => (
                             <button
                               key={option.id}
                               type="button"
                               onClick={() => {
                                 setPixType(option.label);
                                 setIsDropdownOpen(false);
-                                setSearchTerm('');
                               }}
                               className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-brand/10 text-white text-xs transition-colors"
                             >
@@ -585,9 +514,10 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                     <input
                       type="text"
                       value={pixKey}
-                      onChange={(e) => setPixKey(e.target.value)}
+                      readOnly
                       disabled={isSubmitting}
-                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50"
+                      placeholder="Não cadastrado na conta"
+                      className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50 cursor-default"
                     />
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

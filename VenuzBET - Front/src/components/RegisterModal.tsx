@@ -11,7 +11,7 @@ interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchToLogin?: () => void;
-  /** Chamado ap?s cadastro conclu?do com sucesso (ex.: abrir modal de dep?sito). */
+  /** Chamado após cadastro concluído com sucesso (ex.: abrir modal de depósito). */
   onRegisterSuccess?: () => void;
 }
 
@@ -87,16 +87,16 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     cpfVerifiedRef.current = cpfVerified;
   }, [cpfVerified]);
 
-  // Capturar c?digo de indica??o da URL
+  // Capturar código de indicação da URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('c');
     if (code) {
       setReferralCode(code);
-      // Salvar no localStorage para persistir mesmo ap?s navega??o
+      // Salvar no localStorage para persistir mesmo após navegação
       localStorage.setItem('referral_code', code);
     } else {
-      // Tentar recuperar do localStorage se n?o estiver na URL
+      // Tentar recuperar do localStorage se não estiver na URL
       const storedCode = localStorage.getItem('referral_code');
       if (storedCode) {
         setReferralCode(storedCode);
@@ -150,7 +150,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
           setCpfVerified(false);
           setMaskedNameLine('');
           setMaskedBirthLine('');
-          setCpfLookupError('CPF n?o encontrado ou inv?lido.');
+          setCpfLookupError('CPF não encontrado ou inválido.');
         }
       } catch {
         lastLookupCpfRef.current = '';
@@ -158,7 +158,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
         setCpfVerified(false);
         setMaskedNameLine('');
         setMaskedBirthLine('');
-        setCpfLookupError('N?o foi poss?vel validar o CPF. Tente novamente.');
+        setCpfLookupError('Não foi possível validar o CPF. Tente novamente.');
       } finally {
         setCpfLookupLoading(false);
       }
@@ -196,10 +196,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   if (!shouldMount) return null;
 
   const formatCPF = (value: string) => {
-    // Remove tudo que n?o ? d?gito
+    // Remove tudo que não é dígito
     const numbers = value.replace(/\D/g, '');
     
-    // Aplica a formata??o
+    // Aplica a formatação
     if (numbers.length <= 3) {
       return numbers;
     } else if (numbers.length <= 6) {
@@ -212,10 +212,10 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
   };
 
   const formatPhone = (value: string) => {
-    // Remove tudo que n?o ? d?gito
+    // Remove tudo que não é dígito
     const numbers = value.replace(/\D/g, '');
     
-    // Aplica a formata??o
+    // Aplica a formatação
     if (numbers.length <= 2) {
       return numbers.length > 0 ? `(${numbers}` : '';
     } else if (numbers.length <= 7) {
@@ -231,7 +231,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     const { name, value } = e.target;
     let formattedValue = value;
     
-    // Aplica formata??o espec?fica para cada campo
+    // Aplica formatação específica para cada campo
     if (name === 'cpf') {
       formattedValue = formatCPF(value);
     } else if (name === 'phone') {
@@ -247,7 +247,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setError('');
 
     if (!termsAccepted) {
-      setError('Voc? deve aceitar os termos e condi??es');
+      setError('Você deve aceitar os termos e condições');
       return;
     }
 
@@ -260,7 +260,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setLoading(true);
 
     try {
-      // Remove formata??o antes de enviar (apenas n?meros)
+      // Remove formatação antes de enviar (apenas números)
       const phoneClean = formData.phone.replace(/\D/g, '');
       
       await register(
@@ -274,7 +274,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       setFormData({ cpf: '', email: '', phone: '', password: '' });
       resetCpfVerification();
       setTermsAccepted(false);
-      // Limpar c?digo de indica??o ap?s registro bem-sucedido
+      // Limpar código de indicação após registro bem-sucedido
       localStorage.removeItem('referral_code');
       setReferralCode(null);
       onClose();
@@ -326,7 +326,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 Tem certeza que deseja cancelar seu registro?
               </h3>
               <p className="text-sm text-slate-300">
-                Cadastre-se agora para concorrer a b?nus exclusivos e rodadas gr?tis imperd?veis!
+                Cadastre-se agora para concorrer a bônus exclusivos e rodadas grátis imperdíveis!
               </p>
               <div className="flex flex-col gap-2 pt-4">
                 <button
@@ -385,7 +385,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 />
                 {cpfLookupLoading && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-brand-light pointer-events-none">
-                    Consultando?
+                    Consultando...
                   </span>
                 )}
               </div>
@@ -479,8 +479,8 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               />
               <label htmlFor="terms" className="text-xs text-slate-300 leading-tight cursor-pointer">
                 Confirmo que <span className="font-bold text-brand-light">tenho mais de 18 anos</span> e aceito os{' '}
-                <a href="/help/terms" className="text-brand-light font-bold hover:underline">Termos de Condi??es</a> e a{' '}
-                <a href="/help/privacy" className="text-brand-light font-bold hover:underline">Pol?tica de Privacidade</a>.
+                <a href="/help/terms" className="text-brand-light font-bold hover:underline">Termos de Condições</a> e a{' '}
+                <a href="/help/privacy" className="text-brand-light font-bold hover:underline">Política de Privacidade</a>.
               </label>
             </div>
 
@@ -544,7 +544,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
 
             <div className="text-center pt-1 pb-1">
               <p className="text-xs text-white font-bold mt-2">
-                J? possui uma conta?
+                Já possui uma conta?
               </p>
               <button 
                 type="button" 
@@ -554,7 +554,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 }}
                 className="text-brand-light font-bold text-xs underline mt-2 hover:opacity-90"
               >
-                Fa?a login aqui
+                Faça login aqui
               </button>
             </div>
           </form>

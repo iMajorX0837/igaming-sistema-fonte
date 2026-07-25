@@ -86,9 +86,9 @@
     const cfg = window.enterGameConfig || {};
     const res = await fetch("/api/game/rpc", {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
-        ...(cfg.gameSession ? { "X-Game-Session": cfg.gameSession } : {}),
       },
       body: JSON.stringify({
         serverCode: serverCode,
@@ -115,7 +115,6 @@
     const account = String(cfg.account || "").trim();
     const params = new URLSearchParams({ userId: id.userId });
     if (account) params.set("account", account);
-    if (cfg.gameSession) params.set("gs_token", cfg.gameSession);
     const url = "/api/game/events?" + params.toString();
     eventSource = new EventSource(url);
     eventSource.onmessage = function (ev) {
@@ -257,9 +256,9 @@
     try {
       const res = await fetch("/aviator/wallet/histories", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
-          ...(cfg.gameSession ? { "X-Game-Session": cfg.gameSession } : {}),
         },
         body: JSON.stringify({
           user_code: account,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from './lib/auth.js';
 import { createPixTransaction, checkPixTransaction } from './lib/paymentGateway.js';
 import {
   dispatchDepositCreatedWebhook,
@@ -30,23 +31,8 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
     });
   }
 
-  async function getAuthUser(req) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return null;
-    }
-
-    const token = authHeader.slice(7).trim();
-    if (!token) {
-      return null;
-    }
-
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) {
-      return null;
-    }
-
-    return { user: data.user, token };
+  async function resolveAuth(req) {
+    return getAuthUser(supabase, req);
   }
 
   async function getPlatformDepositLimits() {
@@ -67,7 +53,7 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
    */
   router.post('/pix/create', async (req, res) => {
     try {
-      const auth = await getAuthUser(req);
+      const auth = await resolveAuth(req);
       if (!auth) {
         return res.status(401).json({ ok: false, message: 'Faça login para depositar.' });
       }
@@ -194,7 +180,7 @@ export function createDepositRouter({ supabase, supabaseUrl, supabaseAnonKey, di
    */
   router.post('/pix/check', async (req, res) => {
     try {
-      const auth = await getAuthUser(req);
+      const auth = await resolveAuth(req);
       if (!auth) {
         return res.status(401).json({ ok: false, message: 'Faça login para consultar o pagamento.' });
       }

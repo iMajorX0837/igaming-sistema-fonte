@@ -3,17 +3,14 @@ import { supabase } from '../lib/supabase';
 import { adminPageCache } from '../lib/adminPageCache';
 import { logAdminAction } from '../lib/adminLogger';
 import { initClientInfo } from '../lib/clientInfo';
-import {
-  AdminUser,
-  mapSupabaseUserToUser,
-  refreshUserCargoInBackground,
-  setCargoInCache,
-} from '../lib/userCargo';
+import { AdminUser, mapSupabaseUserToUser } from '../lib/userCargo';
 
 interface AuthContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  /** true após get_user_cargo confirmar cargo no servidor (M3) */
+  cargoVerified: boolean;
   login: (email: string, password: string) => Promise<{ requires2FA: boolean; challengeToken?: string }>;
   verify2FA: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -35,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCargo, setLoadingCargo] = useState(false);
+  const [cargoVerified, setCargoVerified] = useState(false);
 
   const mountedRef = useRef(true);
   const initializationCompleteRef = useRef(false);
@@ -56,34 +54,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mountedRef.current || initializationCompleteRef.current) return;
       initializationCompleteRef.current = true;
       setLoading(false);
-      setLoadingCargo(false);
     };
 
     const resolveUserFromSession = async (
-      supabaseUser: Parameters<typeof mapSupabaseUserToUser>[0],
-      options?: { background?: boolean }
+      supabaseUser: Parameters<typeof mapSupabaseUserToUser>[0]
     ) => {
-      const isBackground = options?.background ?? false;
-      const currentUser = userRef.current;
-      const sameUser = currentUser?.id === supabaseUser.id;
-      const hasCachedCargo = sameUser && !!currentUser?.cargo;
-
-      if (isBackground || (sameUser && hasCachedCargo)) {
-        const cachedUser = await mapSupabaseUserToUser(supabaseUser, { preferCache: true });
-        applyUserUpdate(cachedUser);
-        refreshUserCargoInBackground(supabaseUser, applyUserUpdate);
-        return cachedUser;
-      }
-
       if (!mountedRef.current) return null;
 
       setLoadingCargo(true);
+      setCargoVerified(false);
+
       try {
-        const resolvedUser = await mapSupabaseUserToUser(supabaseUser, { preferCache: true });
+        const resolvedUser = await mapSupabaseUserToUser(supabaseUser);
         if (mountedRef.current) {
           applyUserUpdate(resolvedUser);
+          setCargoVerified(true);
         }
         return resolvedUser;
+      } catch (error) {
+        console.error('[AuthContext] Erro ao resolver cargo:', error);
+        if (mountedRef.current) {
+          applyUserUpdate(null);
+          setCargoVerified(false);
+        }
+        return null;
       } finally {
         if (mountedRef.current) {
           setLoadingCargo(false);
@@ -94,9 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initializeAuth = async () => {
       try {
         const { data: { session }, error } = await Promise.race([
-          supabase.auth.getSession(),
+          supabase.auth.validateSession(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('getSession timeout')), SESSION_INIT_TIMEOUT_MS)
+            setTimeout(() => reject(new Error('validateSession timeout')), SESSION_INIT_TIMEOUT_MS)
           ),
         ]);
 
@@ -105,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.error('[AuthContext] Erro ao verificar sessão:', error);
           applyUserUpdate(null);
+          setCargoVerified(false);
           finishInitialLoading();
           return;
         }
@@ -113,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await resolveUserFromSession(session.user);
         } else {
           applyUserUpdate(null);
+          setCargoVerified(false);
         }
 
         finishInitialLoading();
@@ -139,27 +135,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (session?.user) {
-        const currentUser = userRef.current;
-        const isBackgroundRefresh =
-          initializationCompleteRef.current &&
-          (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') &&
-          currentUser?.id === session.user.id &&
-          !!currentUser?.cargo;
-
         try {
-          await resolveUserFromSession(session.user, { background: isBackgroundRefresh });
+          await resolveUserFromSession(session.user);
         } catch (error) {
           console.error('[AuthContext] Erro ao resolver usuário:', error);
           if (!initializationCompleteRef.current) {
             applyUserUpdate(null);
+            setCargoVerified(false);
           }
         }
       } else if (event === 'SIGNED_OUT') {
-        if (userRef.current?.id) {
-          localStorage.removeItem(`user_cargo_${userRef.current.id}`);
-        }
         adminPageCache.clear();
         applyUserUpdate(null);
+        setCargoVerified(false);
         setLoadingCargo(false);
       }
 
@@ -192,15 +180,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.user) {
-      const userData = await mapSupabaseUserToUser(data.user, { preferCache: false });
+      setLoadingCargo(true);
+      setCargoVerified(false);
+
+      const userData = await mapSupabaseUserToUser(data.user);
 
       if (!userData.cargo || userData.cargo !== 'admin') {
         await supabase.auth.signOut();
+        setCargoVerified(false);
+        setLoadingCargo(false);
         throw new Error('Esta conta não possui permissões de administrador');
       }
 
-      setCargoInCache(data.user.id, userData.cargo);
       applyUserUpdate(userData);
+      setCargoVerified(true);
       initializationCompleteRef.current = true;
       setLoading(false);
       setLoadingCargo(false);
@@ -227,15 +220,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.user) {
-      const userData = await mapSupabaseUserToUser(data.user, { preferCache: false });
+      setLoadingCargo(true);
+      setCargoVerified(false);
+
+      const userData = await mapSupabaseUserToUser(data.user);
 
       if (!userData.cargo || userData.cargo !== 'admin') {
         await supabase.auth.signOut();
+        setCargoVerified(false);
+        setLoadingCargo(false);
         throw new Error('Esta conta não possui permissões de administrador');
       }
 
-      setCargoInCache(data.user.id, userData.cargo);
       applyUserUpdate(userData);
+      setCargoVerified(true);
       initializationCompleteRef.current = true;
       setLoading(false);
       setLoadingCargo(false);
@@ -262,21 +260,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(error.message || 'Erro ao fazer logout');
     }
 
-    if (userRef.current?.id) {
-      localStorage.removeItem(`user_cargo_${userRef.current.id}`);
-    }
-
     adminPageCache.clear();
     applyUserUpdate(null);
+    setCargoVerified(false);
     setLoadingCargo(false);
   };
 
-  const isAdmin = useMemo(() => user?.cargo === 'admin', [user?.cargo]);
-  const isAuthenticated = useMemo(() => !!user, [user]);
+  const isAdmin = useMemo(
+    () => cargoVerified && user?.cargo === 'admin',
+    [cargoVerified, user?.cargo]
+  );
+  const isAuthenticated = useMemo(() => !!user && cargoVerified, [user, cargoVerified]);
 
   const value = useMemo(
-    () => ({ user, isAuthenticated, isAdmin, login, verify2FA, logout, loading, loadingCargo }),
-    [user, isAuthenticated, isAdmin, loading, loadingCargo]
+    () => ({
+      user,
+      isAuthenticated,
+      isAdmin,
+      cargoVerified,
+      login,
+      verify2FA,
+      logout,
+      loading,
+      loadingCargo,
+    }),
+    [user, isAuthenticated, isAdmin, cargoVerified, loading, loadingCargo]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

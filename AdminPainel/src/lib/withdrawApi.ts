@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { adminApiFetch } from './adminApiFetch';
 
 export interface ApproveWithdrawResult {
   ok: boolean;
@@ -14,17 +15,12 @@ export interface ApproveWithdrawResult {
 
 export async function approveWithdraw(saqueId: string): Promise<ApproveWithdrawResult> {
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) {
+  if (!data.session?.user) {
     throw new Error('Sessão expirada. Faça login novamente.');
   }
 
-  const response = await fetch('/api/withdraw/approve', {
+  const response = await adminApiFetch('/api/withdraw/approve', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
     body: JSON.stringify({ saque_id: saqueId }),
   });
 

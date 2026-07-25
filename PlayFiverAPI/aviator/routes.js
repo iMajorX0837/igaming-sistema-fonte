@@ -9,8 +9,6 @@ import { createAviatorRounds, MAX_VELAS } from './rounds.js';
 import { createAviatorConfig } from './config.js';
 import { startAviatorRecoveryWatcher } from './recoveryWatcher.js';
 import {
-  createAviatorGameSessionToken,
-  validateAviatorGameSessionToken,
   validateAviatorInternal,
   validateAviatorGameSessionRequest,
 } from '../lib/security.js';
@@ -30,7 +28,6 @@ export function isAviatorGameCode(gameCode, provider) {
 export function buildAviatorLaunchUrl(publicApiUrl, { userCode, lang = 'pt', balance = 0 }) {
   const base = publicApiUrl.replace(/\/$/, '');
   const host = new URL(base).host;
-  const gameSession = createAviatorGameSessionToken(userCode);
   const params = new URLSearchParams({
     param1: userCode,
     param2: 'venuz',
@@ -42,9 +39,6 @@ export function buildAviatorLaunchUrl(publicApiUrl, { userCode, lang = 'pt', bal
     currency: 'BRL',
     balance: String(balance ?? 0),
   });
-  if (gameSession) {
-    params.set('gs_token', gameSession);
-  }
   return `${base}/aviator/?${params.toString()}`;
 }
 
@@ -216,20 +210,7 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
 
   function requireAviatorInternalOrGameSession(req, res, next) {
     if (validateAviatorInternal(req)) return next();
-
-    const userCode = String(
-      req.body?.user_code || req.body?.account || req.query?.account || ''
-    ).trim();
-    const token =
-      req.headers['x-game-session'] ||
-      req.headers['X-Game-Session'] ||
-      req.body?.game_session ||
-      req.query?.gs_token;
-
-    if (userCode && token && validateAviatorGameSessionToken(userCode, token)) {
-      return next();
-    }
-
+    if (validateAviatorGameSessionRequest(req)) return next();
     return res.status(403).json({ ok: false, error: 'Acesso negado' });
   }
 

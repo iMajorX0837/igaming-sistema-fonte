@@ -6,12 +6,16 @@ import { URL } from 'url';
 import { requireMatchingUserCode } from './lib/auth.js';
 import {
   assertProductionSecrets,
+  createAviatorGameSessionToken,
   createCorsMiddleware,
   createRateLimiter,
+  isProduction,
+  validateAviatorInternal,
   validateInternalApiSecret,
   validatePlayFiverWebhook,
   describePlayFiverWebhookRejection,
 } from './lib/security.js';
+import { setAviatorGameSessionCookie } from './lib/authCookies.js';
 import {
   markCupomUsoFreeBonusGranted,
   validateCupomUsoForFreeBonusGrant,
@@ -34,6 +38,7 @@ import { initMisticPayConfig } from './lib/misticpayConfig.js';
 import { initBspayConfig } from './lib/bspayConfig.js';
 import { initVeopagConfig } from './lib/veopagConfig.js';
 import { initPaymentGatewayConfig } from './lib/paymentGatewayConfig.js';
+import { resolveGameLaunchUserContext } from './lib/gameLaunch.js';
 
 dotenv.config();
 assertProductionSecrets();
@@ -43,8 +48,9 @@ const PORT = process.env.PORT || 3000;
 
 /** Aviator próprio (clone Spribe) — ativo por padrão. Desligue com AVIATOR_GAME_ENABLED=false */
 const AVIATOR_GAME_ENABLED = process.env.AVIATOR_GAME_ENABLED !== 'false';
-/** API legada /api/aviator (rodadas Supabase). Desligada por padrão. */
-const AVIATOR_API_ENABLED = process.env.AVIATOR_API_ENABLED === 'true';
+/** API legada /api/aviator (rodadas Supabase). Desligada por padrão; proibida em produção (C6). */
+const AVIATOR_API_ENABLED =
+  process.env.NODE_ENV !== 'production' && process.env.AVIATOR_API_ENABLED === 'true';
 /** Em dev local: não chama api.playfivers.com no game_launch (evita IP bloqueado). */
 const GAME_LAUNCH_MOCK = process.env.GAME_LAUNCH_MOCK === 'true';
 const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
@@ -224,7 +230,7 @@ async function resolvePlayFiversGameName(providerCode, gameCode) {
   return foundGame?.name || fallback;
 }
 
-/** Persiste aposta no Supabase após responder à PlayFivers (evita timeout no game_callback). */
+/** @deprecated Fluxo antigo (C5): saldo+txn agora via RPC processar_callback_playfiver */
 async function persistGameTransaction({
   usuarioId,
   txnId,
@@ -253,7 +259,6 @@ async function persistGameTransaction({
     retorno: win > 0 ? win : 0,
     status: 'Finalizado',
     com_bonus: 'Não',
-    // Horário do servidor (igual Aviator) — created_at da PlayFivers costuma vir 1 dia atrasado
     data: processedAt,
   };
 
@@ -290,6 +295,24 @@ function getGameCallbackNestedKeys(body) {
   );
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function redactUserCode(userCode) {
+  if (!userCode) return '-';
+  if (!isProduction()) return String(userCode);
+  const s = String(userCode);
+  const at = s.indexOf('@');
+  if (at <= 1) return '***';
+  return `${s.slice(0, 2)}***${s.slice(at)}`;
+}
+
 function logGameCallback(level, title, details = {}) {
   const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : '🎯';
   const lines = [
@@ -301,7 +324,7 @@ function logGameCallback(level, title, details = {}) {
 
   if (details.gameType) lines.push(`   game_type: ${details.gameType}`);
   if (details.source) lines.push(`   payload_source: ${details.source}`);
-  if (details.userCode) lines.push(`   user_code: ${details.userCode}`);
+  if (details.userCode) lines.push(`   user_code: ${redactUserCode(details.userCode)}`);
   if (details.txnId) lines.push(`   txn_id: ${details.txnId}`);
   if (details.gameCode) lines.push(`   game_code: ${details.gameCode}`);
   if (details.msg) lines.push(`   msg: ${details.msg}`);
@@ -312,10 +335,12 @@ function logGameCallback(level, title, details = {}) {
   }
   if (details.error) {
     lines.push(`   erro: ${details.error.message || String(details.error)}`);
-    if (details.error.stack) lines.push(details.error.stack);
+    if (!isProduction() && details.error.stack) lines.push(details.error.stack);
   }
-  if (details.extra) lines.push(`   extra: ${safeJsonStringify(details.extra, 4000)}`);
-  if (details.body) {
+  if (details.extra) {
+    lines.push(`   extra: ${safeJsonStringify(details.extra, isProduction() ? 800 : 4000)}`);
+  }
+  if (details.body && !isProduction()) {
     lines.push('   payload:');
     lines.push(safeJsonStringify(details.body));
   }
@@ -413,10 +438,8 @@ function roundMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
-function resolveCallbackBalance(currentBalance, bet, win, userAfterBalance) {
-  if (Number.isFinite(userAfterBalance)) {
-    return roundMoney(userAfterBalance);
-  }
+function resolveCallbackBalance(currentBalance, bet, win, _userAfterBalanceIgnored) {
+  // H2: nunca confiar em user_after_balance do provider — só delta local
   return roundMoney(currentBalance + win - bet);
 }
 
@@ -431,19 +454,6 @@ async function findUsuarioByEmail(userCode) {
     .maybeSingle();
 
   userError = error;
-
-  if (!usuario && (!error || error.code === 'PGRST116')) {
-    const { data: usuarioIlike, error: errorIlike } = await supabase
-      .from('usuarios')
-      .select('id, saldo, email')
-      .ilike('email', trimmedEmail)
-      .maybeSingle();
-
-    if (!errorIlike && usuarioIlike) {
-      usuario = usuarioIlike;
-      userError = null;
-    }
-  }
 
   if (!usuario) {
     const { data: usuarioRpc, error: rpcError } = await supabase.rpc('get_user_by_email', {
@@ -789,7 +799,7 @@ app.use(
 
 // CPF Hub — chaves ficam no servidor
 const cpfHubApiKeys = parseCpfHubApiKeys(process.env.CPFHUB_API_KEY);
-app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys, supabase }));
+app.use('/api/cpfhub', createCpfHubRouter({ apiKeys: cpfHubApiKeys }));
 
 app.use(
   '/api/webhooks',
@@ -958,16 +968,13 @@ async function handleGameCallback(req, res) {
     const extracted = extractGameCallbackPayload(transaction);
 
     if (!extracted) {
-      const { usuario: previewUser } = await findUsuarioByEmail(user_code);
-      const previewBalance = previewUser ? roundMoney(previewUser.saldo) : 0;
-
       return respondGameCallbackError(
         res,
         400,
         `UNSUPPORTED_GAME_TYPE:${game_type || 'unknown'}`,
         {
           ...baseContext,
-          balance: previewBalance,
+          balance: 0,
           extra: {
             type,
             game_type,
@@ -1018,158 +1025,112 @@ async function handleGameCallback(req, res) {
       });
     }
 
-    const { data: existingTransaction } = await supabase
-      .from('transacoes_jogos')
-      .select('id')
-      .eq('txn_id', txnId)
-      .maybeSingle();
+    if (
+      Number.isFinite(userAfterBalance) &&
+      Number.isFinite(userBeforeBalance)
+    ) {
+      const providerDelta = roundMoney(userAfterBalance - userBeforeBalance);
+      const localDelta = roundMoney(win - bet);
+      if (Math.abs(providerDelta - localDelta) > 0.01) {
+        logGameCallback('warn', 'user_after_balance divergente — ignorado (H2)', {
+          ...baseContext,
+          txnId,
+          extra: {
+            user_before_balance: userBeforeBalance,
+            user_after_balance: userAfterBalance,
+            provider_delta: providerDelta,
+            local_delta: localDelta,
+            bet,
+            win,
+          },
+        });
+      }
+    }
 
-    if (existingTransaction) {
-      const { data: usuarioExistente } = await supabase
-        .from('usuarios')
-        .select('saldo')
-        .eq('email', user_code.trim())
-        .maybeSingle();
+    const persistedGameName =
+      resolvePersistedGameName(gameCode, source) ||
+      `Jogo ${gameCode || ''}`.trim() ||
+      'Jogo';
 
-      const balance = usuarioExistente ? parseFloat(usuarioExistente.saldo) || 0 : 0;
+    // C5: crédito + idempotência por txn_id na mesma transação SQL
+    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+      'processar_callback_playfiver',
+      {
+        p_email: user_code,
+        p_txn_id: String(txnId),
+        p_bet: bet,
+        p_win: win,
+        p_jogo: persistedGameName,
+      }
+    );
 
+    if (rpcError) {
+      return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
+        ...baseContext,
+        txnId,
+        gameCode,
+        error: rpcError,
+        extra: { rpc: 'processar_callback_playfiver' },
+      });
+    }
+
+    const result = rpcResult && typeof rpcResult === 'object' ? rpcResult : {};
+    const balance = roundMoney(result.balance);
+
+    if (!result.ok) {
+      const errCode = result.error || 'ERROR_INTERNAL';
+      const status =
+        errCode === 'INVALID_USER'
+          ? 404
+          : errCode === 'INSUFFICIENT_USER_FUNDS'
+            ? 400
+            : errCode === 'INVALID_TXN' || errCode === 'INVALID_AMOUNT'
+              ? 400
+              : 500;
+
+      return respondGameCallbackError(res, status, errCode, {
+        ...baseContext,
+        txnId,
+        gameCode,
+        balance,
+        extra: {
+          type,
+          bet,
+          win,
+          game_type: resolvedGameType,
+          rpc: result,
+        },
+      });
+    }
+
+    if (result.duplicate) {
       logGameCallback('warn', 'Transação duplicada — retornando saldo atual', {
         ...baseContext,
         txnId,
         extra: { balance },
       });
-
-      return res.status(200).json({
-        msg: '',
-        balance,
-      });
-    }
-
-    const { usuario, userError, trimmedEmail } = await findUsuarioByEmail(user_code);
-
-    if (!usuario) {
-      const { data: usuariosSample, error: sampleError } = await supabase
-        .from('usuarios')
-        .select('email')
-        .limit(10);
-
-      return respondGameCallbackError(res, 404, 'INVALID_USER', {
+    } else {
+      logGameCallback('info', 'Aposta processada com sucesso', {
         ...baseContext,
-        txnId,
-        balance: 0,
-        extra: {
-          email_buscado: trimmedEmail,
-          supabase_error: userError,
-          service_key_configurada: !!supabaseServiceKey,
-          emails_exemplo: sampleError ? null : usuariosSample?.map((item) => item.email),
-        },
-      });
-    }
-
-    const currentBalance = roundMoney(usuario.saldo);
-    let workingBalance = currentBalance;
-
-    if (Number.isFinite(userBeforeBalance) && userBeforeBalance >= 0) {
-      if (Math.abs(workingBalance - userBeforeBalance) > 0.01) {
-        logGameCallback('warn', 'Saldo local divergente — usando user_before_balance', {
-          ...baseContext,
-          txnId,
-          extra: {
-            saldo_db: currentBalance,
-            user_before_balance: userBeforeBalance,
-          },
-        });
-        workingBalance = roundMoney(userBeforeBalance);
-      }
-    }
-
-    const debitAmount = roundMoney(Math.max(0, bet - win));
-
-    if (debitAmount > 0 && workingBalance + 1e-6 < debitAmount) {
-      return respondGameCallbackError(res, 400, 'INSUFFICIENT_USER_FUNDS', {
-        ...baseContext,
+        source,
+        gameType: resolvedGameType,
         txnId,
         gameCode,
-        balance: currentBalance,
         extra: {
+          type,
           bet,
           win,
-          debitAmount,
-          saldo_db: currentBalance,
-          saldo_playfivers: workingBalance,
-          game_type: resolvedGameType,
+          saldo_anterior: result.saldo_anterior,
+          saldo_novo: balance,
+          usuario_id: result.usuario_id,
+          playfivers_created_at: createdAt ?? null,
         },
       });
     }
 
-    const newBalance = resolveCallbackBalance(
-      workingBalance,
-      bet,
-      win,
-      userAfterBalance
-    );
-
-    const { error: updateError } = await supabase
-      .from('usuarios')
-      .update({ saldo: newBalance })
-      .eq('id', usuario.id);
-
-    if (updateError) {
-      return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
-        ...baseContext,
-        txnId,
-        gameCode,
-        balance: currentBalance,
-        error: updateError,
-        extra: {
-          usuario_id: usuario.id,
-          saldo_anterior: currentBalance,
-          saldo_novo: newBalance,
-        },
-      });
-    }
-
-    logGameCallback('info', 'Aposta processada com sucesso', {
-      ...baseContext,
-      source,
-      gameType: resolvedGameType,
-      txnId,
-      gameCode,
-      extra: {
-        type,
-        bet,
-        win,
-        saldo_anterior: currentBalance,
-        saldo_novo: newBalance,
-        usuario: usuario.email,
-        playfivers_created_at: createdAt ?? null,
-      },
-    });
-
-    const processedAt = new Date().toISOString();
-    const persistedGameName = resolvePersistedGameName(gameCode, source);
-
-    res.status(200).json({
+    return res.status(200).json({
       msg: '',
-      balance: newBalance,
-    });
-
-    void persistGameTransaction({
-      usuarioId: usuario.id,
-      txnId,
-      bet,
-      win,
-      providerCode,
-      gameCode,
-      processedAt,
-      gameName: persistedGameName,
-    }).catch((error) => {
-      logGameCallback('error', 'Erro ao persistir transação (background)', {
-        ...baseContext,
-        txnId,
-        gameCode,
-        error,
-      });
+      balance,
     });
   } catch (error) {
     return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
@@ -1210,12 +1171,12 @@ app.get(['/webhook', '/api/webhook', '/api'], (req, res) => {
  * GET /dev/game?code=...&user=...
  */
 app.get('/dev/game', (req, res) => {
-  if (process.env.NODE_ENV === 'production' && !GAME_LAUNCH_MOCK) {
+  if (isProduction()) {
     return res.status(404).json({ ok: false, error: 'Não encontrado' });
   }
-  const gameCode = String(req.query.code || 'jogo');
-  const userCode = String(req.query.user || 'teste');
-  const balance = String(req.query.balance || '0');
+  const gameCode = escapeHtml(req.query.code || 'jogo');
+  const userCode = escapeHtml(req.query.user || 'teste');
+  const balance = escapeHtml(req.query.balance || '0');
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
@@ -1308,10 +1269,20 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
       game_code,
       provider,
       game_original,
-      user_balance,
-      user_rtp,
       lang
     } = req.body;
+
+    let launchContext;
+    try {
+      launchContext = await resolveGameLaunchUserContext(supabase, auth.user.id);
+    } catch {
+      return res.status(500).json({
+        status: 0,
+        msg: 'Erro ao consultar saldo do usuário',
+      });
+    }
+
+    const { user_balance, user_rtp } = launchContext;
 
     const { token: agentToken, secret: secretKey } = getPlayFiverCredentials();
 
@@ -1322,11 +1293,15 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
 
     // Aviator próprio — abre o clone local com carteira Supabase
     if (AVIATOR_GAME_ENABLED && isAviatorGameCode(game_code, provider)) {
+      const gameSession = createAviatorGameSessionToken(user_code);
       const launchUrl = buildAviatorLaunchUrl(PUBLIC_API_URL, {
         userCode: user_code,
         lang: lang || 'pt',
         balance: user_balance ?? 0,
       });
+      if (gameSession) {
+        setAviatorGameSessionCookie(res, gameSession);
+      }
       console.log('✈️  game_launch Aviator próprio:', launchUrl);
       return res.status(200).json({
         status: 1,
@@ -1390,8 +1365,8 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
         game_code,
         ...(provider !== undefined && provider !== null && provider !== '' ? { provider } : {}),
         game_original: resolvedGameOriginal,
-        user_balance: user_balance || 0,
-        user_rtp: user_rtp || 70,
+        user_balance,
+        user_rtp,
         lang: lang || 'pt',
       }),
     });
@@ -1628,6 +1603,14 @@ app.post('/api/free_bonus', (_req, res) => {
 // ============================================
 
 if (AVIATOR_API_ENABLED) {
+  /** C6: legado só com secret interno (mesmo critério do wallet bridge). */
+  app.use('/api/aviator', (req, res, next) => {
+    if (validateAviatorInternal(req) || validateInternalApiSecret(req)) {
+      return next();
+    }
+    return res.status(403).json({ ok: false, error: 'Não autorizado' });
+  });
+
 /**
  * Função para gerar multiplicador aleatório entre 1-3x
  */
@@ -2506,6 +2489,9 @@ function startRoundManager() {
 
 // Rota de health check
 app.get('/health', (req, res) => {
+  if (isProduction()) {
+    return res.json({ status: 'ok' });
+  }
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -2516,6 +2502,9 @@ app.get('/health', (req, res) => {
 
 // Rota raiz
 app.get('/', (req, res) => {
+  if (isProduction()) {
+    return res.status(404).json({ ok: false, error: 'Not found' });
+  }
   res.json({
     message: 'Play Fiver Webhook API',
     endpoints: {
@@ -2541,7 +2530,8 @@ app.get('/', (req, res) => {
         authSession: 'GET /api/supabase/auth/session',
       },
       cpfHub: 'GET /api/cpfhub/cpf/:cpf — Consulta CPF (CPF Hub)',
-      webhooksTest: 'POST /api/webhooks/test — Testar webhook (admin)',
+      webhooksAdmin:
+        'GET/POST /api/webhooks — CRUD admin (secret_once só na criação/rotação); POST /api/webhooks/test',
       aviatorGame: AVIATOR_GAME_ENABLED
         ? {
             play: 'GET /aviator/ — Jogo Aviator próprio (clone Spribe)',

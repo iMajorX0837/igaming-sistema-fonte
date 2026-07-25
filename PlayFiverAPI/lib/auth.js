@@ -1,14 +1,12 @@
+import { extractAccessToken } from './authCookies.js';
+
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {import('express').Request} req
+ * @param {{ preferAdmin?: boolean }} [options]
  */
-export async function getAuthUser(supabase, req) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.slice(7).trim();
+export async function getAuthUser(supabase, req, options = {}) {
+  const token = extractAccessToken(req, options);
   if (!token) {
     return null;
   }

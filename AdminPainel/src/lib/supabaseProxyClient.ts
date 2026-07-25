@@ -33,7 +33,7 @@ type QuerySpec = {
 };
 
 type Session = {
-  access_token: string;
+  access_token?: string;
   refresh_token?: string;
   expires_at?: number;
   user: {
@@ -57,6 +57,21 @@ export type SupabaseProxyClientOptions = {
 const DEFAULT_STORAGE_KEY = 'venuz-auth-session';
 
 const AUTH_ERROR_CODES = new Set(['PGRST301', 'PGRST302', 'PGRST303']);
+const REFRESH_MARGIN_SEC = 60;
+
+function purgeLegacyTokenStorage(storageKey: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(storageKey);
+    window.localStorage.removeItem('sb-auth-token');
+  } catch {
+    /* ignore */
+  }
+}
+
+function hasSessionUser(session: Session | null | undefined): session is Session {
+  return !!session?.user?.id;
+}
 
 function isAuthError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -64,11 +79,6 @@ function isAuthError(error: unknown): boolean {
   if (err.code && AUTH_ERROR_CODES.has(err.code)) return true;
   const message = String(err.message ?? '').toLowerCase();
   return message.includes('jwt expired') || message.includes('invalid jwt') || message.includes('jwt malformed');
-}
-
-function isSessionExpired(session: Session): boolean {
-  if (!session.expires_at) return false;
-  return Date.now() >= session.expires_at * 1000 - 30_000;
 }
 
 /** Monta URL legível no DevTools → Network (ex.: select/usuarios/saldo.single) */
@@ -326,11 +336,15 @@ class RealtimeChannel {
 export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = {}) {
   const apiBase = getApiBase(options);
   const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
+  purgeLegacyTokenStorage(storageKey);
+
   const authListeners = new Set<AuthListener>();
   const inflightQueries = new Map<string, Promise<QueryResult<unknown>>>();
   const pollEntries = new Map<string, PollEntry>();
   let pollIntervalId: ReturnType<typeof setInterval> | null = null;
   let pollInFlight = false;
+  let refreshPromise: Promise<Session | null> | null = null;
+  let memorySession: Session | null = null;
 
   function onVisibilityChange(): void {
     if (typeof document !== 'undefined' && !document.hidden) {
@@ -415,18 +429,11 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   }
 
   function readSessionRaw(): Session | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return null;
-      return JSON.parse(raw) as Session;
-    } catch {
-      return null;
-    }
+    return memorySession;
   }
 
   function clearSession(): void {
-    const hadSession = !!readSessionRaw();
+    const hadSession = hasSessionUser(readSessionRaw());
     writeSession(null);
     if (hadSession) {
       notifyAuth('SIGNED_OUT', null);
@@ -434,22 +441,55 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   }
 
   function readSession(): Session | null {
-    const session = readSessionRaw();
-    if (!session) return null;
-    if (isSessionExpired(session)) {
-      clearSession();
-      return null;
-    }
-    return session;
+    return readSessionRaw();
   }
 
   function writeSession(session: Session | null): void {
-    if (typeof window === 'undefined') return;
-    if (!session) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-    window.localStorage.setItem(storageKey, JSON.stringify(session));
+    memorySession = session;
+  }
+
+  function sessionNeedsRefresh(session: Session | null): boolean {
+    if (!hasSessionUser(session)) return false;
+    if (!session.expires_at) return false;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return session.expires_at <= nowSec + REFRESH_MARGIN_SEC;
+  }
+
+  async function performSessionRefresh(): Promise<Session | null> {
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${apiBase}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...options.extraHeaders?.() },
+        });
+        const payload = await response.json();
+
+        if (!response.ok || payload.error || !payload.data?.session?.user) {
+          clearSession();
+          return null;
+        }
+
+        const merged: Session = {
+          ...(readSessionRaw() ?? {}),
+          ...payload.data.session,
+          user: payload.data.session.user,
+        };
+        writeSession(merged);
+        notifyAuth('TOKEN_REFRESHED', merged);
+        return merged;
+      } catch (err) {
+        console.error('[supabase-proxy] refresh session error:', err);
+        clearSession();
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
   }
 
   function notifyAuth(event: string, session: Session | null): void {
@@ -464,11 +504,8 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
   async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
-    headers.set('Content-Type', 'application/json');
-
-    const session = readSession();
-    if (session?.access_token) {
-      headers.set('Authorization', `Bearer ${session.access_token}`);
+    if (!headers.has('Content-Type') && init.body != null) {
+      headers.set('Content-Type', 'application/json');
     }
 
     const extra = options.extraHeaders?.();
@@ -481,6 +518,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     return fetch(`${apiBase}${path}`, {
       ...init,
       headers,
+      credentials: 'include',
     });
   }
 
@@ -528,25 +566,31 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
     /** Valida token no servidor — use só quando precisar confirmar sessão remotamente. */
     async validateSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
-      const local = readSession();
-      if (!local?.access_token) {
-        return { data: { session: null }, error: null };
-      }
-
       const response = await apiFetch('/auth/session');
       const payload = await response.json();
 
-      if (response.status === 401 || isAuthError(payload.error) || payload.error || !payload.data?.session) {
+      if (response.status === 401 || isAuthError(payload.error) || payload.error || !payload.data?.session?.user) {
+        const refreshed = await performSessionRefresh();
+        if (refreshed) {
+          return { data: { session: refreshed }, error: null };
+        }
         clearSession();
         return { data: { session: null }, error: payload.error ?? null };
       }
 
       const merged: Session = {
-        ...local,
+        ...(readSessionRaw() ?? {}),
         ...payload.data.session,
-        user: payload.data.session.user ?? local.user,
+        user: payload.data.session.user,
       };
       writeSession(merged);
+      notifyAuth('INITIAL_SESSION', merged);
+
+      if (sessionNeedsRefresh(merged)) {
+        const refreshed = await performSessionRefresh();
+        return { data: { session: refreshed ?? merged }, error: null };
+      }
+
       return { data: { session: merged }, error: null };
     },
 
@@ -561,7 +605,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
         return { data: { user: null, session: null }, error: payload.error };
       }
 
-      if (payload.data?.session && !payload.data?.requires2FA) {
+      if (payload.data?.session?.user && !payload.data?.requires2FA) {
         writeSession(payload.data.session);
         notifyAuth('SIGNED_IN', payload.data.session);
       }
@@ -587,7 +631,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
         };
       }
 
-      if (payload.data?.session) {
+      if (payload.data?.session?.user) {
         writeSession(payload.data.session);
         notifyAuth('SIGNED_IN', payload.data.session);
       }
@@ -638,7 +682,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
         return { data: { user: null, session: null }, error: payload.error };
       }
 
-      if (payload.data?.session) {
+      if (payload.data?.session?.user) {
         writeSession(payload.data.session);
         notifyAuth('SIGNED_IN', payload.data.session);
       }

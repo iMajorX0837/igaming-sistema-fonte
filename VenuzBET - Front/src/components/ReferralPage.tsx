@@ -100,20 +100,7 @@ export default function ReferralPage() {
             .single();
 
           if (!userError && userData?.link_indicação) {
-            const code = userData.link_indicação as string;
-            setReferralCode(code);
-
-            const { count } = await supabase
-              .from('usuarios')
-              .select('*', { count: 'exact', head: true })
-              .eq('indicado_por', code);
-
-            setTotalReferrals(count || 0);
-
-            const { data: qualifiedData } = await supabase.rpc('count_qualified_referrals', {
-              referral_code_param: code,
-            });
-            setQualifiedReferrals(Number(qualifiedData) || 0);
+            setReferralCode(userData.link_indicação as string);
           }
         }
       } catch (err) {

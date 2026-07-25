@@ -15,13 +15,11 @@ function getDepositApiBasePath(): string {
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) {
+  if (!data.session?.user) {
     throw new Error('Faça login para depositar.');
   }
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
   };
 }
 
@@ -69,6 +67,7 @@ export async function createMisticPayTransaction(
   const res = await fetch(`${getDepositApiBasePath()}/pix/create`, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({
       amount: params.amount,
       cupom_codigo: params.cupom_codigo ?? null,
@@ -119,6 +118,7 @@ export async function checkMisticPayTransaction(
   const res = await fetch(`${getDepositApiBasePath()}/pix/check`, {
     method: 'POST',
     headers,
+    credentials: 'include',
     body: JSON.stringify({
       checkTransactionId: transactionId,
       depositoId: options?.depositoId ?? null,

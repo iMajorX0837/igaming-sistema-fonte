@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
-import { generateWebhookSecret, testWebhook } from '../lib/webhooksApi';
+import {
+  createWebhook,
+  deleteWebhook,
+  listWebhooks,
+  rotateWebhookSecret,
+  testWebhook,
+  updateWebhook,
+  type WebhookPublic,
+} from '../lib/webhooksApi';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-import { Copy, Send, RefreshCw, CheckCircle2, XCircle, Webhook } from 'lucide-react';
+import { Copy, Send, RefreshCw, CheckCircle2, XCircle, Webhook, KeyRound } from 'lucide-react';
 
 const WEBHOOK_EVENTS = [
   { value: 'user.register', label: 'Registro de usuário (user.register)' },
@@ -16,17 +24,6 @@ const WEBHOOK_EVENTS = [
   { value: 'deposit.paid', label: 'Depósito concluído (deposit.paid)' },
   { value: 'withdraw.approved', label: 'Saque aprovado (withdraw.approved)' },
 ] as const;
-
-interface WebhookRow {
-  id: string;
-  nome: string;
-  url: string;
-  evento: string;
-  secret_key: string;
-  ativo: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
 interface DeliveryRow {
   id: string;
@@ -40,11 +37,17 @@ interface DeliveryRow {
   delivered_at: string | null;
 }
 
-const emptyForm = {
+type WebhookForm = {
+  nome: string;
+  url: string;
+  evento: string;
+  ativo: boolean;
+};
+
+const emptyForm: WebhookForm = {
   nome: '',
   url: '',
   evento: 'user.register',
-  secret_key: generateWebhookSecret(),
   ativo: true,
 };
 
@@ -54,33 +57,26 @@ function eventLabel(value: string) {
 
 export default function WebhooksPage() {
   const { showToast } = useToast();
-  const [webhooks, setWebhooks] = useState<WebhookRow[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookPublic[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState(emptyForm);
   const [logsWebhookId, setLogsWebhookId] = useState<string | null>(null);
+  const [secretOnce, setSecretOnce] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('webhooks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        showToast('Erro ao carregar webhooks. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
-        return;
-      }
-
-      setWebhooks((data as WebhookRow[]) ?? []);
-    } catch {
-      showToast('Erro ao carregar webhooks.', 'error');
+      const data = await listWebhooks();
+      setWebhooks(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao carregar webhooks.', 'error');
     } finally {
       setLoading(false);
     }
@@ -115,17 +111,13 @@ export default function WebhooksPage() {
     }
   }, [logsWebhookId, loadDeliveries]);
 
-  const validateForm = (form: typeof emptyForm) => {
+  const validateForm = (form: WebhookForm) => {
     if (!form.nome.trim()) {
       showToast('Informe o nome do webhook.', 'warning');
       return false;
     }
     if (!form.url.trim() || !/^https?:\/\/.+/i.test(form.url.trim())) {
       showToast('Informe uma URL válida (http/https).', 'warning');
-      return false;
-    }
-    if (!form.secret_key.trim()) {
-      showToast('Informe a chave secreta.', 'warning');
       return false;
     }
     return true;
@@ -135,23 +127,20 @@ export default function WebhooksPage() {
     if (!validateForm(createForm)) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('webhooks').insert({
+      const { secret_once } = await createWebhook({
         nome: createForm.nome.trim(),
         url: createForm.url.trim(),
         evento: createForm.evento,
-        secret_key: createForm.secret_key.trim(),
         ativo: createForm.ativo,
       });
 
-      if (error) {
-        showToast(`Erro ao criar: ${error.message}`, 'error');
-        return;
-      }
-
       showToast('Webhook criado!', 'success');
       setIsCreating(false);
-      setCreateForm({ ...emptyForm, secret_key: generateWebhookSecret() });
+      setCreateForm(emptyForm);
+      setSecretOnce(secret_once);
       await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao criar webhook.', 'error');
     } finally {
       setSaving(false);
     }
@@ -161,57 +150,61 @@ export default function WebhooksPage() {
     if (!editingId || !validateForm(editForm)) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('webhooks')
-        .update({
-          nome: editForm.nome.trim(),
-          url: editForm.url.trim(),
-          evento: editForm.evento,
-          secret_key: editForm.secret_key.trim(),
-          ativo: editForm.ativo,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingId);
-
-      if (error) {
-        showToast(`Erro ao salvar: ${error.message}`, 'error');
-        return;
-      }
+      await updateWebhook(editingId, {
+        nome: editForm.nome.trim(),
+        url: editForm.url.trim(),
+        evento: editForm.evento,
+        ativo: editForm.ativo,
+      });
 
       showToast('Webhook atualizado!', 'success');
       setEditingId(null);
       await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao salvar webhook.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleActive = async (row: WebhookRow) => {
-    const { error } = await supabase
-      .from('webhooks')
-      .update({ ativo: !row.ativo, updated_at: new Date().toISOString() })
-      .eq('id', row.id);
-
-    if (error) {
-      showToast('Erro ao alterar status.', 'error');
+  const handleRotateSecret = async (id: string) => {
+    if (!window.confirm('Gerar nova chave secreta? A chave anterior deixa de funcionar imediatamente.')) {
       return;
     }
 
-    await loadData();
+    setRotatingId(id);
+    try {
+      const { secret_once } = await rotateWebhookSecret(id);
+      setSecretOnce(secret_once);
+      showToast('Chave rotacionada. Copie e guarde agora — não será exibida novamente.', 'success');
+      await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao rotacionar chave.', 'error');
+    } finally {
+      setRotatingId(null);
+    }
   };
 
-  const deleteWebhook = async (id: string) => {
+  const toggleActive = async (row: WebhookPublic) => {
+    try {
+      await updateWebhook(row.id, { ativo: !row.ativo });
+      await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao alterar status.', 'error');
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
     if (!window.confirm('Excluir este webhook?')) return;
 
-    const { error } = await supabase.from('webhooks').delete().eq('id', id);
-    if (error) {
-      showToast('Erro ao excluir webhook.', 'error');
-      return;
+    try {
+      await deleteWebhook(id);
+      showToast('Webhook excluído.', 'success');
+      if (logsWebhookId === id) setLogsWebhookId(null);
+      await loadData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao excluir webhook.', 'error');
     }
-
-    showToast('Webhook excluído.', 'success');
-    if (logsWebhookId === id) setLogsWebhookId(null);
-    await loadData();
   };
 
   const handleTest = async (id: string) => {
@@ -237,8 +230,8 @@ export default function WebhooksPage() {
   };
 
   const renderFormFields = (
-    form: typeof emptyForm,
-    setForm: React.Dispatch<React.SetStateAction<typeof emptyForm>>
+    form: WebhookForm,
+    setForm: React.Dispatch<React.SetStateAction<WebhookForm>>
   ) => (
     <div className="space-y-4">
       <div>
@@ -273,19 +266,6 @@ export default function WebhooksPage() {
           ))}
         </select>
       </div>
-      <div>
-        <label className="block text-sm text-admin-muted mb-1">Chave secreta</label>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-lg bg-admin-panel-2 border border-admin-border px-3 py-2 text-admin-foreground font-mono text-xs"
-            value={form.secret_key}
-            onChange={(e) => setForm((f) => ({ ...f, secret_key: e.target.value }))}
-          />
-          <Button type="button" variant="secondary" onClick={() => setForm((f) => ({ ...f, secret_key: generateWebhookSecret() }))}>
-            Gerar
-          </Button>
-        </div>
-      </div>
       <label className="flex items-center gap-2 text-sm text-admin-foreground">
         <input
           type="checkbox"
@@ -304,7 +284,7 @@ export default function WebhooksPage() {
         title="Webhooks"
         description="Dispare eventos do sistema para URLs externas (Meta Ads, n8n, Zapier). Assinatura HMAC-SHA256 no header X-Webhook-Signature."
         actions={
-          <Button onClick={() => { setCreateForm({ ...emptyForm, secret_key: generateWebhookSecret() }); setIsCreating(true); }}>
+          <Button onClick={() => { setCreateForm(emptyForm); setIsCreating(true); }}>
             Novo webhook
           </Button>
         }
@@ -340,11 +320,8 @@ export default function WebhooksPage() {
                     <td className="py-3 pr-4 font-medium text-admin-foreground">{row.nome}</td>
                     <td className="py-3 pr-4 max-w-[220px] truncate text-admin-muted-2" title={row.url}>{row.url}</td>
                     <td className="py-3 pr-4 text-admin-muted-2">{eventLabel(row.evento)}</td>
-                    <td className="py-3 pr-4">
-                      <button type="button" className="inline-flex items-center gap-1 text-xs font-mono text-admin-muted hover:text-admin-foreground" onClick={() => void copySecret(row.secret_key)}>
-                        <Copy className="w-3.5 h-3.5" />
-                        {row.secret_key.slice(0, 8)}…
-                      </button>
+                    <td className="py-3 pr-4 font-mono text-xs text-admin-muted">
+                      {row.secret_prefix}…
                     </td>
                     <td className="py-3 pr-4">
                       <button type="button" onClick={() => void toggleActive(row)} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${row.ativo ? 'bg-emerald-500/15 text-emerald-300' : 'bg-admin-panel-3 text-admin-muted'}`}>
@@ -354,8 +331,12 @@ export default function WebhooksPage() {
                     </td>
                     <td className="py-3">
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="secondary" onClick={() => { setEditingId(row.id); setEditForm({ nome: row.nome, url: row.url, evento: row.evento, secret_key: row.secret_key, ativo: row.ativo }); }}>
+                        <Button variant="secondary" onClick={() => { setEditingId(row.id); setEditForm({ nome: row.nome, url: row.url, evento: row.evento, ativo: row.ativo }); }}>
                           Editar
+                        </Button>
+                        <Button variant="secondary" disabled={rotatingId === row.id} onClick={() => void handleRotateSecret(row.id)}>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          {rotatingId === row.id ? 'Rotacionando…' : 'Rotacionar secret'}
                         </Button>
                         <Button variant="secondary" disabled={testingId === row.id} onClick={() => void handleTest(row.id)}>
                           <Send className="w-3.5 h-3.5" />
@@ -364,7 +345,7 @@ export default function WebhooksPage() {
                         <Button variant="secondary" onClick={() => setLogsWebhookId(row.id)}>
                           Logs
                         </Button>
-                        <Button variant="danger" onClick={() => void deleteWebhook(row.id)}>
+                        <Button variant="danger" onClick={() => void handleDeleteWebhook(row.id)}>
                           Excluir
                         </Button>
                       </div>
@@ -378,6 +359,9 @@ export default function WebhooksPage() {
       )}
 
       <Modal open={isCreating} onClose={() => setIsCreating(false)} title="Novo webhook">
+        <p className="text-sm text-admin-muted mb-4">
+          A chave secreta será gerada no servidor e exibida uma única vez após a criação.
+        </p>
         {renderFormFields(createForm, setCreateForm)}
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="secondary" onClick={() => setIsCreating(false)}>Cancelar</Button>
@@ -390,6 +374,26 @@ export default function WebhooksPage() {
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="secondary" onClick={() => setEditingId(null)}>Cancelar</Button>
           <Button onClick={() => void saveEdit()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!secretOnce} onClose={() => setSecretOnce(null)} title="Chave secreta (copie agora)">
+        <p className="text-sm text-amber-200/90 mb-4">
+          Esta chave não será exibida novamente. Guarde em local seguro (gerenciador de senhas ou variável de ambiente no receptor).
+        </p>
+        <div className="flex gap-2">
+          <input
+            readOnly
+            className="flex-1 rounded-lg bg-admin-panel-2 border border-admin-border px-3 py-2 text-admin-foreground font-mono text-xs"
+            value={secretOnce ?? ''}
+          />
+          <Button type="button" variant="secondary" onClick={() => secretOnce && void copySecret(secretOnce)}>
+            <Copy className="w-3.5 h-3.5" />
+            Copiar
+          </Button>
+        </div>
+        <div className="flex justify-end mt-6">
+          <Button onClick={() => setSecretOnce(null)}>Entendi</Button>
         </div>
       </Modal>
 

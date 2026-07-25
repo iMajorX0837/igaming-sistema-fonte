@@ -1,4 +1,4 @@
-import { normalizeInternalHref } from '../lib/cmsLink';
+import { normalizeInternalHref, isSafeCmsHref } from '../lib/cmsLink';
 import type { SidebarLanguage } from '../i18n/sidebar';
 import {
   getSidebarMenuLabel,
@@ -64,8 +64,14 @@ export function SidebarMenuItemIcon({
 }
 
 export function getSidebarMenuItemHref(item: SidebarMenuItem): string {
-  if (item.link_tipo === 'href') return item.href ? normalizeInternalHref(item.href) : '#';
-  if (item.link_tipo === 'external') return item.action_value || '#';
+  if (item.link_tipo === 'href') {
+    const href = item.href ? normalizeInternalHref(item.href) : '/';
+    return isSafeCmsHref(href) ? href : '#';
+  }
+  if (item.link_tipo === 'external') {
+    const ext = item.action_value || '';
+    return ext && isSafeCmsHref(ext) ? ext : '#';
+  }
   if (item.link_tipo === 'game') return '#';
   if (item.link_tipo === 'event') return '#';
   return '#';

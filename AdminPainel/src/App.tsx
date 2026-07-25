@@ -31,12 +31,9 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { AdminSiteBrandProvider } from './contexts/AdminSiteBrandContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isAdmin, loading, loadingCargo, user } = useAuth();
+  const { isAuthenticated, isAdmin, loading, loadingCargo, cargoVerified } = useAuth();
 
-  const isInitialAuth = loading || (loadingCargo && !user);
-  const waitingForCargo = isAuthenticated && !user?.cargo && loadingCargo;
-
-  if (isInitialAuth || waitingForCargo) {
+  if (loading || loadingCargo || !cargoVerified) {
     return <LoadingSpinner />;
   }
 
@@ -44,7 +41,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!user?.cargo || !isAdmin) {
+  if (!isAdmin) {
     return <Navigate to="/login" replace />;
   }
 
@@ -52,27 +49,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, isAdmin, loading, loadingCargo, cargoVerified } = useAuth();
   const navigate = useNavigate();
   const redirectAttempted = useRef(false);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || loadingCargo || !cargoVerified) return;
 
-    if (isAuthenticated && !redirectAttempted.current) {
+    if (isAuthenticated && isAdmin && !redirectAttempted.current) {
       redirectAttempted.current = true;
       requestAnimationFrame(() => {
         navigate('/dashboard', { replace: true });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, loading]);
+  }, [isAuthenticated, isAdmin, loading, loadingCargo, cargoVerified]);
 
-  if (loading || (isAuthenticated && !user?.cargo)) {
+  if (loading || loadingCargo || (isAuthenticated && !cargoVerified)) {
     return <LoadingSpinner />;
   }
 
-  if (isAuthenticated) {
+  if (isAuthenticated && isAdmin) {
     return <LoadingSpinner />;
   }
 
