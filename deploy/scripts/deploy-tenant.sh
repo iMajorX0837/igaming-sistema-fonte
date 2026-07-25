@@ -3,6 +3,7 @@
 #   cd /opt/venuzbet/deploy && ./scripts/deploy-tenant.sh
 #   cd /opt/venuzbet/deploy && ./scripts/deploy-tenant.sh stewgaming
 #   NO_CACHE=1 ./scripts/deploy-tenant.sh stewgaming
+#   CLEAN=1 ./scripts/deploy-tenant.sh           — para tudo, apaga assets, rebuild sem cache
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,6 +16,7 @@ usage() {
   echo "Uso: $0 [tenant]"
   echo "  tenant padrão: stewgaming"
   echo "  NO_CACHE=1 $0        — rebuild Docker sem cache"
+  echo "  CLEAN=1 $0           — stop + limpa front/admin + build --no-cache + recreate"
   exit 1
 }
 
@@ -27,25 +29,45 @@ if [[ ! -f "$ENV_API" ]]; then
 fi
 
 BUILD_EXTRA=()
-if [[ "${NO_CACHE:-}" == "1" ]]; then
+if [[ "${NO_CACHE:-}" == "1" || "${CLEAN:-}" == "1" ]]; then
   BUILD_EXTRA+=(--no-cache)
 fi
 
-echo "==> [1/5] git pull ($REPO_ROOT)"
+TENANT_DIR="$ROOT_DIR/tenants/$TENANT"
+
+echo "==> [1/6] git pull ($REPO_ROOT)"
 cd "$REPO_ROOT"
 git pull
 
-echo "==> [2/5] Build imagem API ${BUILD_EXTRA[*]:-"(cache)"}"
 cd "$ROOT_DIR"
+
+if [[ "${CLEAN:-}" == "1" ]]; then
+  echo "==> [2/6] Parar API + nginx e limpar assets ($TENANT)"
+  docker compose --profile "$TENANT" stop "$SERVICE" nginx 2>/dev/null || true
+  rm -rf "$TENANT_DIR/front" "$TENANT_DIR/admin"
+  mkdir -p "$TENANT_DIR/front" "$TENANT_DIR/admin"
+  docker builder prune -f >/dev/null 2>&1 || true
+  STEP_BUILD=3
+  STEP_TENANT=4
+  STEP_UP=5
+  STEP_HEALTH=6
+else
+  STEP_BUILD=2
+  STEP_TENANT=3
+  STEP_UP=4
+  STEP_HEALTH=5
+fi
+
+echo "==> [$STEP_BUILD/6] Build imagem API ${BUILD_EXTRA[*]:-"(cache)"}"
 docker compose build "${BUILD_EXTRA[@]}"
 
-echo "==> [3/5] Build front + admin ($TENANT)"
+echo "==> [$STEP_TENANT/6] Build front + admin ($TENANT)"
 bash "$ROOT_DIR/scripts/build-tenant.sh" "$TENANT"
 
-echo "==> [4/5] Subir API + nginx (--force-recreate)"
+echo "==> [$STEP_UP/6] Subir API + nginx (--force-recreate)"
 docker compose --profile "$TENANT" up -d --force-recreate "$SERVICE" nginx
 
-echo "==> [5/5] Healthcheck (aguarda 20s)"
+echo "==> [$STEP_HEALTH/6] Healthcheck (aguarda 20s)"
 sleep 20
 
 if docker compose exec -T nginx wget -qO- "http://${SERVICE}:3000/health" 2>/dev/null; then
