@@ -35,9 +35,11 @@ fi
 
 TENANT_DIR="$ROOT_DIR/tenants/$TENANT"
 
-echo "==> [1/6] git pull ($REPO_ROOT)"
+echo "==> [1/6] Atualizar código ($REPO_ROOT)"
 cd "$REPO_ROOT"
-git pull
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+git fetch origin
+git reset --hard "origin/$BRANCH"
 
 cd "$ROOT_DIR"
 
