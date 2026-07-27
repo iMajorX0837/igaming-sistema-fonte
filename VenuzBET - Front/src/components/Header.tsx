@@ -18,6 +18,56 @@ import { useAuthModalsConfig, useFooterConfig } from '../contexts/SiteConfigCont
 import { preloadRegisterModalImage } from '../lib/authModalImages';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import { openLiveSupportWhatsapp } from '../lib/liveSupport';
+import Notification from './Notification';
+
+const BALANCE_TOGGLE_COOLDOWN_MS = 20_000;
+const BALANCE_VIEW_STORAGE_PREFIX = 'venuz_header_balance_view';
+const BALANCE_COOLDOWN_STORAGE_PREFIX = 'venuz_header_balance_cooldown';
+
+function getStoredBalanceView(userId: string): 'real' | 'bonus' {
+  try {
+    const raw = localStorage.getItem(`${BALANCE_VIEW_STORAGE_PREFIX}:${userId}`);
+    return raw === 'bonus' ? 'bonus' : 'real';
+  } catch {
+    return 'real';
+  }
+}
+
+function storeBalanceView(userId: string, view: 'real' | 'bonus') {
+  try {
+    localStorage.setItem(`${BALANCE_VIEW_STORAGE_PREFIX}:${userId}`, view);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function getStoredCooldownUntil(userId: string): number | null {
+  try {
+    const raw = localStorage.getItem(`${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`);
+    if (!raw) return null;
+    const until = Number(raw);
+    if (!Number.isFinite(until) || until <= Date.now()) {
+      localStorage.removeItem(`${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`);
+      return null;
+    }
+    return until;
+  } catch {
+    return null;
+  }
+}
+
+function storeCooldownUntil(userId: string, until: number | null) {
+  try {
+    const key = `${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`;
+    if (until === null || until <= Date.now()) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, String(until));
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 const accountMenuItemClass =
   'flex items-center gap-3 px-4 py-1.5 text-sm text-[#CBD5E1] transition-colors duration-200 hover:text-white hover:no-underline';
@@ -69,6 +119,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [saldo, setSaldo] = useState<number>(0);
+  const [saldoBonus, setSaldoBonus] = useState<number>(0);
+  const [balanceView, setBalanceView] = useState<'real' | 'bonus'>('real');
+  const [toggleCooldownUntil, setToggleCooldownUntil] = useState<number | null>(null);
+  const [cooldownTick, setCooldownTick] = useState(0);
+  const [notification, setNotification] = useState<string | null>(null);
   
   const isEsportesPage = location.pathname === '/esportes';
   const sidebarOffsetPx = isSidebarOpen ? SIDEBAR_WIDTH_EXPANDED_PX : SIDEBAR_WIDTH_COLLAPSED_PX;
@@ -126,13 +181,23 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     }
   }, [isAuthenticated, isRegisterOpen]);
 
+  useEffect(() => {
+    if (user?.id) {
+      setBalanceView(getStoredBalanceView(user.id));
+      setToggleCooldownUntil(getStoredCooldownUntil(user.id));
+    } else {
+      setBalanceView('real');
+      setToggleCooldownUntil(null);
+    }
+  }, [user?.id]);
+
   // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
       try {
         const { data, error } = await supabase
           .from('usuarios')
-          .select('saldo')
+          .select('saldo, saldo_bonus')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -143,12 +208,14 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
 
         if (data) {
           setSaldo(data.saldo || 0);
+          setSaldoBonus(Number(data.saldo_bonus) || 0);
         }
       } catch (error) {
         console.error('Erro ao buscar saldo:', error);
       }
     } else {
       setSaldo(0);
+      setSaldoBonus(0);
     }
   }, [isAuthenticated, user]);
 
@@ -175,6 +242,9 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
           if (payload.new && 'saldo' in payload.new) {
             setSaldo(payload.new.saldo as number);
           }
+          if (payload.new && 'saldo_bonus' in payload.new) {
+            setSaldoBonus(Number(payload.new.saldo_bonus) || 0);
+          }
         }
       )
       .subscribe();
@@ -193,6 +263,63 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
       maximumFractionDigits: 2,
     }).format(valor);
   }, [language]);
+
+  const formatBonusSaldo = useCallback((valor: number): string => {
+    const amount = new Intl.NumberFormat(getLocaleForLanguage(language), {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(valor);
+    return `B$ ${amount}`;
+  }, [language]);
+
+  const isBalanceToggleOnCooldown =
+    toggleCooldownUntil !== null && Date.now() < toggleCooldownUntil;
+
+  const balanceToggleCooldownSeconds =
+    toggleCooldownUntil !== null && Date.now() < toggleCooldownUntil
+      ? Math.max(1, Math.ceil((toggleCooldownUntil - Date.now()) / 1000))
+      : 0;
+
+  useEffect(() => {
+    if (!toggleCooldownUntil) return;
+
+    const interval = window.setInterval(() => {
+      if (Date.now() >= toggleCooldownUntil) {
+        setToggleCooldownUntil(null);
+        if (user?.id) {
+          storeCooldownUntil(user.id, null);
+        }
+      }
+      setCooldownTick((value) => value + 1);
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [toggleCooldownUntil, user?.id]);
+
+  const handleToggleBalanceView = useCallback(() => {
+    const now = Date.now();
+    if (toggleCooldownUntil !== null && now < toggleCooldownUntil) {
+      const secs = Math.max(1, Math.ceil((toggleCooldownUntil - now) / 1000));
+      setNotification(
+        `Aguarde ${secs}s para alternar entre saldo real e bônus.`,
+      );
+      return;
+    }
+
+    const nextView = balanceView === 'real' ? 'bonus' : 'real';
+    const cooldownUntil = now + BALANCE_TOGGLE_COOLDOWN_MS;
+    setBalanceView(nextView);
+    if (user?.id) {
+      storeBalanceView(user.id, nextView);
+      storeCooldownUntil(user.id, cooldownUntil);
+    }
+    setToggleCooldownUntil(cooldownUntil);
+    setNotification(
+      nextView === 'real'
+        ? 'Saldo disponível (R$) em destaque.'
+        : 'Bônus disponível (B$) em destaque.',
+    );
+  }, [balanceView, toggleCooldownUntil, user?.id]);
 
   useEffect(() => {
     // Fecha o menu ao clicar fora dele
@@ -214,7 +341,13 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
 
   return (
     <>
-      <div className="w-full flex-shrink-0 border-b border-white/10 relative z-[60]" style={{ backgroundColor: headerConfig.fundo }}>
+    <Notification
+      isOpen={notification !== null}
+      onClose={() => setNotification(null)}
+      message={notification ?? ''}
+      duration={4000}
+    />
+    <div className="w-full flex-shrink-0 border-b border-white/10 relative z-[60]" style={{ backgroundColor: headerConfig.fundo }}>
       <header className="flex items-center h-[72px] w-full max-w-[1919px] mx-auto relative">
           <div className="hidden md:flex items-center gap-2 absolute left-4 top-1/2 -translate-y-1/2 z-10">
               <a
@@ -295,15 +428,48 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
             {isAuthenticated && user ? (
               <>
                 <div className="flex items-center gap-1.5 rounded-lg px-1.5 py-0.5">
-                  <div className="cursor-pointer text-white">
-                    <span 
-                      className="iconify" 
-                      data-icon="fa6-solid:coins" 
-                      aria-hidden="true" 
-                      style={{ fontSize: '18px', color: '#FFFFFF' }}
-                    ></span>
+                  <button
+                    type="button"
+                    onClick={handleToggleBalanceView}
+                    className="group relative shrink-0 cursor-pointer"
+                    aria-label={
+                      balanceView === 'real'
+                        ? 'Alternar para bônus disponível'
+                        : 'Alternar para saldo disponível'
+                    }
+                    title={
+                      isBalanceToggleOnCooldown
+                        ? `Aguarde ${balanceToggleCooldownSeconds}s para alternar`
+                        : balanceView === 'real'
+                          ? 'Clique para destacar bônus (B$)'
+                          : 'Clique para destacar saldo real (R$)'
+                    }
+                  >
+                    <span
+                      className="iconify text-white transition-colors duration-200 group-hover:text-[var(--brand-primary)]"
+                      data-icon="fa6-solid:coins"
+                      aria-hidden="true"
+                      style={{ fontSize: '18px' }}
+                    />
+                    {isBalanceToggleOnCooldown ? (
+                      <span className="absolute -bottom-1 -right-1 min-w-[14px] rounded-full bg-slate-800 px-0.5 text-[8px] font-bold leading-none text-amber-300">
+                        {balanceToggleCooldownSeconds}
+                      </span>
+                    ) : null}
+                  </button>
+                  <div className="flex flex-col min-w-0">
+                    {balanceView === 'real' ? (
+                      <>
+                        <p className="text-white font-bold text-sm leading-tight">{formatSaldo(saldo)}</p>
+                        <p className="text-white text-sm leading-tight">{formatBonusSaldo(saldoBonus)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-white font-bold text-sm leading-tight">{formatBonusSaldo(saldoBonus)}</p>
+                        <p className="text-white text-sm leading-tight">{formatSaldo(saldo)}</p>
+                      </>
+                    )}
                   </div>
-                  <p className="text-white font-bold text-sm">{formatSaldo(saldo)}</p>
                   <div className="relative ml-1">
                     <div className="pix rounded-full flex items-center justify-center gap-0.5 px-1 py-0.5 absolute -top-3 left-1/2 transform -translate-x-1/2 z-10" style={{ backgroundColor: '#FFD700', color: '#000000' }}>
                       <span className="iconify i-ic:baseline-pix" data-icon="ic:baseline-pix" aria-hidden="true" style={{ fontSize: '8px', color: '#000000' }}></span> <span style={{ color: '#000000', fontSize: '9px', fontWeight: '600' }}>PIX</span>

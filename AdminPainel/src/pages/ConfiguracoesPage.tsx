@@ -22,6 +22,7 @@ interface PlataformaConfig {
   saque_maximo: number;
   saques_diarios_permitidos: number;
   rollover_padrao: number;
+  rollover_giros_gratis: number;
   indicacao_recompensa: number;
   indicacao_deposito_minimo: number;
 }
@@ -74,7 +75,7 @@ export default function ConfiguracoesPage() {
   const [saving, setSaving] = useState(false);
   const [depositoForm, setDepositoForm] = useState({ minimo: '20', maximo: '1000000' });
   const [saqueForm, setSaqueForm] = useState({ minimo: '50', maximo: '1000000', diarios: '1' });
-  const [rolloverForm, setRolloverForm] = useState({ padrao: '1' });
+  const [rolloverForm, setRolloverForm] = useState({ padrao: '1', girosGratis: '5' });
   const [indicacaoForm, setIndicacaoForm] = useState({ recompensa: '100', depositoMinimo: '50' });
 
   const loadConfig = async () => {
@@ -101,6 +102,7 @@ export default function ConfiguracoesPage() {
         });
         setRolloverForm({
           padrao: String(result.rollover_padrao ?? 1),
+          girosGratis: String(result.rollover_giros_gratis ?? 5),
         });
         setIndicacaoForm({
           recompensa: String(result.indicacao_recompensa ?? 100),
@@ -165,6 +167,8 @@ export default function ConfiguracoesPage() {
     if (saquesDiarios === null) return;
     const rolloverPadrao = parseRollover(rolloverForm.padrao, 'Rollover padrão');
     if (rolloverPadrao === null) return;
+    const rolloverGirosGratis = parseRollover(rolloverForm.girosGratis, 'Rollover de giros grátis');
+    if (rolloverGirosGratis === null) return;
     const indicacaoRecompensa = parseNonNegative(indicacaoForm.recompensa, 'Recompensa do indicador');
     if (indicacaoRecompensa === null) return;
     const indicacaoDepositoMin = parseNonNegative(
@@ -191,6 +195,7 @@ export default function ConfiguracoesPage() {
         p_saque_maximo: saqueMax,
         p_saques_diarios_permitidos: saquesDiarios,
         p_rollover_padrao: rolloverPadrao,
+        p_rollover_giros_gratis: rolloverGirosGratis,
         p_indicacao_recompensa: indicacaoRecompensa,
         p_indicacao_deposito_minimo: indicacaoDepositoMin,
       });
@@ -222,6 +227,13 @@ export default function ConfiguracoesPage() {
       ? 'Desativado'
       : Number.isFinite(rolloverValue)
         ? `${rolloverValue}x`
+        : '—';
+  const rolloverGirosValue = Number(rolloverForm.girosGratis.replace(',', '.').trim());
+  const rolloverGirosSummary =
+    Number.isFinite(rolloverGirosValue) && rolloverGirosValue === 0
+      ? 'Desativado'
+      : Number.isFinite(rolloverGirosValue)
+        ? `${rolloverGirosValue}x`
         : '—';
 
   return (
@@ -312,18 +324,30 @@ export default function ConfiguracoesPage() {
           <ConfigSection
             icon={Repeat}
             title="Rollover"
-            description="Múltiplo exigido em apostas antes de liberar saque."
+            description="Múltiplos exigidos em apostas antes de liberar saque ou converter bônus."
           >
-            <FormField
-              label="Rollover padrão (x)"
-              required
-              hint="Ex.: 2x em depósito de R$ 50 exige R$ 100 em apostas. Use 0 para desativar."
-              type="number"
-              min="0"
-              step="1"
-              value={rolloverForm.padrao}
-              onChange={(v) => setRolloverForm({ ...rolloverForm, padrao: v })}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                label="Rollover padrão — depósitos (x)"
+                required
+                hint="Ex.: 2x em depósito de R$ 50 exige R$ 100 em apostas. Use 0 para desativar."
+                type="number"
+                min="0"
+                step="1"
+                value={rolloverForm.padrao}
+                onChange={(v) => setRolloverForm({ ...rolloverForm, padrao: v })}
+              />
+              <FormField
+                label="Rollover giros grátis (x)"
+                required
+                hint="Ex.: 5x em ganho de R$ 100 exige R$ 500 em apostas para converter o bônus."
+                type="number"
+                min="0"
+                step="1"
+                value={rolloverForm.girosGratis}
+                onChange={(v) => setRolloverForm({ ...rolloverForm, girosGratis: v })}
+              />
+            </div>
           </ConfigSection>
 
           <ConfigSection
@@ -384,7 +408,8 @@ export default function ConfiguracoesPage() {
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
                 Rollover
               </p>
-              <SummaryRow label="Padrão" value={rolloverSummary} />
+              <SummaryRow label="Depósitos" value={rolloverSummary} />
+              <SummaryRow label="Giros grátis" value={rolloverGirosSummary} />
 
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 pt-3 pb-1">
                 Indique e Ganhe

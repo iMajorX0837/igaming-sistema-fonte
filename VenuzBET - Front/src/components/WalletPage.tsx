@@ -19,6 +19,7 @@ import {
   type FreeBonusItem,
 } from '../lib/freeBonus';
 import { resolveGameByGameCode } from '../utils/resolveGameBySlug';
+import { converterBonusSaldo, obterBonusUsuario } from '../lib/bonusWallet';
 import LoadingScreen from './LoadingScreen';
 import { appPageContainerClass } from '../constants/homeLayout';
 
@@ -105,6 +106,14 @@ function WalletTransactionMobileCard({
             />
           </>
         )}
+        {activeTab === 'bonus' && (
+          <>
+            <WalletMobileField label="Tipo" value={String(item.tipo ?? '—')} />
+            <WalletMobileField label="Descrição" value={String(item.descricao ?? '—')} />
+            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
+            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+          </>
+        )}
       </div>
       {activeTab === 'rodadas' && String(item.statusApi ?? '').toLowerCase() === 'pending' && (
         <button
@@ -133,6 +142,13 @@ export default function WalletPage() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [saldo, setSaldo] = useState<number>(0);
+  const [saldoBonus, setSaldoBonus] = useState<number>(0);
+  const [rolloverBonusPendente, setRolloverBonusPendente] = useState<number>(0);
+  const [rolloverGirosGratis, setRolloverGirosGratis] = useState<number>(5);
+  const [podeConverterBonus, setPodeConverterBonus] = useState(false);
+  const [convertingBonus, setConvertingBonus] = useState(false);
+  const [loadingBonus, setLoadingBonus] = useState(false);
+  const [bonusConversoes, setBonusConversoes] = useState<Array<{ id: string; valor: number; created_at: string }>>([]);
   const [saques, setSaques] = useState<any[]>([]);
   const [depositos, setDepositos] = useState<any[]>([]);
   const [transacoesJogos, setTransacoesJogos] = useState<any[]>([]);
@@ -291,6 +307,81 @@ export default function WalletPage() {
     }).format(valor);
   };
 
+  const fetchBonusStatus = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setSaldoBonus(0);
+      setRolloverBonusPendente(0);
+      setPodeConverterBonus(false);
+      return;
+    }
+
+    setLoadingBonus(true);
+    try {
+      const status = await obterBonusUsuario();
+      if (status) {
+        setSaldoBonus(status.saldoBonus);
+        setRolloverBonusPendente(status.rolloverBonusPendente);
+        setRolloverGirosGratis(status.rolloverGirosGratis);
+        setPodeConverterBonus(status.podeConverter);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar bônus:', error);
+    } finally {
+      setLoadingBonus(false);
+    }
+  }, [isAuthenticated, user]);
+
+  const fetchBonusConversoes = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setBonusConversoes([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('bonus_conversoes')
+        .select('id, valor, created_at')
+        .eq('usuario_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Erro ao buscar conversões de bônus:', error);
+        return;
+      }
+
+      setBonusConversoes(data ?? []);
+    } catch (error) {
+      console.error('Erro ao buscar conversões de bônus:', error);
+    }
+  }, [isAuthenticated, user]);
+
+  const handleConverterBonus = async () => {
+    if (!podeConverterBonus || convertingBonus) return;
+
+    setConvertingBonus(true);
+    try {
+      const result = await converterBonusSaldo();
+      if (!result.ok) {
+        setNotification(result.msg || 'Não foi possível converter o bônus.');
+        return;
+      }
+
+      setSaldo(result.saldo ?? saldo + (result.valorConvertido ?? 0));
+      setSaldoBonus(0);
+      setRolloverBonusPendente(0);
+      setPodeConverterBonus(false);
+      setNotification(
+        `Bônus convertido: ${formatCurrency(result.valorConvertido ?? 0)} adicionados ao saldo disponível.`,
+      );
+      void fetchBonusConversoes();
+    } catch (error) {
+      console.error('Erro ao converter bônus:', error);
+      setNotification('Erro ao converter bônus. Tente novamente.');
+    } finally {
+      setConvertingBonus(false);
+    }
+  };
+
   // Função para buscar saldo do usuário
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
@@ -317,10 +408,14 @@ export default function WalletPage() {
     }
   }, [isAuthenticated, user]);
 
-  // Buscar saldo quando o usuário está autenticado
   useEffect(() => {
     fetchSaldo();
-  }, [fetchSaldo]);
+    void fetchBonusStatus();
+  }, [fetchSaldo, fetchBonusStatus]);
+
+  useEffect(() => {
+    void fetchBonusConversoes();
+  }, [fetchBonusConversoes]);
 
   // Buscar saques quando o usuário está autenticado
   useEffect(() => {
@@ -351,7 +446,11 @@ export default function WalletPage() {
     if (activeTab === 'rodadas') {
       void fetchFreeBonuses();
     }
-  }, [activeTab, fetchCupons, fetchFreeBonuses]);
+    if (activeTab === 'bonus') {
+      void fetchBonusConversoes();
+      void fetchTransacoesJogos();
+    }
+  }, [activeTab, fetchCupons, fetchFreeBonuses, fetchBonusConversoes, fetchTransacoesJogos]);
 
   // Listener para mudanças no saldo em tempo real
   useEffect(() => {
@@ -370,6 +469,15 @@ export default function WalletPage() {
         (payload) => {
           if (payload.new && 'saldo' in payload.new) {
             setSaldo(payload.new.saldo as number);
+          }
+          if (payload.new && 'saldo_bonus' in payload.new) {
+            setSaldoBonus(Number(payload.new.saldo_bonus) || 0);
+          }
+          if (payload.new && 'rollover_bonus_pendente' in payload.new) {
+            const pendente = Number(payload.new.rollover_bonus_pendente) || 0;
+            setRolloverBonusPendente(pendente);
+            const bonus = Number(payload.new.saldo_bonus) || 0;
+            setPodeConverterBonus(bonus > 0.009 && pendente <= 0.009);
           }
         }
       )
@@ -395,8 +503,8 @@ export default function WalletPage() {
           filter: `usuario_id=eq.${user.id}`,
         },
         () => {
-          // Recarregar transações quando uma nova for inserida
-          fetchTransacoesJogos();
+          void fetchTransacoesJogos();
+          void fetchBonusStatus();
         }
       )
       .subscribe();
@@ -404,7 +512,7 @@ export default function WalletPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, user, fetchTransacoesJogos]);
+  }, [isAuthenticated, user, fetchTransacoesJogos, fetchBonusStatus]);
 
   // Formatar saldo para exibição
   const formatSaldo = (valor: number): string => {
@@ -475,6 +583,27 @@ export default function WalletPage() {
       data: cupom.data,
     }));
 
+  const bonusFormatted = [
+    ...transacoesJogos
+      .filter((transacao) => transacao.com_bonus === 'Sim')
+      .map((transacao) => ({
+        id: transacao.txn_id || transacao.id,
+        tipo: 'Ganho',
+        descricao: transacao.jogo || 'Rodadas grátis',
+        valor: formatCurrency(transacao.retorno || 0),
+        data: formatDate(transacao.data || transacao.created_at),
+        sortDate: transacao.data || transacao.created_at,
+      })),
+    ...bonusConversoes.map((conversao) => ({
+      id: conversao.id,
+      tipo: 'Conversão',
+      descricao: 'Convertido para saldo disponível',
+      valor: formatCurrency(conversao.valor),
+      data: formatDate(conversao.created_at),
+      sortDate: conversao.created_at,
+    })),
+  ].sort((a, b) => new Date(String(b.sortDate)).getTime() - new Date(String(a.sortDate)).getTime());
+
   const rodadasFormatted = freeBonuses.map((bonus) => ({
     id: String(bonus.id),
     jogo: bonus.game_name,
@@ -535,7 +664,7 @@ export default function WalletPage() {
           : activeTab === 'rodadas'
             ? rodadasFormatted
             : activeTab === 'bonus'
-              ? []
+              ? bonusFormatted
               : activeTab === 'depositos'
                 ? depositsFormatted
                 : transactionsFormatted;
@@ -808,14 +937,30 @@ export default function WalletPage() {
                       </g>
                       </svg>
                     <div className="min-w-0">
-                      <p className="text-white font-bold text-lg md:text-xl">B$ 0,00</p>
+                      <p className="text-white font-bold text-lg md:text-xl">
+                        {loadingBonus ? '...' : formatSaldo(saldoBonus)}
+                      </p>
                       <p className="text-slate-400 text-[10px] md:text-xs uppercase">Bônus disponível</p>
                     </div>
                   </div>
                 </div>
+                {rolloverBonusPendente > 0 && saldoBonus > 0 ? (
+                  <p className="text-amber-300 text-[10px] md:text-xs mb-2">
+                    Rollover: aposte mais {formatSaldo(rolloverBonusPendente)} para converter ({rolloverGirosGratis}x)
+                  </p>
+                ) : null}
                 <div>
-                  <button type="button" disabled className="w-full h-9 rounded-lg bg-slate-600 text-slate-400 text-xs font-bold transition-all cursor-not-allowed opacity-50">
-                    Converter
+                  <button
+                    type="button"
+                    onClick={() => void handleConverterBonus()}
+                    disabled={!podeConverterBonus || convertingBonus || loadingBonus}
+                    className={`w-full h-9 rounded-lg text-xs font-bold transition-all ${
+                      podeConverterBonus && !convertingBonus
+                        ? 'bg-brand hover:bg-brand-hover text-white'
+                        : 'bg-slate-600 text-slate-400 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    {convertingBonus ? 'Convertendo...' : 'Converter'}
                   </button>
                 </div>
               </div>
@@ -916,9 +1061,48 @@ export default function WalletPage() {
 
               <div className="overflow-x-auto">
                 {activeTab === 'bonus' ? (
-                  <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhum registro encontrado</p>
-                  </div>
+                  loadingBonus && bonusFormatted.length === 0 ? (
+                    <LoadingScreen variant="inline" className="py-12 md:py-20" />
+                  ) : bonusFormatted.length === 0 ? (
+                    <div className="py-12 md:py-20 px-3">
+                      <p className="text-slate-400 text-xs md:text-sm text-center">Nenhum registro encontrado</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2 p-1 md:hidden">
+                        {currentTransactions.map((item: Record<string, unknown>, index: number) => (
+                          <WalletTransactionMobileCard
+                            key={`${String(item.id ?? index)}-${index}`}
+                            activeTab={activeTab}
+                            item={item}
+                            backgroundColor={index % 2 === 0 ? homeConfig.fundo : walletRowAltBg}
+                            playingRodadaId={playingRodadaId}
+                            onPlayRodada={handleJogarRodadas}
+                          />
+                        ))}
+                      </div>
+                      <table className="hidden md:table w-full">
+                        <thead>
+                          <tr className="border-b border-slate-700/50 bg-slate-800/30">
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Tipo</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Descrição</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Valor</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentTransactions.map((item: Record<string, unknown>, index: number) => (
+                            <tr key={index} className="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors">
+                              <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-white align-middle">{String(item.tipo ?? '—')}</td>
+                              <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-slate-300 align-middle">{String(item.descricao ?? '—')}</td>
+                              <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-white whitespace-nowrap align-middle">{String(item.valor ?? '—')}</td>
+                              <td className="px-2 py-2 md:px-4 md:py-3 text-[10px] md:text-sm text-slate-400 whitespace-nowrap align-middle">{String(item.data ?? '—')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )
                 ) : (activeTab === 'transacoes' && loadingTransacoes) ? (
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'transacoes' && transactionsFormatted.length === 0) ? (
