@@ -493,7 +493,14 @@ GRANT EXECUTE ON FUNCTION public.processar_callback_playfiver(TEXT, TEXT, NUMERI
 
 -- =============================================================================
 -- Aviator — respeita carteira_ativa
+-- (DROP necessário: RETURN TABLE de _aviator_resolve_usuario mudou)
 -- =============================================================================
+DROP FUNCTION IF EXISTS public.aviator_registrar_perda(TEXT, TEXT, NUMERIC);
+DROP FUNCTION IF EXISTS public.aviator_reembolsar_saldo(TEXT, NUMERIC, TEXT);
+DROP FUNCTION IF EXISTS public.aviator_creditar_saldo(TEXT, NUMERIC, TEXT, NUMERIC, TEXT);
+DROP FUNCTION IF EXISTS public.aviator_debit_saldo(TEXT, NUMERIC, TEXT);
+DROP FUNCTION IF EXISTS public._aviator_resolve_usuario(TEXT);
+
 CREATE OR REPLACE FUNCTION public._aviator_resolve_usuario(p_email TEXT)
 RETURNS TABLE (
   usuario_id UUID,

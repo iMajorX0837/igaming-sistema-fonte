@@ -11,6 +11,7 @@ import { X } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef, type ReactNode, type RefObject } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { syncWalletPreference, getStoredBalanceView } from '../lib/walletPreference';
 import { useListenOpenMobileMenu } from '../hooks/useListenOpenMobileMenu';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
@@ -459,6 +460,8 @@ export default function GamePage({
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [saldo, setSaldo] = useState<number>(0);
+  const [saldoBonus, setSaldoBonus] = useState<number>(0);
+  const [balanceView, setBalanceView] = useState<'real' | 'bonus'>('real');
   const [saldoLoaded, setSaldoLoaded] = useState(false);
   const [dismissedDepositPrompt, setDismissedDepositPrompt] = useState(false);
   const [gameUrl, setGameUrl] = useState<string | null>(() => {
@@ -472,11 +475,25 @@ export default function GamePage({
   const fetchSaldo = useCallback(async () => {
     if (isAuthenticated && user) {
       try {
-        const { data, error } = await supabase
+        const view = getStoredBalanceView(user.id);
+        setBalanceView(view);
+
+        let { data, error } = await supabase
           .from('usuarios')
-          .select('saldo, email')
+          .select('saldo, saldo_bonus, carteira_ativa, email')
           .eq('id', user.id)
           .maybeSingle();
+
+        if (error) {
+          const msg = String(error.message || '').toLowerCase();
+          if (msg.includes('carteira_ativa') || (msg.includes('column') && msg.includes('does not exist'))) {
+            ({ data, error } = await supabase
+              .from('usuarios')
+              .select('saldo, saldo_bonus, email')
+              .eq('id', user.id)
+              .maybeSingle());
+          }
+        }
 
         if (error) {
           console.error('Erro ao buscar saldo:', error);
@@ -484,15 +501,21 @@ export default function GamePage({
         }
 
         if (data) {
-          setSaldo(parseFloat(String(data.saldo)) || 0);
+          const real = parseFloat(String(data.saldo)) || 0;
+          const bonus = parseFloat(String(data.saldo_bonus)) || 0;
+          setSaldo(real);
+          setSaldoBonus(bonus);
+          setBalanceView(view);
           setSaldoLoaded(true);
-          return data;
+          return { ...data, playableBalance: view === 'bonus' ? bonus : real };
         }
       } catch (error) {
         console.error('Erro ao buscar saldo:', error);
       }
     } else {
       setSaldo(0);
+      setSaldoBonus(0);
+      setBalanceView('real');
       setSaldoLoaded(false);
     }
     return null;
@@ -511,6 +534,13 @@ export default function GamePage({
     setError(null);
 
     try {
+      if (user?.id) {
+        const syncedView = await syncWalletPreference(user.id);
+        setBalanceView(syncedView);
+      }
+
+      const activeWallet = user?.id ? getStoredBalanceView(user.id) : balanceView;
+
       // Buscar saldo e dados do usuário ANTES de lançar o jogo
       const userData = await fetchSaldo();
       
@@ -537,6 +567,7 @@ export default function GamePage({
         body: JSON.stringify({
           user_code: userCode,
           game_code: gameCode,
+          carteira_ativa: activeWallet,
           ...(launchProvider ? { provider: launchProvider } : {}),
           game_original:
             gameOriginal ||
@@ -601,6 +632,13 @@ export default function GamePage({
         (payload) => {
           if (payload.new && 'saldo' in payload.new) {
             setSaldo(parseFloat(String(payload.new.saldo)) || 0);
+          }
+          if (payload.new && 'saldo_bonus' in payload.new) {
+            setSaldoBonus(parseFloat(String(payload.new.saldo_bonus)) || 0);
+          }
+          if (payload.new && 'carteira_ativa' in payload.new) {
+            const carteira = payload.new.carteira_ativa === 'bonus' ? 'bonus' : 'real';
+            setBalanceView(carteira);
           }
         }
       )
@@ -747,7 +785,8 @@ export default function GamePage({
     </div>
   );
 
-  const showInsufficientBalance = saldoLoaded && saldo <= 0 && !dismissedDepositPrompt;
+  const playableBalance = balanceView === 'bonus' ? saldoBonus : saldo;
+  const showInsufficientBalance = saldoLoaded && playableBalance <= 0 && !dismissedDepositPrompt;
 
   const handleDepositFromGame = () => setIsDepositOpen(true);
   const handlePlayWithoutDeposit = () => setDismissedDepositPrompt(true);

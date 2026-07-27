@@ -82,11 +82,15 @@ export async function syncWalletPreference(userId: string): Promise<WalletView> 
   const local = getStoredBalanceView(userId);
   const remote = await obterCarteiraAtiva();
 
-  if (remote) {
-    storeBalanceView(userId, remote);
-    return remote;
+  // RPC indisponível (patch não aplicado): mantém escolha local no header
+  if (remote === null) {
+    return local;
   }
 
-  await definirCarteiraAtiva(local);
+  // Header/localStorage é a fonte da escolha do jogador — envia pro servidor
+  if (local !== remote) {
+    await definirCarteiraAtiva(local);
+  }
+
   return local;
 }

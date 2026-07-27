@@ -15,12 +15,45 @@ export function getPlayFiverUserRtp() {
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
  */
-export async function resolveGameLaunchUserContext(supabase, userId) {
-  const { data, error } = await supabase
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} userId
+ * @param {'real' | 'bonus' | null | undefined} [preferredCarteira]
+ */
+export async function resolveGameLaunchUserContext(supabase, userId, preferredCarteira) {
+  const carteiraPref =
+    preferredCarteira === 'bonus' ? 'bonus' : preferredCarteira === 'real' ? 'real' : null;
+
+  if (carteiraPref) {
+    const { error: persistError } = await supabase
+      .from('usuarios')
+      .update({ carteira_ativa: carteiraPref })
+      .eq('id', userId);
+
+    if (persistError && !String(persistError.message || '').toLowerCase().includes('carteira_ativa')) {
+      console.warn('[game_launch] persistir carteira_ativa:', persistError.message);
+    }
+  }
+
+  const baseSelect = 'saldo, saldo_bonus';
+
+  let { data, error } = await supabase
     .from('usuarios')
-    .select('saldo, saldo_bonus, carteira_ativa')
+    .select(`${baseSelect}, carteira_ativa`)
     .eq('id', userId)
     .maybeSingle();
+
+  if (error) {
+    const msg = String(error.message || '').toLowerCase();
+    if (msg.includes('carteira_ativa') || (msg.includes('column') && msg.includes('does not exist'))) {
+      ({ data, error } = await supabase
+        .from('usuarios')
+        .select(baseSelect)
+        .eq('id', userId)
+        .maybeSingle());
+      if (data) data.carteira_ativa = 'real';
+    }
+  }
 
   if (error) {
     console.error('[game_launch] consulta saldo:', error);
@@ -29,12 +62,15 @@ export async function resolveGameLaunchUserContext(supabase, userId) {
 
   const saldo = Number(data?.saldo ?? 0);
   const saldoBonus = Number(data?.saldo_bonus ?? 0);
-  const carteira = data?.carteira_ativa === 'bonus' ? 'bonus' : 'real';
+  const carteira =
+    carteiraPref ??
+    (data?.carteira_ativa === 'bonus' ? 'bonus' : 'real');
   const walletAmount = carteira === 'bonus' ? saldoBonus : saldo;
   const user_balance = Math.round(Math.max(0, walletAmount) * 100) / 100;
 
   return {
     user_balance,
     user_rtp: getPlayFiverUserRtp(),
+    carteira_ativa: carteira,
   };
 }

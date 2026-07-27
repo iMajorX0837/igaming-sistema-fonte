@@ -455,16 +455,82 @@ function getPlayableBalance(usuario) {
   return roundMoney(value);
 }
 
+function normalizeUsuarioCarteira(usuario) {
+  if (!usuario || typeof usuario !== 'object') return usuario;
+  if (usuario.carteira_ativa !== 'bonus') {
+    usuario.carteira_ativa = 'real';
+  }
+  return usuario;
+}
+
+function isMissingCarteiraColumnError(error) {
+  const msg = String(error?.message || error?.details || '').toLowerCase();
+  return msg.includes('carteira_ativa') || msg.includes('column') && msg.includes('does not exist');
+}
+
+async function queryUsuarioByEmail(trimmedEmail, includeCarteira = true) {
+  const baseSelect = 'id, saldo, saldo_bonus, email';
+  const select = includeCarteira ? `${baseSelect}, carteira_ativa` : baseSelect;
+
+  let { data, error } = await supabase
+    .from('usuarios')
+    .select(select)
+    .eq('email', trimmedEmail)
+    .maybeSingle();
+
+  if (error && includeCarteira && isMissingCarteiraColumnError(error)) {
+    ({ data, error } = await supabase
+      .from('usuarios')
+      .select(baseSelect)
+      .eq('email', trimmedEmail)
+      .maybeSingle());
+    if (data) data.carteira_ativa = 'real';
+  }
+
+  if (!data && !error) {
+    let ilikeResult = await supabase
+      .from('usuarios')
+      .select(select)
+      .ilike('email', trimmedEmail)
+      .maybeSingle();
+
+    if (ilikeResult.error && includeCarteira && isMissingCarteiraColumnError(ilikeResult.error)) {
+      ilikeResult = await supabase
+        .from('usuarios')
+        .select(baseSelect)
+        .ilike('email', trimmedEmail)
+        .maybeSingle();
+      if (ilikeResult.data) ilikeResult.data.carteira_ativa = 'real';
+    }
+
+    data = ilikeResult.data;
+    error = ilikeResult.error;
+  }
+
+  return { data: normalizeUsuarioCarteira(data), error };
+}
+
+async function fetchPlayableBalanceForUser(userCode, rpcResult) {
+  const { usuario } = await findUsuarioByEmail(userCode);
+  if (usuario) {
+    return getPlayableBalance(usuario);
+  }
+
+  if (rpcResult?.carteira_ativa != null) {
+    const carteira = rpcResult.carteira_ativa === 'bonus' ? 'bonus' : 'real';
+    const saldo = Number(rpcResult.saldo ?? 0);
+    const saldoBonus = Number(rpcResult.saldo_bonus ?? 0);
+    return carteira === 'bonus' ? roundMoney(saldoBonus) : roundMoney(saldo);
+  }
+
+  return roundMoney(rpcResult?.balance ?? 0);
+}
+
 async function findUsuarioByEmail(userCode) {
   const trimmedEmail = String(userCode || '').trim();
   let userError = null;
 
-  let { data: usuario, error } = await supabase
-    .from('usuarios')
-    .select('id, saldo, saldo_bonus, carteira_ativa, email')
-    .eq('email', trimmedEmail)
-    .maybeSingle();
-
+  let { data: usuario, error } = await queryUsuarioByEmail(trimmedEmail, true);
   userError = error;
 
   if (!usuario) {
@@ -473,7 +539,7 @@ async function findUsuarioByEmail(userCode) {
     });
 
     if (!rpcError && usuarioRpc && usuarioRpc.length > 0) {
-      usuario = usuarioRpc[0];
+      usuario = normalizeUsuarioCarteira(usuarioRpc[0]);
       userError = null;
     }
   }
@@ -1087,7 +1153,7 @@ async function handleGameCallback(req, res) {
     }
 
     const result = rpcResult && typeof rpcResult === 'object' ? rpcResult : {};
-    const balance = roundMoney(result.balance);
+    const balance = await fetchPlayableBalanceForUser(user_code, result);
 
     if (!result.ok) {
       const errCode = result.error || 'ERROR_INTERNAL';
@@ -1281,12 +1347,16 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
       game_code,
       provider,
       game_original,
-      lang
+      lang,
+      carteira_ativa: carteiraAtivaBody,
     } = req.body;
+
+    const preferredCarteira =
+      carteiraAtivaBody === 'bonus' ? 'bonus' : carteiraAtivaBody === 'real' ? 'real' : null;
 
     let launchContext;
     try {
-      launchContext = await resolveGameLaunchUserContext(supabase, auth.user.id);
+      launchContext = await resolveGameLaunchUserContext(supabase, auth.user.id, preferredCarteira);
     } catch {
       return res.status(500).json({
         status: 0,
@@ -1300,7 +1370,11 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
 
     console.log(
       '🎮 Requisição de game_launch recebida:',
-      JSON.stringify({ user_code, game_code, provider, game_original }, null, 2)
+      JSON.stringify(
+        { user_code, game_code, provider, game_original, carteira_ativa: preferredCarteira },
+        null,
+        2
+      )
     );
 
     // Aviator próprio — abre o clone local com carteira Supabase
