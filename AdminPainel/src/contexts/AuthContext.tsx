@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.error('[AuthContext] Erro ao verificar sessão:', error);
           applyUserUpdate(null);
-          setCargoVerified(false);
+          setCargoVerified(true);
           finishInitialLoading();
           return;
         }
@@ -108,12 +108,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await resolveUserFromSession(session.user);
         } else {
           applyUserUpdate(null);
-          setCargoVerified(false);
+          setCargoVerified(true);
         }
 
         finishInitialLoading();
       } catch (error) {
         console.warn('[AuthContext] initializeAuth falhou, aguardando onAuthStateChange:', error);
+        applyUserUpdate(null);
+        setCargoVerified(true);
         initTimeoutId = setTimeout(() => {
           if (mountedRef.current && !initializationCompleteRef.current) {
             console.warn('[AuthContext] Timeout de inicialização, liberando UI');
@@ -144,10 +146,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setCargoVerified(false);
           }
         }
-      } else if (event === 'SIGNED_OUT') {
-        adminPageCache.clear();
+      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session?.user)) {
+        if (event === 'SIGNED_OUT') {
+          adminPageCache.clear();
+        }
         applyUserUpdate(null);
-        setCargoVerified(false);
+        setCargoVerified(true);
         setLoadingCargo(false);
       }
 

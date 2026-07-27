@@ -31,9 +31,9 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { AdminSiteBrandProvider } from './contexts/AdminSiteBrandContext';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isAdmin, loading, loadingCargo, cargoVerified } = useAuth();
+  const { isAuthenticated, isAdmin, loading, loadingCargo, cargoVerified, user } = useAuth();
 
-  if (loading || loadingCargo || !cargoVerified) {
+  if (loading || loadingCargo || (user !== null && !cargoVerified)) {
     return <LoadingSpinner />;
   }
 

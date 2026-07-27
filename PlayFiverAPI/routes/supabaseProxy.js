@@ -31,6 +31,7 @@ import {
   get2FAChallenge,
   isAdminSessionElevated,
   markAdminSessionElevated,
+  revokeAdminSessionElevation,
   transferAdminSessionElevation,
   verifyTotpCode,
 } from '../lib/adminTwoFactor.js';
@@ -202,7 +203,7 @@ export function createSupabaseProxyRouter({
     }
 
     // Com 2FA ativo, só sessão elevada (login no painel + TOTP) acessa APIs admin.
-    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token)) {
+    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token, req)) {
       res.status(403).json({
         data: null,
         error: { message: '2FA necessário. Entre pelo painel administrativo.' },
@@ -265,7 +266,7 @@ export function createSupabaseProxyRouter({
 
           // Admin sem 2FA no painel: eleva a sessão para APIs admin.
           if (data.session?.access_token) {
-            markAdminSessionElevated(data.session.access_token);
+            markAdminSessionElevated(data.session.access_token, undefined, res);
           }
         }
         // Front (ou qualquer cliente sem header admin-panel):
@@ -323,7 +324,7 @@ export function createSupabaseProxyRouter({
 
       consume2FAChallenge(challengeToken);
       if (pendingSession.session?.access_token) {
-        markAdminSessionElevated(pendingSession.session.access_token);
+        markAdminSessionElevated(pendingSession.session.access_token, undefined, res);
         setAuthCookies(res, req, pendingSession.session);
       }
       res.json({
@@ -582,6 +583,7 @@ export function createSupabaseProxyRouter({
     try {
       const auth = await getAuthUser(req);
       if (auth?.token) {
+        revokeAdminSessionElevation(auth.token, res);
         const userClient = createUserClient(auth.token);
         await userClient.auth.signOut();
       }
@@ -596,8 +598,33 @@ export function createSupabaseProxyRouter({
   /** GET /api/supabase/auth/session */
   router.get('/auth/session', async (req, res) => {
     try {
-      const auth = await getAuthUser(req);
+      const adminClient = isAdminClient(req);
+      let auth = await getAuthUser(req, { preferAdmin: adminClient });
+
       if (!auth) {
+        const refreshToken = extractRefreshToken(req, { preferAdmin: adminClient });
+        if (refreshToken) {
+          const { data, error } = await authClient.auth.refreshSession({
+            refresh_token: refreshToken,
+          });
+
+          if (!error && data?.session?.access_token) {
+            const oldToken = extractAccessToken(req, { preferAdmin: adminClient });
+            if (oldToken) {
+              transferAdminSessionElevation(oldToken, data.session.access_token, req, res);
+            }
+            setAuthCookies(res, req, data.session);
+            return res.json({
+              data: { session: sanitizeSessionForClient(data.session) },
+              error: null,
+            });
+          }
+
+          if (error) {
+            clearAuthCookies(res, req);
+          }
+        }
+
         return res.json({ data: { session: null }, error: null });
       }
 
@@ -627,7 +654,8 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/refresh */
   router.post('/auth/refresh', authRefreshRateLimit, async (req, res) => {
     try {
-      const refreshToken = extractRefreshToken(req);
+      const adminClient = isAdminClient(req);
+      const refreshToken = extractRefreshToken(req, { preferAdmin: adminClient });
       if (!refreshToken) {
         return res.status(401).json({
           data: { session: null },
@@ -647,9 +675,9 @@ export function createSupabaseProxyRouter({
         });
       }
 
-      const oldToken = extractAccessToken(req);
+      const oldToken = extractAccessToken(req, { preferAdmin: adminClient });
       if (oldToken && data?.session?.access_token) {
-        transferAdminSessionElevation(oldToken, data.session.access_token);
+        transferAdminSessionElevation(oldToken, data.session.access_token, req, res);
       }
 
       if (data?.session?.access_token) {
@@ -766,7 +794,7 @@ export function createSupabaseProxyRouter({
     const record = await getAdmin2FARecord(auth.user.id);
     const isAdmin = record?.cargo === 'admin';
     const needsElevation = !!(isAdmin && record.two_factor_enabled && record.totp_secret);
-    const elevated = isAdminSessionElevated(auth.token);
+    const elevated = isAdminSessionElevated(auth.token, req);
 
     // Admin elevado (ou sem 2FA): bypass deny-list de RPCs.
     if (isAdmin && (!needsElevation || elevated)) {

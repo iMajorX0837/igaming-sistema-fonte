@@ -613,13 +613,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
       const response = await apiFetch('/auth/session');
       const payload = await response.json();
 
-      if (response.status === 401 || payload.error || !payload.data?.session?.user) {
-        if (sessionNeedsRefresh(readSession())) {
-          const refreshed = await performSessionRefresh();
-          if (refreshed) {
-            return { data: { session: refreshed }, error: null };
-          }
-        }
+      if (!payload.data?.session?.user) {
         clearSessionAndNotify();
         return { data: { session: null }, error: payload.error ?? null };
       }
@@ -634,7 +628,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
       if (sessionNeedsRefresh(merged)) {
         const refreshed = await performSessionRefresh();
-        return { data: { session: refreshed ?? merged }, error: refreshed ? null : null };
+        return { data: { session: refreshed ?? merged }, error: null };
       }
 
       return { data: { session: merged }, error: null };

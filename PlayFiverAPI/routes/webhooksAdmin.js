@@ -71,7 +71,7 @@ export function createWebhooksAdminRouter({ supabase, supabaseUrl, supabaseAnonK
     if (
       adminRow?.two_factor_enabled &&
       adminRow?.totp_secret &&
-      !isAdminSessionElevated(token)
+      !isAdminSessionElevated(token, req)
     ) {
       return res.status(403).json({
         ok: false,

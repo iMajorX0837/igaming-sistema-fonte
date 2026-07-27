@@ -4,6 +4,8 @@ const USER_ACCESS = 'venuz_at';
 const USER_REFRESH = 'venuz_rt';
 const ADMIN_ACCESS = 'venuz_admin_at';
 const ADMIN_REFRESH = 'venuz_admin_rt';
+/** Sessão admin elevada (2FA ok) — sobrevive restart da API. */
+export const ADMIN_ELEVATION = 'venuz_admin_elev';
 /** M9: sessão do jogo Aviator — HttpOnly, nunca na query string. */
 export const AVIATOR_GAME_SESSION = 'venuz_gs';
 const AVIATOR_GS_MAX_AGE_SEC = 86_400;
@@ -99,9 +101,37 @@ export function clearAuthCookies(res, req, { both = false } = {}) {
     const names = cookieNames(scope);
     cookies.push(buildClearCookie(names.access));
     cookies.push(buildClearCookie(names.refresh));
+    if (scope === 'admin') {
+      cookies.push(buildClearCookie(ADMIN_ELEVATION));
+    }
   }
 
   res.setHeader('Set-Cookie', cookies);
+}
+
+export function setAdminElevationCookie(res, value, maxAgeSec) {
+  if (!value) return;
+  const cookie = buildCookie(ADMIN_ELEVATION, value, maxAgeSec);
+  const existing = res.getHeader('Set-Cookie');
+  if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else if (existing) {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', cookie);
+  }
+}
+
+export function clearAdminElevationCookie(res) {
+  const cookie = buildClearCookie(ADMIN_ELEVATION);
+  const existing = res.getHeader('Set-Cookie');
+  if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else if (existing) {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', cookie);
+  }
 }
 
 export function extractAccessToken(req, options = {}) {

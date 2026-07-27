@@ -569,11 +569,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
       const response = await apiFetch('/auth/session');
       const payload = await response.json();
 
-      if (response.status === 401 || isAuthError(payload.error) || payload.error || !payload.data?.session?.user) {
-        const refreshed = await performSessionRefresh();
-        if (refreshed) {
-          return { data: { session: refreshed }, error: null };
-        }
+      if (!payload.data?.session?.user) {
         clearSession();
         return { data: { session: null }, error: payload.error ?? null };
       }
