@@ -151,6 +151,31 @@ function getPlayFiverAgentToken() {
   return (process.env.PLAYFIVER_AGENT_TOKEN || '').trim();
 }
 
+/**
+ * Formato real dos callbacks PlayFivers (produção): type + user_code (+ slot/sport/live).
+ * agent_code/agent_secret no body nem sempre vêm — ver logs do painel PlayFivers.
+ */
+export function isPlayFiverCallbackBody(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+
+  const type = String(body.type || '').trim().toUpperCase();
+  const userCode = String(body.user_code || '').trim();
+  if (!type || !userCode) return false;
+
+  if (type === 'BALANCE' || type === 'WINBET') return true;
+  if (body.game_type) return true;
+  if (body.slot || body.sport || body.sports || body.live) return true;
+
+  return false;
+}
+
+function isPlayFiverWebhookTrustEnabled() {
+  const raw = String(process.env.PLAYFIVER_WEBHOOK_TRUST_CALLBACK ?? '').trim().toLowerCase();
+  if (raw === 'false' || raw === '0' || raw === 'no') return false;
+  // Padrão true: PlayFivers chama só com type/user_code; sem isso saldo nos jogos fica 0.
+  return true;
+}
+
 /** Credenciais no body — PlayFivers usa agent_code/agent_secret ou agent_token/secret_key. */
 function extractPlayFiverWebhookCredentials(body) {
   const payload = body && typeof body === 'object' ? body : {};
@@ -226,6 +251,10 @@ export function validatePlayFiverWebhook(req) {
     return true;
   }
 
+  if (isPlayFiverWebhookTrustEnabled() && isPlayFiverCallbackBody(req.body)) {
+    return true;
+  }
+
   return false;
 }
 
@@ -256,6 +285,12 @@ export function describePlayFiverWebhookRejection(req) {
     }
   } else {
     parts.push('body_agent_code_ausente');
+  }
+
+  if (isPlayFiverCallbackBody(body)) {
+    parts.push(
+      isPlayFiverWebhookTrustEnabled() ? 'trust_callback_habilitado' : 'trust_callback_desabilitado'
+    );
   }
 
   return parts.join(', ');

@@ -2654,7 +2654,7 @@ app.get('/', (req, res) => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`🔗 Callback PlayFivers (único): http://localhost:${PORT}/webhook`);
+  console.log(`🔗 Callback PlayFivers (único): ${PUBLIC_API_URL}/webhook`);
   console.log('   Aliases aceitos: /api/webhook · /api · /game_callback');
   console.log(`📚 Catálogo (providers/games): http://localhost:${PORT}/api/v2/providers`);
   console.log(`🎮 Game Launch Proxy: http://localhost:${PORT}/api/game_launch`);
