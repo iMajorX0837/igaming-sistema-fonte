@@ -18,7 +18,7 @@ export function getPlayFiverUserRtp() {
 export async function resolveGameLaunchUserContext(supabase, userId) {
   const { data, error } = await supabase
     .from('usuarios')
-    .select('saldo, saldo_bonus')
+    .select('saldo, saldo_bonus, carteira_ativa')
     .eq('id', userId)
     .maybeSingle();
 
@@ -29,8 +29,9 @@ export async function resolveGameLaunchUserContext(supabase, userId) {
 
   const saldo = Number(data?.saldo ?? 0);
   const saldoBonus = Number(data?.saldo_bonus ?? 0);
-  const total = (Number.isFinite(saldo) ? saldo : 0) + (Number.isFinite(saldoBonus) ? saldoBonus : 0);
-  const user_balance = Math.round(Math.max(0, total) * 100) / 100;
+  const carteira = data?.carteira_ativa === 'bonus' ? 'bonus' : 'real';
+  const walletAmount = carteira === 'bonus' ? saldoBonus : saldo;
+  const user_balance = Math.round(Math.max(0, walletAmount) * 100) / 100;
 
   return {
     user_balance,

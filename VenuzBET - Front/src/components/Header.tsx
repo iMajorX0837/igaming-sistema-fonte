@@ -19,55 +19,15 @@ import { preloadRegisterModalImage } from '../lib/authModalImages';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import { openLiveSupportWhatsapp } from '../lib/liveSupport';
 import Notification from './Notification';
-
-const BALANCE_TOGGLE_COOLDOWN_MS = 20_000;
-const BALANCE_VIEW_STORAGE_PREFIX = 'venuz_header_balance_view';
-const BALANCE_COOLDOWN_STORAGE_PREFIX = 'venuz_header_balance_cooldown';
-
-function getStoredBalanceView(userId: string): 'real' | 'bonus' {
-  try {
-    const raw = localStorage.getItem(`${BALANCE_VIEW_STORAGE_PREFIX}:${userId}`);
-    return raw === 'bonus' ? 'bonus' : 'real';
-  } catch {
-    return 'real';
-  }
-}
-
-function storeBalanceView(userId: string, view: 'real' | 'bonus') {
-  try {
-    localStorage.setItem(`${BALANCE_VIEW_STORAGE_PREFIX}:${userId}`, view);
-  } catch {
-    // ignore quota / private mode
-  }
-}
-
-function getStoredCooldownUntil(userId: string): number | null {
-  try {
-    const raw = localStorage.getItem(`${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`);
-    if (!raw) return null;
-    const until = Number(raw);
-    if (!Number.isFinite(until) || until <= Date.now()) {
-      localStorage.removeItem(`${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`);
-      return null;
-    }
-    return until;
-  } catch {
-    return null;
-  }
-}
-
-function storeCooldownUntil(userId: string, until: number | null) {
-  try {
-    const key = `${BALANCE_COOLDOWN_STORAGE_PREFIX}:${userId}`;
-    if (until === null || until <= Date.now()) {
-      localStorage.removeItem(key);
-      return;
-    }
-    localStorage.setItem(key, String(until));
-  } catch {
-    // ignore quota / private mode
-  }
-}
+import {
+  BALANCE_TOGGLE_COOLDOWN_MS,
+  definirCarteiraAtiva,
+  getStoredCooldownUntil,
+  storeBalanceView,
+  storeCooldownUntil,
+  syncWalletPreference,
+  type WalletView,
+} from '../lib/walletPreference';
 
 const accountMenuItemClass =
   'flex items-center gap-3 px-4 py-1.5 text-sm text-[#CBD5E1] transition-colors duration-200 hover:text-white hover:no-underline';
@@ -120,7 +80,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [saldo, setSaldo] = useState<number>(0);
   const [saldoBonus, setSaldoBonus] = useState<number>(0);
-  const [balanceView, setBalanceView] = useState<'real' | 'bonus'>('real');
+  const [balanceView, setBalanceView] = useState<WalletView>('real');
   const [toggleCooldownUntil, setToggleCooldownUntil] = useState<number | null>(null);
   const [cooldownTick, setCooldownTick] = useState(0);
   const [notification, setNotification] = useState<string | null>(null);
@@ -182,13 +142,14 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
   }, [isAuthenticated, isRegisterOpen]);
 
   useEffect(() => {
-    if (user?.id) {
-      setBalanceView(getStoredBalanceView(user.id));
-      setToggleCooldownUntil(getStoredCooldownUntil(user.id));
-    } else {
+    if (!user?.id) {
       setBalanceView('real');
       setToggleCooldownUntil(null);
+      return;
     }
+
+    void syncWalletPreference(user.id).then(setBalanceView);
+    setToggleCooldownUntil(getStoredCooldownUntil(user.id));
   }, [user?.id]);
 
   // Função para buscar saldo do usuário
@@ -306,13 +267,14 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
       return;
     }
 
-    const nextView = balanceView === 'real' ? 'bonus' : 'real';
+    const nextView: WalletView = balanceView === 'real' ? 'bonus' : 'real';
     const cooldownUntil = now + BALANCE_TOGGLE_COOLDOWN_MS;
     setBalanceView(nextView);
     if (user?.id) {
       storeBalanceView(user.id, nextView);
       storeCooldownUntil(user.id, cooldownUntil);
     }
+    void definirCarteiraAtiva(nextView);
     setToggleCooldownUntil(cooldownUntil);
     setNotification(
       nextView === 'real'

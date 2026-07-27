@@ -446,11 +446,13 @@ function resolveCallbackBalance(currentBalance, bet, win, _userAfterBalanceIgnor
 }
 
 function getPlayableBalance(usuario) {
+  const carteira = usuario?.carteira_ativa === 'bonus' ? 'bonus' : 'real';
   const saldo = Number(usuario?.saldo ?? 0);
   const saldoBonus = Number(usuario?.saldo_bonus ?? 0);
-  return roundMoney(
-    (Number.isFinite(saldo) ? saldo : 0) + (Number.isFinite(saldoBonus) ? saldoBonus : 0)
-  );
+  const value = carteira === 'bonus'
+    ? (Number.isFinite(saldoBonus) ? saldoBonus : 0)
+    : (Number.isFinite(saldo) ? saldo : 0);
+  return roundMoney(value);
 }
 
 async function findUsuarioByEmail(userCode) {
@@ -459,7 +461,7 @@ async function findUsuarioByEmail(userCode) {
 
   let { data: usuario, error } = await supabase
     .from('usuarios')
-    .select('id, saldo, saldo_bonus, email')
+    .select('id, saldo, saldo_bonus, carteira_ativa, email')
     .eq('email', trimmedEmail)
     .maybeSingle();
 
@@ -860,7 +862,7 @@ async function handleBalanceWebhook(req, res) {
     }
 
     const balance = getPlayableBalance(usuario);
-    console.log(`✅ Saldo BALANCE: ${balance} para ${usuario.email} (R$ ${usuario.saldo} + B$ ${usuario.saldo_bonus ?? 0})`);
+    console.log(`✅ Saldo BALANCE: ${balance} para ${usuario.email} (carteira: ${usuario.carteira_ativa ?? 'real'})`);
 
     return res.status(200).json({
       msg: '',

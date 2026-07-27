@@ -45,14 +45,14 @@ export function createAviatorWallet(supabase, rounds = null) {
 
     let { data: usuario } = await supabase
       .from('usuarios')
-      .select('id, saldo, email, nome')
+      .select('id, saldo, saldo_bonus, carteira_ativa, email, nome')
       .eq('email', email)
       .maybeSingle();
 
     if (!usuario) {
       const { data: usuarioIlike } = await supabase
         .from('usuarios')
-        .select('id, saldo, email, nome')
+        .select('id, saldo, saldo_bonus, carteira_ativa, email, nome')
         .ilike('email', email)
         .maybeSingle();
       usuario = usuarioIlike;
@@ -66,12 +66,20 @@ export function createAviatorWallet(supabase, rounds = null) {
     return usuario;
   }
 
+  function resolvePlayableBalance(usuario) {
+    const carteira = usuario?.carteira_ativa === 'bonus' ? 'bonus' : 'real';
+    if (carteira === 'bonus') {
+      return parseFloat(usuario.saldo_bonus) || 0;
+    }
+    return parseFloat(usuario.saldo) || 0;
+  }
+
   async function getBalance(userCode) {
     const usuario = await findUsuario(userCode);
     if (!usuario) {
       return { ok: false, status: 404, error: 'Usuário não encontrado', gold: 0, balance: 0 };
     }
-    const balance = parseFloat(usuario.saldo) || 0;
+    const balance = resolvePlayableBalance(usuario);
     return {
       ok: true,
       usuario,
@@ -107,7 +115,7 @@ export function createAviatorWallet(supabase, rounds = null) {
 
     const result = rpcResult && typeof rpcResult === 'object' ? rpcResult : {};
     if (!result.ok) {
-      return mapRpcError(result, realToGold(parseFloat(usuario.saldo) || 0));
+      return mapRpcError(result, realToGold(resolvePlayableBalance(usuario)));
     }
 
     const newBalance = Number(result.balance);
