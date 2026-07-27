@@ -444,6 +444,8 @@ export default function GamePage({
   const { nomeBet, siteTitulo } = useSiteBrand();
   const { isAuthenticated, user } = useAuth();
   const prevGameCodeRef = useRef(gameCode);
+  const launchInFlightRef = useRef<string | null>(null);
+  const lastLaunchKeyRef = useRef<string | null>(null);
   const playerStageRef = useRef<HTMLDivElement>(null);
   const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(() =>
@@ -522,9 +524,15 @@ export default function GamePage({
   }, [isAuthenticated, user]);
 
   // Lançar jogo via API
-  const launchGame = useCallback(async (options?: { background?: boolean }) => {
+  const launchGame = useCallback(async (options?: { background?: boolean; force?: boolean }) => {
     if (!gameCode || !isAuthenticated || !user) {
       return;
+    }
+
+    const launchKey = `${gameCode}:${user.id}`;
+    if (!options?.force) {
+      if (launchInFlightRef.current === launchKey) return;
+      if (options?.background && lastLaunchKeyRef.current === launchKey) return;
     }
 
     const background = options?.background ?? false;
@@ -532,6 +540,7 @@ export default function GamePage({
       setIsLoading(true);
     }
     setError(null);
+    launchInFlightRef.current = launchKey;
 
     try {
       if (user?.id) {
@@ -605,16 +614,13 @@ export default function GamePage({
         setError(err.message || 'Erro ao carregar o jogo. Tente novamente.');
       }
     } finally {
+      if (launchInFlightRef.current === launchKey) {
+        launchInFlightRef.current = null;
+      }
+      lastLaunchKeyRef.current = launchKey;
       setIsLoading(false);
     }
   }, [gameCode, isAuthenticated, user, fetchSaldo, launchProvider, gameOriginal]);
-
-  useEffect(() => {
-    // Sempre buscar saldo atualizado quando o componente montar ou gameCode mudar
-    if (isAuthenticated && user) {
-      fetchSaldo();
-    }
-  }, [isAuthenticated, user, fetchSaldo]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -660,6 +666,7 @@ export default function GamePage({
         sessionStorage.removeItem(`game_url_${previousCode}`);
       }
       prevGameCodeRef.current = gameCode;
+      lastLaunchKeyRef.current = null;
       setDismissedDepositPrompt(false);
       setSaldoLoaded(false);
       const cachedUrl = sessionStorage.getItem(`game_url_${gameCode}`);
@@ -874,7 +881,7 @@ export default function GamePage({
                     <p className="text-red-400 text-xs md:text-sm">{error}</p>
                   </div>
                   <button
-                    onClick={() => launchGame()}
+                    onClick={() => launchGame({ force: true })}
                     className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                   >
                     Tentar novamente
