@@ -10,8 +10,9 @@ import {
 
 const ISSUER = 'VenuzBET Admin';
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
-/** Sessão elevada (2FA ok no painel) — acompanha vida típica do access_token. */
-const ELEVATION_TTL_MS = 60 * 60 * 1000;
+/** Sessão elevada (2FA ok no painel) — acompanha sessão admin (refresh token). */
+const ELEVATION_TTL_MS = 60 * 60 * 24 * 30 * 1000;
+const USER_ELEV_PREFIX = 'u.';
 
 /** @type {Map<string, { session: object; expires: number }>} */
 const pendingChallenges = new Map();
@@ -57,11 +58,17 @@ function signElevation(tokenHash, expSec) {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
 
+function signUserElevation(userId, expSec) {
+  const secret = getElevationSecret();
+  if (!secret) return null;
+  return crypto.createHmac('sha256', secret).update(`${userId}.${expSec}`).digest('hex');
+}
+
 function verifyElevationCookie(req, tokenHash) {
   if (!req) return null;
 
   const raw = parseCookies(req)[ADMIN_ELEVATION];
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== 'string' || raw.startsWith(USER_ELEV_PREFIX)) return null;
 
   const parts = raw.split('.');
   if (parts.length !== 2) return null;
@@ -85,6 +92,37 @@ function verifyElevationCookie(req, tokenHash) {
   return expSec * 1000;
 }
 
+function verifyUserElevationCookie(req, userId) {
+  if (!req || !userId) return null;
+
+  const raw = parseCookies(req)[ADMIN_ELEVATION];
+  if (!raw || typeof raw !== 'string' || !raw.startsWith(USER_ELEV_PREFIX)) return null;
+
+  const rest = raw.slice(USER_ELEV_PREFIX.length);
+  const parts = rest.split('.');
+  if (parts.length < 3) return null;
+
+  const sig = parts[parts.length - 1];
+  const expSec = Number(parts[parts.length - 2]);
+  const cookieUserId = parts.slice(0, -2).join('.');
+
+  if (cookieUserId !== userId || !Number.isFinite(expSec) || !sig) return null;
+  if (expSec <= Math.floor(Date.now() / 1000)) return null;
+
+  const expected = signUserElevation(userId, expSec);
+  if (!expected) return null;
+
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
+  return expSec * 1000;
+}
+
 function persistElevationCookie(res, accessToken, ttlMs) {
   if (!res || !accessToken) return;
 
@@ -94,6 +132,20 @@ function persistElevationCookie(res, accessToken, ttlMs) {
   if (!sig) return;
 
   setAdminElevationCookie(res, `${expSec}.${sig}`, Math.max(60, Math.ceil(ttlMs / 1000)));
+}
+
+function persistUserElevationCookie(res, userId, ttlMs) {
+  if (!res || !userId) return;
+
+  const expSec = Math.floor((Date.now() + ttlMs) / 1000);
+  const sig = signUserElevation(userId, expSec);
+  if (!sig) return;
+
+  setAdminElevationCookie(
+    res,
+    `${USER_ELEV_PREFIX}${userId}.${expSec}.${sig}`,
+    Math.max(60, Math.ceil(ttlMs / 1000))
+  );
 }
 
 export function generateTotpSecret() {
@@ -152,17 +204,46 @@ export function consume2FAChallenge(challengeToken) {
   return session;
 }
 
-/** Marca access_token como elevado (liberado para rotas/admin RPCs). */
-export function markAdminSessionElevated(accessToken, ttlMs = ELEVATION_TTL_MS, res = null) {
-  if (!accessToken) return;
+/**
+ * Marca sessão admin como elevada (2FA ok ou admin sem 2FA no painel).
+ * @param {string | null | undefined} accessToken
+ * @param {number} [ttlMs]
+ * @param {import('express').Response | null} [res]
+ * @param {string | null | undefined} [userId] — cookie de elevação por usuário (sobrevive refresh do JWT)
+ */
+export function markAdminSessionElevated(accessToken, ttlMs = ELEVATION_TTL_MS, res = null, userId = null) {
   cleanupElevations();
-  elevatedAdminTokens.set(hashToken(accessToken), Date.now() + ttlMs);
-  persistElevationCookie(res, accessToken, ttlMs);
+
+  if (accessToken) {
+    elevatedAdminTokens.set(hashToken(accessToken), Date.now() + ttlMs);
+    persistElevationCookie(res, accessToken, ttlMs);
+  }
+
+  if (userId) {
+    persistUserElevationCookie(res, userId, ttlMs);
+  }
 }
 
-export function isAdminSessionElevated(accessToken, req = null) {
-  if (!accessToken) return false;
+/**
+ * @param {string | null | undefined} accessToken
+ * @param {import('express').Request | null} [req]
+ * @param {string | null | undefined} [userId]
+ */
+export function isAdminSessionElevated(accessToken, req = null, userId = null) {
+  if (!accessToken && !userId) return false;
   cleanupElevations();
+
+  if (userId && req) {
+    const userExpires = verifyUserElevationCookie(req, userId);
+    if (userExpires && userExpires > Date.now()) {
+      if (accessToken) {
+        elevatedAdminTokens.set(hashToken(accessToken), userExpires);
+      }
+      return true;
+    }
+  }
+
+  if (!accessToken) return false;
 
   const tokenHash = hashToken(accessToken);
   const expires = elevatedAdminTokens.get(tokenHash);
@@ -193,15 +274,21 @@ export function revokeAdminSessionElevation(accessToken, res = null) {
   }
 }
 
-/** Ao renovar JWT, preserva elevação se o token antigo era elevado. */
+/** Ao renovar JWT, preserva elevação se a sessão antiga era elevada. */
 export function transferAdminSessionElevation(
   oldAccessToken,
   newAccessToken,
   req = null,
   res = null,
-  ttlMs = ELEVATION_TTL_MS
+  ttlMs = ELEVATION_TTL_MS,
+  userId = null
 ) {
-  if (!oldAccessToken || !newAccessToken) return;
-  if (!isAdminSessionElevated(oldAccessToken, req)) return;
-  markAdminSessionElevated(newAccessToken, ttlMs, res);
+  if (!newAccessToken) return;
+
+  const wasElevated = userId
+    ? isAdminSessionElevated(oldAccessToken, req, userId)
+    : isAdminSessionElevated(oldAccessToken, req);
+
+  if (!wasElevated) return;
+  markAdminSessionElevated(newAccessToken, ttlMs, res, userId);
 }

@@ -98,7 +98,7 @@ export function createAviatorConfig(supabase) {
       if (
         usuario.two_factor_enabled &&
         usuario.totp_secret &&
-        !isAdminSessionElevated(token, req)
+        !isAdminSessionElevated(token, req, data.user.id)
       ) {
         return false;
       }

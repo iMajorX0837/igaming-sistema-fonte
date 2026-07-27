@@ -15,6 +15,7 @@ import { createRateLimiter, getClientIp } from '../lib/security.js';
 import { getAuthUser as resolveAuthUser } from '../lib/auth.js';
 import {
   clearAuthCookies,
+  collectStoredAccessTokens,
   extractAccessToken,
   extractRefreshToken,
   isAdminClient,
@@ -177,7 +178,7 @@ export function createSupabaseProxyRouter({
     return data.cargo;
   }
 
-  async function getAdmin2FARecord(userId) {
+  async function getAdmin2FARecord(userId, accessToken = null) {
     const serviceClient = createServiceClient();
     const { data, error } = await serviceClient
       .from('usuarios')
@@ -185,8 +186,28 @@ export function createSupabaseProxyRouter({
       .eq('id', userId)
       .maybeSingle();
 
-    if (error) return null;
-    return data;
+    if (!error && data) return data;
+
+    if (!accessToken) return null;
+
+    const userClient = createUserClient(accessToken);
+    const { data: userRow, error: userError } = await userClient
+      .from('usuarios')
+      .select('cargo, two_factor_enabled, totp_secret, totp_pending_secret')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!userError && userRow) return userRow;
+
+    const { data: cargo, error: cargoError } = await userClient.rpc('get_user_cargo');
+    if (cargoError || cargo == null || cargo === '') return null;
+
+    return {
+      cargo: String(cargo),
+      two_factor_enabled: false,
+      totp_secret: null,
+      totp_pending_secret: null,
+    };
   }
 
   async function requireAdminUser(req, res) {
@@ -196,14 +217,14 @@ export function createSupabaseProxyRouter({
       return null;
     }
 
-    const record = await getAdmin2FARecord(auth.user.id);
+    const record = await getAdmin2FARecord(auth.user.id, auth.token);
     if (record?.cargo !== 'admin') {
       res.status(403).json({ data: null, error: { message: 'Acesso negado' } });
       return null;
     }
 
     // Com 2FA ativo, só sessão elevada (login no painel + TOTP) acessa APIs admin.
-    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token, req)) {
+    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token, req, auth.user.id)) {
       res.status(403).json({
         data: null,
         error: { message: '2FA necessário. Entre pelo painel administrativo.' },
@@ -240,7 +261,7 @@ export function createSupabaseProxyRouter({
       const isAdminPanel = req.headers['x-client-info'] === 'admin-panel';
 
       if (data?.user?.id) {
-        const record = await getAdmin2FARecord(data.user.id);
+        const record = await getAdmin2FARecord(data.user.id, data.session?.access_token);
 
         // Painel admin: só conta admin; 2FA obrigatório se ativo.
         if (isAdminPanel) {
@@ -266,7 +287,7 @@ export function createSupabaseProxyRouter({
 
           // Admin sem 2FA no painel: eleva a sessão para APIs admin.
           if (data.session?.access_token) {
-            markAdminSessionElevated(data.session.access_token, undefined, res);
+            markAdminSessionElevated(data.session.access_token, undefined, res, data.user.id);
           }
         }
         // Front (ou qualquer cliente sem header admin-panel):
@@ -324,7 +345,12 @@ export function createSupabaseProxyRouter({
 
       consume2FAChallenge(challengeToken);
       if (pendingSession.session?.access_token) {
-        markAdminSessionElevated(pendingSession.session.access_token, undefined, res);
+        markAdminSessionElevated(
+          pendingSession.session.access_token,
+          undefined,
+          res,
+          pendingSession.user.id
+        );
         setAuthCookies(res, req, pendingSession.session);
       }
       res.json({
@@ -581,16 +607,21 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/sign-out */
   router.post('/auth/sign-out', async (req, res) => {
     try {
-      const auth = await getAuthUser(req);
-      if (auth?.token) {
-        revokeAdminSessionElevation(auth.token, res);
-        const userClient = createUserClient(auth.token);
-        await userClient.auth.signOut();
+      for (const token of collectStoredAccessTokens(req)) {
+        revokeAdminSessionElevation(token, res);
+        try {
+          const userClient = createUserClient(token);
+          await userClient.auth.signOut();
+        } catch (signOutErr) {
+          console.warn('[supabase-proxy] sign-out token:', signOutErr?.message ?? signOutErr);
+        }
       }
-      clearAuthCookies(res, req);
+
+      clearAuthCookies(res, req, { both: true });
       res.json({ error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-out:', err);
+      clearAuthCookies(res, req, { both: true });
       res.status(500).json({ error: { message: 'Erro ao encerrar sessão' } });
     }
   });
@@ -610,8 +641,23 @@ export function createSupabaseProxyRouter({
 
           if (!error && data?.session?.access_token) {
             const oldToken = extractAccessToken(req, { preferAdmin: adminClient });
+            const userId = data.session.user?.id;
             if (oldToken) {
-              transferAdminSessionElevation(oldToken, data.session.access_token, req, res);
+              transferAdminSessionElevation(
+                oldToken,
+                data.session.access_token,
+                req,
+                res,
+                undefined,
+                userId
+              );
+            }
+            if (
+              userId &&
+              !isAdminSessionElevated(data.session.access_token, req, userId) &&
+              isAdminSessionElevated(null, req, userId)
+            ) {
+              markAdminSessionElevated(data.session.access_token, undefined, res, userId);
             }
             setAuthCookies(res, req, data.session);
             return res.json({
@@ -636,6 +682,14 @@ export function createSupabaseProxyRouter({
           data: { session: sanitizeSessionForClient({ user: auth.user }) },
           error: null,
         });
+      }
+
+      if (
+        adminClient &&
+        auth.user?.id &&
+        isAdminSessionElevated(auth.token, req, auth.user.id)
+      ) {
+        markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
       }
 
       res.json({
@@ -676,8 +730,24 @@ export function createSupabaseProxyRouter({
       }
 
       const oldToken = extractAccessToken(req, { preferAdmin: adminClient });
+      const userId = data?.session?.user?.id;
       if (oldToken && data?.session?.access_token) {
-        transferAdminSessionElevation(oldToken, data.session.access_token, req, res);
+        transferAdminSessionElevation(
+          oldToken,
+          data.session.access_token,
+          req,
+          res,
+          undefined,
+          userId
+        );
+      }
+      if (
+        userId &&
+        data?.session?.access_token &&
+        !isAdminSessionElevated(data.session.access_token, req, userId) &&
+        isAdminSessionElevated(null, req, userId)
+      ) {
+        markAdminSessionElevated(data.session.access_token, undefined, res, userId);
       }
 
       if (data?.session?.access_token) {
@@ -791,14 +861,36 @@ export function createSupabaseProxyRouter({
       return false;
     }
 
-    const record = await getAdmin2FARecord(auth.user.id);
+    const record = await getAdmin2FARecord(auth.user.id, auth.token);
     const isAdmin = record?.cargo === 'admin';
     const needsElevation = !!(isAdmin && record.two_factor_enabled && record.totp_secret);
-    const elevated = isAdminSessionElevated(auth.token, req);
+    const fromAdminPanel = isAdminClient(req);
+    let elevated = isAdminSessionElevated(auth.token, req, auth.user.id);
+
+    // Admin sem 2FA no painel: eleva sessão sob demanda (cookie perdido / sessão antiga).
+    if (fromAdminPanel && isAdmin && !needsElevation && !elevated) {
+      markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
+      elevated = true;
+    }
 
     // Admin elevado (ou sem 2FA): bypass deny-list de RPCs.
     if (isAdmin && (!needsElevation || elevated)) {
       return true;
+    }
+
+    if (
+      effectiveRpc &&
+      isAdminOnlyRpcName(effectiveRpc) &&
+      isAdmin &&
+      needsElevation &&
+      !elevated
+    ) {
+      res.status(403).json({
+        data: null,
+        error: { message: '2FA necessário. Faça login novamente no painel administrativo.' },
+        count: null,
+      });
+      return false;
     }
 
     if (effectiveRpc && (BLOCKED_USER_RPCS.has(effectiveRpc) || isAdminOnlyRpcName(effectiveRpc))) {

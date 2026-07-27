@@ -109,6 +109,21 @@ export function clearAuthCookies(res, req, { both = false } = {}) {
   res.setHeader('Set-Cookie', cookies);
 }
 
+/** Tokens de acesso presentes nos cookies (user + admin) — logout deve invalidar todos. */
+export function collectStoredAccessTokens(req) {
+  const cookies = parseCookies(req);
+  const tokens = new Set();
+
+  for (const name of [USER_ACCESS, ADMIN_ACCESS]) {
+    const value = cookies[name];
+    if (typeof value === 'string' && value.trim()) {
+      tokens.add(value.trim());
+    }
+  }
+
+  return [...tokens];
+}
+
 export function setAdminElevationCookie(res, value, maxAgeSec) {
   if (!value) return;
   const cookie = buildCookie(ADMIN_ELEVATION, value, maxAgeSec);
@@ -146,7 +161,7 @@ export function extractAccessToken(req, options = {}) {
   const scope = resolveAuthScope(req, { preferAdmin });
 
   if (scope === 'admin') {
-    return cookies[ADMIN_ACCESS] || cookies[USER_ACCESS] || null;
+    return cookies[ADMIN_ACCESS] || null;
   }
 
   return cookies[USER_ACCESS] || null;
@@ -163,7 +178,7 @@ export function extractRefreshToken(req, options = {}) {
   const scope = resolveAuthScope(req, { preferAdmin });
 
   if (scope === 'admin') {
-    return cookies[ADMIN_REFRESH] || cookies[USER_REFRESH] || null;
+    return cookies[ADMIN_REFRESH] || null;
   }
 
   return cookies[USER_REFRESH] || null;

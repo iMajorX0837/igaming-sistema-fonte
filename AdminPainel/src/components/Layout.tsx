@@ -1,4 +1,4 @@
-﻿import { Outlet, Link, useLocation } from 'react-router-dom';
+﻿import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard,
@@ -25,10 +25,12 @@ import {
   ChevronDown,
   Home,
   BadgeCheck,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useAdminSiteBrand } from '../contexts/AdminSiteBrandContext';
+import Button from './ui/Button';
 
 interface NavItem {
   path: string;
@@ -131,11 +133,13 @@ function loadExpandedGroups(): Record<string, boolean> {
 }
 
 export default function Layout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const { logoUrl, nomeBet } = useAdminSiteBrand();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(loadExpandedGroups);
   const [logoBroken, setLogoBroken] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     setLogoBroken(false);
@@ -166,17 +170,42 @@ export default function Layout() {
     });
   };
 
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('[Layout] Erro ao fazer logout:', error);
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-admin-bg">
       <header className="fixed top-0 right-0 left-64 h-16 flex items-center justify-end px-6 z-10 bg-admin-bg/90 border-b border-admin-border backdrop-blur-[18px]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-admin-panel-3 border border-admin-border-strong rounded-lg flex items-center justify-center">
-            <User className="h-4.5 w-4.5 text-admin-foreground" />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-admin-panel-3 border border-admin-border-strong rounded-lg flex items-center justify-center">
+              <User className="h-4.5 w-4.5 text-admin-foreground" />
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-admin-foreground font-medium leading-tight">{user?.email?.split('@')[0]}</p>
+              <p className="text-xs text-admin-muted leading-tight">Admin</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-admin-foreground font-medium leading-tight">{user?.email?.split('@')[0]}</p>
-            <p className="text-xs text-admin-muted leading-tight">Admin</p>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            icon={LogOut}
+            loading={loggingOut}
+            onClick={() => void handleLogout()}
+            className="px-3"
+          >
+            Sair
+          </Button>
         </div>
       </header>
 

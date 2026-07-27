@@ -185,12 +185,105 @@ function crashBarWidth(x: number) {
 }
 
 function formatCrashX(x: number) {
-  return `${Number(x || 0).toFixed(2)}x`;
+  if (!Number.isFinite(x) || x <= 0) return '—';
+  return `${Number(x).toFixed(2)}x`;
+}
+
+function toFormString(value: unknown, fallback: string): string {
+  if (value == null) return fallback;
+  const text = String(value).trim();
+  if (!text || text === 'undefined' || text === 'null' || text === 'NaN') return fallback;
+  return text;
+}
+
+function toFormNumberString(value: unknown, fallback: number): string {
+  if (value == null || value === '') return String(fallback);
+  const n = Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(n)) return String(fallback);
+  return String(n);
+}
+
+function toRtpPctString(value: unknown, fallbackPct: number): string {
+  if (value == null || value === '') return String(fallbackPct);
+  const n = Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(n)) return String(fallbackPct);
+  const pct = n > 0 && n <= 1 ? n * 100 : n;
+  return String(Math.round(pct * 100) / 100);
+}
+
+function formatRoundId(value: unknown): string {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  return String(Math.trunc(n));
+}
+
+function normalizeAviatorStats(raw: unknown): AviatorStats | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const s = raw as Record<string, unknown>;
+  return {
+    window_hours: Number(s.window_hours) || 24,
+    total_wagered: Number(s.total_wagered) || 0,
+    total_paid: Number(s.total_paid) || 0,
+    ggr: Number(s.ggr) || 0,
+    ggr_pct: Number(s.ggr_pct) || 0,
+    rtp_real_pct: Number(s.rtp_real_pct) || 0,
+    bet_count: Number(s.bet_count) || 0,
+  };
+}
+
+function normalizeScheduleEntry(raw: unknown): AviatorScheduleEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const item = raw as Record<string, unknown>;
+
+  const crashX = Number(item.crash_x ?? item.crashX);
+  const crashMulRaw = item.crash_mul ?? item.crashMul;
+  const crashMul = Number(
+    crashMulRaw ?? (Number.isFinite(crashX) && crashX > 0 ? Math.round(crashX * 100) : NaN)
+  );
+  const roundId = Number(item.round_id ?? item.roundId);
+  const crashAtMs = Number(item.crash_at_ms ?? item.crashAtMs ?? 0);
+
+  if (!Number.isFinite(crashX) || crashX <= 0) return null;
+
+  return {
+    round_id: Number.isFinite(roundId) && roundId > 0 ? Math.trunc(roundId) : 0,
+    queue_position:
+      item.queue_position != null || item.queuePosition != null
+        ? Number(item.queue_position ?? item.queuePosition)
+        : null,
+    crash_mul: Number.isFinite(crashMul) && crashMul > 0 ? Math.trunc(crashMul) : Math.round(crashX * 100),
+    crash_x: crashX,
+    bet_start_ms: item.bet_start_ms != null ? Number(item.bet_start_ms) : undefined,
+    bet_start_at:
+      typeof item.bet_start_at === 'string'
+        ? item.bet_start_at
+        : typeof item.bet_startAt === 'string'
+          ? item.bet_startAt
+          : undefined,
+    crash_at_ms: Number.isFinite(crashAtMs) ? crashAtMs : 0,
+    crash_at:
+      typeof item.crash_at === 'string'
+        ? item.crash_at
+        : typeof item.crashAt === 'string'
+          ? item.crashAt
+          : '',
+    seconds_until_crash:
+      item.seconds_until_crash != null ? Number(item.seconds_until_crash) : undefined,
+    status: toFormString(item.status, 'queued'),
+    phase: toFormString(item.phase, '—'),
+    is_live: Boolean(item.is_live ?? item.isLive),
+    is_past: Boolean(item.is_past ?? item.isPast),
+  };
+}
+
+function normalizeScheduleList(raw: unknown): AviatorScheduleEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeScheduleEntry).filter((entry): entry is AviatorScheduleEntry => entry != null);
 }
 
 function summarizeUpcoming(rounds: AviatorScheduleEntry[]) {
-  if (!rounds.length) return null;
-  const values = rounds.map((r) => Number(r.crash_x));
+  const values = rounds.map((r) => Number(r.crash_x)).filter((v) => Number.isFinite(v) && v > 0);
+  if (!values.length) return null;
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
   const low = values.filter((v) => v < 2).length;
   const mid = values.filter((v) => v >= 2 && v < 10).length;
@@ -323,20 +416,26 @@ export default function AviatorRtpPage() {
   const applyConfigToForm = (config: AviatorConfig) => {
     setForm({
       modo_geracao: parseModo(config.modo_geracao),
-      rtp_geral_pct: String(Number(config.rtp_geral) * 100),
-      pct_vela_azul: String(config.pct_vela_azul),
-      pct_vela_roxa: String(config.pct_vela_roxa),
-      pct_vela_rosa: String(config.pct_vela_rosa),
-      geracao_min_crash: String(config.geracao_min_crash ?? config.min_crash ?? 1.01),
-      geracao_max_crash: String(config.geracao_max_crash ?? config.max_crash ?? 500),
-      min_crash: String(config.min_crash),
-      max_crash: String(config.max_crash),
-      queue_size: String(config.queue_size),
+      rtp_geral_pct: toRtpPctString(config.rtp_geral, Number(defaultForm.rtp_geral_pct)),
+      pct_vela_azul: toFormNumberString(config.pct_vela_azul, Number(defaultForm.pct_vela_azul)),
+      pct_vela_roxa: toFormNumberString(config.pct_vela_roxa, Number(defaultForm.pct_vela_roxa)),
+      pct_vela_rosa: toFormNumberString(config.pct_vela_rosa, Number(defaultForm.pct_vela_rosa)),
+      geracao_min_crash: toFormNumberString(
+        config.geracao_min_crash ?? config.min_crash,
+        Number(defaultForm.geracao_min_crash)
+      ),
+      geracao_max_crash: toFormNumberString(
+        config.geracao_max_crash ?? config.max_crash,
+        Number(defaultForm.geracao_max_crash)
+      ),
+      min_crash: toFormNumberString(config.min_crash, Number(defaultForm.min_crash)),
+      max_crash: toFormNumberString(config.max_crash, Number(defaultForm.max_crash)),
+      queue_size: toFormNumberString(config.queue_size, Number(defaultForm.queue_size)),
     });
     setLimits({
-      rtpMin: Number(config.rtp_limit_min_pct ?? 85),
-      rtpMax: Number(config.rtp_limit_max_pct ?? 99.99),
-      crashMax: Number(config.crash_technical_max ?? 1000),
+      rtpMin: Number(config.rtp_limit_min_pct ?? 85) || 85,
+      rtpMax: Number(config.rtp_limit_max_pct ?? 99.99) || 99.99,
+      crashMax: Number(config.crash_technical_max ?? 1000) || 1000,
     });
   };
 
@@ -347,7 +446,7 @@ export default function AviatorRtpPage() {
       const nodeEngine = preview.engine as { modo_geracao?: string; min_crash?: number; max_crash?: number };
       const pyEngine = (preview.queue as { engine?: { modo_geracao?: string; min_crash?: number; max_crash?: number } })?.engine;
       setEngineMotor({
-        modo_geracao: String(nodeEngine?.modo_geracao ?? pyEngine?.modo_geracao ?? ''),
+        modo_geracao: toFormString(nodeEngine?.modo_geracao ?? pyEngine?.modo_geracao, ''),
         min_crash: Number(nodeEngine?.min_crash ?? pyEngine?.min_crash ?? 0) || undefined,
         max_crash: Number(nodeEngine?.max_crash ?? pyEngine?.max_crash ?? 0) || undefined,
       });
@@ -356,9 +455,15 @@ export default function AviatorRtpPage() {
         if (timeline.server_time_ms) {
           setClockOffset(timeline.server_time_ms - Date.now());
         }
-        setLiveRound(timeline.live_round ?? null);
-        setUpcomingRounds(timeline.upcoming ?? timeline.schedule?.filter((s) => !s.is_live && !s.is_past) ?? []);
-        setPastRounds(timeline.past ?? []);
+        setLiveRound(normalizeScheduleEntry(timeline.live_round) ?? null);
+        const upcomingSource =
+          timeline.upcoming ??
+          timeline.schedule?.filter((s) => {
+            const entry = s as { is_live?: boolean; is_past?: boolean };
+            return !entry.is_live && !entry.is_past;
+          });
+        setUpcomingRounds(normalizeScheduleList(upcomingSource));
+        setPastRounds(normalizeScheduleList(timeline.past));
       } else {
         setLiveRound(null);
         setUpcomingRounds([]);
@@ -393,7 +498,7 @@ export default function AviatorRtpPage() {
 
         if (result?.ok && result.config) {
           applyConfigToForm(result.config);
-          setStats(result.stats || null);
+          setStats(normalizeAviatorStats(result.stats));
         }
 
         await refreshMotorPreview({ silent: true });
@@ -415,7 +520,7 @@ export default function AviatorRtpPage() {
       const { data } = await supabase.rpc('obter_aviator_config_admin');
       const result = data as { config?: AviatorConfig; stats?: AviatorStats };
       if (result?.config) applyConfigToForm(result.config);
-      if (result?.stats) setStats(result.stats);
+      if (result?.stats) setStats(normalizeAviatorStats(result.stats));
       await refreshMotorPreview({ silent: true });
     } finally {
       setRefreshingPreview(false);
@@ -481,7 +586,7 @@ export default function AviatorRtpPage() {
           applyConfigToForm(result.config);
         }
       }
-      if (!modeSwitchOnly && result.stats) setStats(result.stats);
+      if (!modeSwitchOnly && result.stats) setStats(normalizeAviatorStats(result.stats));
 
       try {
         await invalidateAviatorQueue();
@@ -581,14 +686,14 @@ export default function AviatorRtpPage() {
           <StatCard
             label={houseProfit ? 'Seu lucro' : 'Sua perda'}
             value={formatMoney(Math.abs(houseGgr))}
-            sub={`Últimas ${stats.window_hours}h`}
+            sub={`Últimas ${stats.window_hours || 24}h`}
             icon={houseProfit ? TrendingUp : TrendingDown}
             tone={houseProfit ? 'good' : 'warn'}
           />
           <StatCard
             label="Apostado no período"
             value={formatMoney(stats.total_wagered)}
-            sub={`${stats.bet_count} apostas finalizadas`}
+            sub={`${stats.bet_count ?? 0} apostas finalizadas`}
             icon={Wallet}
           />
           <StatCard
@@ -905,13 +1010,13 @@ function LiveRoundCard({ item, clockOffset }: { item: AviatorScheduleEntry; cloc
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-gray-500">Rodada #{item.round_id}</p>
+          <p className="text-[10px] uppercase tracking-wide text-gray-500">Rodada #{formatRoundId(item.round_id)}</p>
           <p className="font-mono text-3xl font-semibold tabular-nums" style={styles.textStyle}>
             {formatCrashX(Number(item.crash_x))}
           </p>
         </div>
         <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-admin-accent text-[#0d0e10] font-semibold shrink-0">
-          {item.phase || 'Ao vivo'}
+          {item.phase && item.phase !== '—' ? item.phase : 'Ao vivo'}
         </span>
       </div>
 
@@ -991,7 +1096,7 @@ function UpcomingRow({
   return (
     <tr className="border-b border-admin-border/40 last:border-0 hover:bg-white/[0.02]">
       <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
-      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
+      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{formatRoundId(item.round_id)}</td>
       <td className="py-2.5 px-1">
         <span className="text-[10px]" style={{ color: styles.hex }}>
           {crashTierLabel(tier)}
@@ -1016,7 +1121,7 @@ function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number })
   return (
     <tr className="border-b border-admin-border/40 last:border-0 hover:bg-white/[0.02]">
       <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
-      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{item.round_id}</td>
+      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{formatRoundId(item.round_id)}</td>
       <td className="py-2.5 px-1">
         <span
           className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums"

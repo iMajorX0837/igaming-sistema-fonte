@@ -266,7 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     adminPageCache.clear();
     applyUserUpdate(null);
-    setCargoVerified(false);
+    setCargoVerified(true);
     setLoadingCargo(false);
   };
 

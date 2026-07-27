@@ -687,9 +687,12 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     },
 
     async signOut() {
-      await apiFetch('/auth/sign-out', { method: 'POST' });
-      writeSession(null);
-      notifyAuth('SIGNED_OUT', null);
+      try {
+        await apiFetch('/auth/sign-out', { method: 'POST' });
+      } finally {
+        writeSession(null);
+        notifyAuth('SIGNED_OUT', null);
+      }
       return { error: null };
     },
 
