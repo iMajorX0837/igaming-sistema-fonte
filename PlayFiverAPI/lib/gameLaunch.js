@@ -68,6 +68,15 @@ export async function resolveGameLaunchUserContext(supabase, userId, preferredCa
   const walletAmount = carteira === 'bonus' ? saldoBonus : saldo;
   const user_balance = Math.round(Math.max(0, walletAmount) * 100) / 100;
 
+  console.log('[game_launch] carteira:', {
+    userId,
+    carteira,
+    preferredCarteira: carteiraPref,
+    saldo,
+    saldoBonus,
+    user_balance,
+  });
+
   return {
     user_balance,
     user_rtp: getPlayFiverUserRtp(),

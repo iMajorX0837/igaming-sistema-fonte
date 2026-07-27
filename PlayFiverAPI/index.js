@@ -1364,7 +1364,7 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
       });
     }
 
-    const { user_balance, user_rtp } = launchContext;
+    const { user_balance, user_rtp, carteira_ativa: carteiraAtivaLaunch } = launchContext;
 
     const { token: agentToken, secret: secretKey } = getPlayFiverCredentials();
 
@@ -1469,12 +1469,20 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
       });
     }
 
-    // Retornar resposta da API Play Fiver
+    // Retornar resposta da PlayFivers + metadados locais (carteira/saldo calculados no servidor)
     if (!playFiverResponse.ok) {
-      return res.status(playFiverResponse.status).json(data);
+      return res.status(playFiverResponse.status).json({
+        ...data,
+        user_balance,
+        carteira_ativa: carteiraAtivaLaunch ?? preferredCarteira ?? 'real',
+      });
     }
 
-    res.status(200).json(data);
+    res.status(200).json({
+      ...data,
+      user_balance,
+      carteira_ativa: carteiraAtivaLaunch ?? preferredCarteira ?? 'real',
+    });
 
   } catch (error) {
     console.error('❌ Erro ao fazer proxy do game_launch:', error);
