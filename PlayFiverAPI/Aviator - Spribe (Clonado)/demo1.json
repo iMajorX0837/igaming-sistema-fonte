@@ -1,0 +1,28 @@
+{
+    "brandLogo": "",
+    "brandName": "demo",
+    "ws": {
+        "host": "app-demo.spribe.io",
+        "port": 443,
+        "useSSL": true,
+        "zone": "aviator_core",
+        "debug": false
+    },
+    "servers": [
+        {
+            "host": "app-demo.spribe.io",
+            "port": 443,
+            "useSSL": true,
+            "zone": "aviator_core",
+            "debug": false
+        },
+        {
+            "host": "app-demo2.spribe.io",
+            "port": 443,
+            "useSSL": true,
+            "zone": "aviator_core_inst2_demo1",
+            "debug": false
+        }
+    ],
+    "userWithOperator": true
+}

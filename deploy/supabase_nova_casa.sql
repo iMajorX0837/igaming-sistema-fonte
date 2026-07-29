@@ -10410,7 +10410,7 @@ BEGIN
   FROM public.depositos d
   LEFT JOIN public.usuarios u ON u.id = d.usuario_id
   WHERE d.id = p_deposito_id
-  FOR UPDATE;
+  FOR UPDATE OF d;
 
   IF NOT FOUND THEN
     RETURN json_build_object('ok', false, 'error', 'Depósito não encontrado');

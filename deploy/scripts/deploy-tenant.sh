@@ -42,6 +42,7 @@ git fetch origin
 git reset --hard "origin/$BRANCH"
 
 cd "$ROOT_DIR"
+chmod +x "$ROOT_DIR"/scripts/*.sh 2>/dev/null || true
 
 if [[ "${CLEAN:-}" == "1" ]]; then
   echo "==> [2/6] Parar API + nginx e limpar assets ($TENANT)"
@@ -60,8 +61,8 @@ else
   STEP_HEALTH=5
 fi
 
-echo "==> [$STEP_BUILD/6] Build imagem API ${BUILD_EXTRA[*]:-"(cache)"}"
-docker compose build "${BUILD_EXTRA[@]}"
+echo "==> [$STEP_BUILD/6] Build imagem API ($SERVICE) ${BUILD_EXTRA[*]:-"(cache)"}"
+docker compose build "${BUILD_EXTRA[@]}" "$SERVICE"
 
 echo "==> [$STEP_TENANT/6] Build front + admin ($TENANT)"
 bash "$ROOT_DIR/scripts/build-tenant.sh" "$TENANT"
@@ -80,6 +81,15 @@ else
   echo "AVISO: /health interno falhou. Logs:"
   docker compose logs --tail=30 "$SERVICE"
   exit 1
+fi
+
+echo "==> Aviator: regenerar fila de velas (invalidate RTP queue)"
+if docker compose exec -T "$SERVICE" node -e \
+  "fetch('http://127.0.0.1:8001/api/rtp/invalidate',{method:'POST',headers:{'X-Aviator-Internal':process.env.AVIATOR_INTERNAL_SECRET,'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(j=>{if(!j.ok)process.exit(1);}).catch(()=>process.exit(1))" \
+  2>/dev/null; then
+  echo "OK: fila Aviator regenerada."
+else
+  echo "AVISO: invalidate da fila Aviator falhou (jogo pode usar velas antigas até Salvar no admin)."
 fi
 
 echo
