@@ -114,7 +114,6 @@ export default function BannersPage({ embedded = false }: { embedded?: boolean }
 
   const loadBanners = async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data, error: fetchError } = await supabase
         .from('cms_items')

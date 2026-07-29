@@ -1,3 +1,5 @@
+import { getAppCopy } from '../i18n';
+import type { AppLanguage } from '../i18n/types';
 import { supabase } from './supabase';
 
 export type PrizeWheelErrorCode =
@@ -61,30 +63,25 @@ export interface GirarRoletaResult {
 }
 
 const DEFAULT_IMAGES = {
-  titulo:
-    'https://betsolution.net/roleta/api/image_proxy.php?p=uploads%2Froulettes%2F69b332751671a_Camada%200.png',
-  banner:
-    'https://betsolution.net/roleta/api/image_proxy.php?p=uploads%2Froulettes%2F69ae5a84b9cff_SEU%20PR%C3%8AMIO%20URANO.png',
-  roleta:
-    'https://betsolution.net/roleta/api/image_proxy.php?p=uploads%2Froulettes%2F69ae5add7dcc9_URANO%20ROLETA.png',
-  widget:
-    'https://betsolution.net/roleta/api/image_proxy.php?p=uploads%2Froulettes%2F69ae5a84b95b9_ChatGPTImage8_03_202617_52_42.png',
-  centro:
-    'https://betsolution.net/roleta/api/image_proxy.php?p=uploads%2Froulettes%2F69ae5a84b95b9_ChatGPTImage8_03_202617_52_42.png',
+  titulo: '',
+  banner: '',
+  roleta: '',
+  widget: '',
+  centro: '',
 };
 
-const ERROR_MESSAGES: Record<PrizeWheelErrorCode, string> = {
-  not_authenticated: 'Faça login para girar a roleta.',
-  wheel_disabled: 'A roleta não está disponível no momento.',
-  no_segments: 'A roleta ainda não foi configurada.',
-  cooldown_active: 'Você já girou a roleta. Aguarde para girar novamente.',
-  usage_limit_reached: 'Este prêmio atingiu o limite de uso.',
-  user_limit_reached: 'Você já utilizou este prêmio.',
-  invalid_segment: 'Erro ao processar o prêmio. Tente novamente.',
-};
-
-export function getPrizeWheelErrorMessage(error?: string): string {
-  return ERROR_MESSAGES[error as PrizeWheelErrorCode] ?? 'Não foi possível girar a roleta.';
+export function getPrizeWheelErrorMessage(error?: string, lang: AppLanguage = 'pt'): string {
+  const copy = getAppCopy(lang).prizeWheel;
+  const messages: Record<PrizeWheelErrorCode, string> = {
+    not_authenticated: copy.loginRequired,
+    wheel_disabled: copy.wheelDisabled,
+    no_segments: copy.noSegments,
+    cooldown_active: copy.cooldownActive,
+    usage_limit_reached: copy.usageLimitReached,
+    user_limit_reached: copy.userLimitReached,
+    invalid_segment: copy.invalidSegment,
+  };
+  return messages[error as PrizeWheelErrorCode] ?? copy.spinFailed;
 }
 
 export function getDefaultWheelImages() {
@@ -167,16 +164,22 @@ export async function girarRoleta(): Promise<GirarRoletaResult> {
   return data as GirarRoletaResult;
 }
 
-export function formatPrizeMessage(result: GirarRoletaResult): string {
+export function formatPrizeMessage(result: GirarRoletaResult, lang: AppLanguage = 'pt'): string {
+  const copy = getAppCopy(lang).prizeWheel;
+
   if (!result.ok || !result.quantidade_giros || !result.jogo_nome) {
-    return getPrizeWheelErrorMessage(result.error);
+    return getPrizeWheelErrorMessage(result.error, lang);
   }
 
-  const giros = `${result.quantidade_giros} giros em ${result.jogo_nome}`;
+  const giros = copy.wonSpins(`${result.quantidade_giros} giros`, result.jogo_nome);
 
   if (result.requer_deposito && (result.deposito_minimo ?? 0) > 0) {
-    return `Você ganhou ${giros}! Deposite no mínimo R$ ${result.deposito_minimo!.toFixed(2).replace('.', ',')} com o cupom ${result.codigo} para ativar.`;
+    return copy.wonSpinsDeposit(
+      giros,
+      result.deposito_minimo!.toFixed(2).replace('.', ','),
+      result.codigo ?? '',
+    );
   }
 
-  return `Parabéns! Você ganhou ${giros}! As rodadas já estão disponíveis.`;
+  return copy.wonSpinsAvailable(giros);
 }

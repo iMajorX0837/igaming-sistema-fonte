@@ -86,7 +86,6 @@ export default function PromotionsPage() {
 
   const loadBanners = async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data, error: fetchError } = await supabase
         .from('cms_items')

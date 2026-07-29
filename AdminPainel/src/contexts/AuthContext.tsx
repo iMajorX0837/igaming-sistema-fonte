@@ -11,6 +11,8 @@ interface AuthContextType {
   isAdmin: boolean;
   /** true após get_user_cargo confirmar cargo no servidor (M3) */
   cargoVerified: boolean;
+  /** true após a primeira verificação de sessão (validateSession) terminar */
+  authReady: boolean;
   login: (email: string, password: string) => Promise<{ requires2FA: boolean; challengeToken?: string }>;
   verify2FA: (challengeToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +33,7 @@ const shouldIgnoreAuthEvent = (event: string, hasUser: boolean): boolean => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const [loadingCargo, setLoadingCargo] = useState(false);
   const [cargoVerified, setCargoVerified] = useState(false);
 
@@ -46,6 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     initializationCompleteRef.current = false;
+    setAuthReady(false);
+    setLoading(true);
     void initClientInfo();
 
     let initTimeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -53,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const finishInitialLoading = () => {
       if (!mountedRef.current || initializationCompleteRef.current) return;
       initializationCompleteRef.current = true;
+      setAuthReady(true);
       setLoading(false);
     };
 
@@ -114,11 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         finishInitialLoading();
       } catch (error) {
         console.warn('[AuthContext] initializeAuth falhou, aguardando onAuthStateChange:', error);
-        applyUserUpdate(null);
-        setCargoVerified(true);
         initTimeoutId = setTimeout(() => {
           if (mountedRef.current && !initializationCompleteRef.current) {
             console.warn('[AuthContext] Timeout de inicialização, liberando UI');
+            applyUserUpdate(null);
+            setCargoVerified(true);
             finishInitialLoading();
           }
         }, SESSION_INIT_TIMEOUT_MS);
@@ -136,6 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Proxy dispara INITIAL_SESSION=null antes do validateSession no F5 — não é logout.
+      if (event === 'INITIAL_SESSION' && !session?.user) {
+        return;
+      }
+
       if (session?.user) {
         try {
           await resolveUserFromSession(session.user);
@@ -146,16 +157,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setCargoVerified(false);
           }
         }
-      } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session?.user)) {
-        if (event === 'SIGNED_OUT') {
-          adminPageCache.clear();
-        }
+      } else if (event === 'SIGNED_OUT') {
+        adminPageCache.clear();
         applyUserUpdate(null);
         setCargoVerified(true);
         setLoadingCargo(false);
       }
 
-      finishInitialLoading();
+      if (event !== 'INITIAL_SESSION' || session?.user) {
+        finishInitialLoading();
+      }
     });
 
     return () => {
@@ -199,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyUserUpdate(userData);
       setCargoVerified(true);
       initializationCompleteRef.current = true;
+      setAuthReady(true);
       setLoading(false);
       setLoadingCargo(false);
 
@@ -239,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyUserUpdate(userData);
       setCargoVerified(true);
       initializationCompleteRef.current = true;
+      setAuthReady(true);
       setLoading(false);
       setLoadingCargo(false);
 
@@ -282,13 +295,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated,
       isAdmin,
       cargoVerified,
+      authReady,
       login,
       verify2FA,
       logout,
       loading,
       loadingCargo,
     }),
-    [user, isAuthenticated, isAdmin, cargoVerified, loading, loadingCargo]
+    [user, isAuthenticated, isAdmin, cargoVerified, authReady, loading, loadingCargo]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

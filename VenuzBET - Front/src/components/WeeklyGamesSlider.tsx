@@ -2,19 +2,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { HOME_SECTION_GAMES_MAX } from '../lib/homeSectionGames';
 
-const WEEKLY_NUMBER_IMAGES = Array.from(
-  { length: 10 },
-  (_, i) => `https://royalbetsolutions.com/_ipx/_/assets/imgs/numbers/${i + 1}.webp`
-);
 const CARD_WIDTH = 170;
 const CARD_HEIGHT = 210;
 const NUMBER_BADGE_WIDTH = 48;
-const CARD_OVERLAP = 32;
 
-const MOBILE_MAX = 767;
-const MOBILE_GAP_PX = 8;
+const WEEKLY_RANK_IMAGES = Array.from(
+  { length: 10 },
+  (_, index) => `/assets/imgs/numbers/${index + 1}.webp`
+);
 
 interface Game {
   name: string;
@@ -30,37 +28,33 @@ interface WeeklyGamesSliderProps {
   games?: Game[];
 }
 
-function isMobileViewport(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches;
-}
-
 function WeeklyRankBadge({ index }: { index: number }) {
-  if (index < WEEKLY_NUMBER_IMAGES.length) {
-    return (
-      <img
-        src={WEEKLY_NUMBER_IMAGES[index]}
-        alt={`${index + 1}`}
-        className="relative z-0 h-[128px] w-auto object-contain sm:h-[170px] md:h-[210px]"
-        loading="lazy"
-      />
-    );
-  }
+  const rank = index + 1;
+  const src = WEEKLY_RANK_IMAGES[index] ?? `/assets/imgs/numbers/${rank}.webp`;
 
   return (
-    <div className="relative z-0 flex h-[128px] w-12 items-center justify-center sm:h-[170px] sm:w-14 md:h-[210px] md:w-16">
-      <span className="text-4xl font-black text-brand sm:text-5xl md:text-6xl">{index + 1}</span>
+    <div className="relative z-0 flex h-[210px] w-12 items-center justify-center sm:w-14 md:w-16">
+      <img
+        src={src}
+        alt={String(rank)}
+        className="h-full w-auto max-w-none object-contain select-none pointer-events-none"
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+      />
     </div>
   );
 }
 
 export default function WeeklyGamesSlider({
-  title = '+ Jogados da Semana',
+  title,
   viewAllLink = '/games',
   games = [],
 }: WeeklyGamesSliderProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { config: homeConfig } = useHomeConfig();
+  const sectionTitle = title ?? t.home.mostPlayedWeek;
   const surfaceBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const hoverBg = homeConfig.fundo;
   const surfaceHoverHandlers = {
@@ -76,18 +70,6 @@ export default function WeeklyGamesSlider({
   const visibleGames = useMemo(() => games.slice(0, HOME_SECTION_GAMES_MAX), [games]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [mobileCard, setMobileCard] = useState({ w: 104, h: 128 });
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches : false
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
-    const onChange = () => setNarrow(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
 
   const checkScrollability = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -103,16 +85,7 @@ export default function WeeklyGamesSlider({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const updateMobileCardWidth = () => {
-      if (!isMobileViewport()) return;
-      const cw = container.clientWidth;
-      const w = Math.max(72, Math.floor((cw - MOBILE_GAP_PX * 2) / 3));
-      const h = Math.round((w * CARD_HEIGHT) / CARD_WIDTH);
-      setMobileCard((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
-    };
-
     const onScrollOrResize = () => {
-      updateMobileCardWidth();
       checkScrollability();
     };
 
@@ -127,16 +100,9 @@ export default function WeeklyGamesSlider({
       container.removeEventListener('scroll', checkScrollability);
       window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [checkScrollability, narrow, visibleGames.length]);
+  }, [checkScrollability, visibleGames.length]);
 
-  const getScrollStep = () => {
-    const el = scrollContainerRef.current;
-    if (!el) return CARD_WIDTH + NUMBER_BADGE_WIDTH - CARD_OVERLAP + 16;
-    if (isMobileViewport()) {
-      return el.clientWidth;
-    }
-    return CARD_WIDTH + NUMBER_BADGE_WIDTH - CARD_OVERLAP + 16;
-  };
+  const getScrollStep = () => CARD_WIDTH + NUMBER_BADGE_WIDTH + 16;
 
   const scrollLeft = () => {
     scrollContainerRef.current?.scrollBy({
@@ -173,7 +139,7 @@ export default function WeeklyGamesSlider({
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
-        <h4 className="text-white font-bold text-lg md:text-xl tracking-tight pr-2">{title}</h4>
+        <h4 className="text-white font-bold text-lg md:text-xl tracking-tight pr-2">{sectionTitle}</h4>
         <div className="flex items-center gap-2 flex-shrink-0">
           <a
             href={viewAllLink}
@@ -181,7 +147,7 @@ export default function WeeklyGamesSlider({
             style={{ backgroundColor: surfaceBg }}
             {...surfaceHoverHandlers}
           >
-            Ver Tudo
+            {t.common.seeAll}
           </a>
           <div className="flex items-center gap-2">
             <button
@@ -228,12 +194,8 @@ export default function WeeklyGamesSlider({
             >
               <WeeklyRankBadge index={index} />
               <div
-                className="relative z-10 -ml-5 sm:-ml-6 md:-ml-8 group rounded-xl overflow-hidden shadow-xl"
-                style={
-                  narrow
-                    ? { width: mobileCard.w, height: mobileCard.h }
-                    : { width: CARD_WIDTH, height: CARD_HEIGHT }
-                }
+                className="relative z-10 ml-0 sm:ml-0 md:ml-1 group rounded-xl overflow-hidden shadow-xl shrink-0"
+                style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
               >
                 <div
                   className="w-full h-full bg-center bg-cover"
@@ -253,7 +215,7 @@ export default function WeeklyGamesSlider({
                     <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    JOGAR
+                    {t.common.playUpper}
                   </button>
                 </div>
               </div>

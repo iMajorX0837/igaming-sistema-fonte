@@ -3,6 +3,7 @@ import AppPageScaffold from './AppPageScaffold';
 import { useNavigate } from 'react-router-dom';
 import { usePromotionBanners } from '../hooks/usePromotionBanners';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import LoadingScreen from './LoadingScreen';
 
 interface PromotionsPageProps {
@@ -18,12 +19,14 @@ function PromotionBannerCard({
   texto,
   imagem_url,
   fundo,
+  noImageLabel,
 }: {
   id: string;
   titulo: string;
   texto: string;
   imagem_url: string | null;
   fundo: string;
+  noImageLabel: string;
 }) {
   const navigate = useNavigate();
 
@@ -46,7 +49,7 @@ function PromotionBannerCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-slate-500 text-sm">
-            Sem imagem
+            {noImageLabel}
           </div>
         )}
       </div>
@@ -71,13 +74,14 @@ function PromotionBannerCard({
 export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps) {
   const { banners, loading } = usePromotionBanners();
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
 
   return (
     <AppPageScaffold>
       <div className="flex flex-col min-h-full" style={{ backgroundColor: homeConfig.fundo }}>
         <div className="mx-auto w-full max-w-[1080px] px-6 py-8 flex-1">
         {loading ? (
-          <LoadingScreen title="Carregando promoções..." variant="page" className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]" />
+          <LoadingScreen title={t.promotions.loading} variant="page" className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]" />
         ) : banners.length === 0 ? (
           <div
             className="flex min-h-[40vh] items-center justify-center rounded-xl border px-6 py-16"
@@ -87,7 +91,7 @@ export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps)
               className="text-center text-lg font-semibold text-slate-300"
               style={{ fontFamily: 'Montserrat, sans-serif' }}
             >
-              Sem promoções no momento
+              {t.promotions.empty}
             </p>
           </div>
         ) : (
@@ -100,6 +104,7 @@ export default function PromotionsPage({ onBack: _onBack }: PromotionsPageProps)
                 texto={banner.texto}
                 imagem_url={banner.imagem_url}
                 fundo={homeConfig.fundo}
+                noImageLabel={t.common.noImage}
               />
             ))}
           </div>

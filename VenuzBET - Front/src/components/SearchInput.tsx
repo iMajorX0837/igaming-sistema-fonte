@@ -1,4 +1,5 @@
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import IconifyIcon from './IconifyIcon';
 
 interface SearchInputProps {
@@ -12,11 +13,13 @@ interface SearchInputProps {
 export default function SearchInput({
   value,
   onChange,
-  placeholder = 'Pesquisar',
+  placeholder,
   className = '',
   variant = 'page',
 }: SearchInputProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t.common.search;
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.currentTarget.style.borderColor = 'var(--brand-primary)';
@@ -36,7 +39,7 @@ export default function SearchInput({
     return (
       <input
         type="text"
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={handleFocus}
@@ -56,7 +59,7 @@ export default function SearchInput({
       />
       <input
         type="text"
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={handleFocus}

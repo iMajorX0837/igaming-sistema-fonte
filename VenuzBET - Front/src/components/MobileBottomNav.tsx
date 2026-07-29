@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface MobileBottomNavProps {
   visible: boolean;
@@ -19,6 +20,7 @@ const navIconClass = 'h-5 w-5 shrink-0 opacity-90 object-contain';
 
 export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [aviatorLoading, setAviatorLoading] = useState(false);
@@ -84,13 +86,13 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
       data-mobile-nav
       className="fixed bottom-0 left-0 right-0 z-[55] md:hidden pointer-events-none"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      aria-label="Navegação principal"
+      aria-label={t.navigation.mainNavAria}
     >
       <div className="pointer-events-auto mx-2 mb-2 flex items-end justify-between gap-0.5 rounded-2xl px-1 shadow-[0_-4px_24px_rgba(0,0,0,0.35)]" style={{ backgroundColor: homeConfig.fundo }}>
-        <button type="button" onClick={toggleMenu} className={`${itemBase} ${inactive}`} aria-label="Abrir ou fechar menu">
+        <button type="button" onClick={toggleMenu} className={`${itemBase} ${inactive}`} aria-label={t.navigation.openCloseMenu}>
           <img src={ICONS.menu} alt="" className={navIconClass} width={20} height={20} />
           <span className={`${labelClass} font-semibold`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Menu
+            {t.navigation.menu}
           </span>
         </button>
 
@@ -102,7 +104,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
         >
           <img src={ICONS.sport} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Esporte
+            {t.navigation.sports}
           </span>
         </button>
 
@@ -115,14 +117,14 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
             boxShadow: '0 4px 20px rgb(var(--brand-primary-rgb) / 0.45)',
           }}
           aria-current={isCasino ? 'page' : undefined}
-          aria-label="Cassino — início"
+          aria-label={t.navigation.casinoHome}
         >
           <img src={ICONS.casino} alt="" className="h-[22px] w-[22px] shrink-0 object-contain" width={22} height={22} />
           <span
             className="mt-0.5 text-[10px] font-black tracking-wide text-white"
             style={{ fontFamily: 'Montserrat, sans-serif' }}
           >
-            Cassino
+            {t.navigation.casino}
           </span>
         </button>
 
@@ -134,7 +136,7 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
         >
           <img src={ICONS.live} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Ao Vivo
+            {t.navigation.live}
           </span>
         </button>
 
@@ -143,11 +145,11 @@ export default function MobileBottomNav({ visible }: MobileBottomNavProps) {
           onClick={onAviator}
           disabled={aviatorLoading}
           className={`${itemBase} ${inactive} disabled:opacity-50`}
-          aria-label="Abrir Aviator"
+          aria-label={t.navigation.aviatorOpen}
         >
           <img src={ICONS.aviator} alt="" className={navIconClass} width={20} height={20} />
           <span className={labelClass} style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            {aviatorLoading ? '…' : 'Aviator'}
+            {aviatorLoading ? '…' : t.navigation.aviator}
           </span>
         </button>
       </div>

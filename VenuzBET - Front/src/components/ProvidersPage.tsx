@@ -18,6 +18,7 @@ import {
   isPlatformGameEnabled,
   isPlatformProviderEnabled,
 } from '../lib/platformGames';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ApiProvider {
   id: number;
@@ -43,17 +44,17 @@ interface Provider {
   apiId: number;
 }
 
-// Fun˜˜o para criar slug de URL (normalizar para URL-friendly)
+// Funï¿½ï¿½o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n˜o alfanum˜ricos por h˜fen
-    .replace(/^-+|-+$/g, ''); // Remove h˜fens do in˜cio e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres nï¿½o alfanumï¿½ricos por hï¿½fen
+    .replace(/^-+|-+$/g, ''); // Remove hï¿½fens do inï¿½cio e fim
 };
 
-// Fun˜˜o para obter o slug do provider baseado no nome
+// Funï¿½ï¿½o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   const providerMap: { [key: string]: string } = {
     'PG Soft': 'pgsoft',
@@ -76,6 +77,7 @@ const getProviderSlug = (providerName: string): string => {
 
 export default function ProvidersPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { config: homeConfig } = useHomeConfig();
   const cardBg = getEstudiosCardBackground(homeConfig.fundo);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -96,7 +98,7 @@ export default function ProvidersPage() {
         const mappedProviders: Provider[] = filteredProviders.map(provider => ({
           id: provider.id.toString(),
           name: provider.name,
-          games: 0, // Ser˜ atualizado depois
+          games: 0, // Serï¿½ atualizado depois
           image: provider.image_url,
           apiId: provider.id,
         }));
@@ -154,12 +156,12 @@ export default function ProvidersPage() {
       }
     } catch (err) {
       console.error('Erro ao buscar provedores:', err);
-      setError('Erro ao carregar provedores. Tente novamente.');
+      setError(t.games.loadProvidersError);
       setProviders([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t.games.loadProvidersError]);
 
   useEffect(() => {
     fetchProviders();
@@ -171,11 +173,11 @@ export default function ProvidersPage() {
           <div className="flex-1 py-4 sm:py-6">
             <div className="flex items-center gap-4 mb-8 min-h-[40px] min-w-0">
               <BackButton compact onClick={() => navigate('/')} />
-              <h1 className="text-white text-2xl font-bold">Todos os provedores</h1>
+              <h1 className="text-white text-2xl font-bold">{t.games.providersTitle}</h1>
             </div>
 
             {isLoading && (
-              <LoadingScreen title="Carregando provedores..." variant="page" />
+              <LoadingScreen title={t.games.loadingProviders} variant="page" />
             )}
 
             {error && !isLoading && (
@@ -185,7 +187,7 @@ export default function ProvidersPage() {
                   onClick={fetchProviders}
                   className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
-                  Tentar novamente
+                  {t.common.tryAgain}
                 </button>
               </div>
             )}
@@ -233,7 +235,7 @@ export default function ProvidersPage() {
 
                 {providers.length === 0 && (
                   <div className="py-20 text-center">
-                    <p className="text-slate-400 text-lg">Nenhum provedor encontrado</p>
+                    <p className="text-slate-400 text-lg">{t.games.noProvidersFound}</p>
                   </div>
                 )}
               </>

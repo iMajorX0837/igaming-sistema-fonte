@@ -1,6 +1,7 @@
 ﻿import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { getEstudiosCardBackground, getHomeSliderSurfaceBackground } from '../lib/homeTheme';
 
 interface Provider {
@@ -15,8 +16,10 @@ interface ProviderSliderProps {
   providers: Provider[];
 }
 
-export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/providers', providers }: ProviderSliderProps) {
+export default function ProviderSlider({ title, viewAllLink = '/providers', providers }: ProviderSliderProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
+  const sectionTitle = title ?? t.home.studios;
   const surfaceBg = getHomeSliderSurfaceBackground(homeConfig.fundo);
   const cardBg = getEstudiosCardBackground(homeConfig.fundo);
   const hoverBg = homeConfig.fundo;
@@ -86,7 +89,7 @@ export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/pr
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h4 className="text-white font-bold text-xl tracking-tight">{title}</h4>
+        <h4 className="text-white font-bold text-xl tracking-tight">{sectionTitle}</h4>
         <div className="flex items-center gap-2 flex-shrink-0">
           <a
             href={viewAllLink}
@@ -94,7 +97,7 @@ export default function ProviderSlider({ title = 'Estúdios', viewAllLink = '/pr
             style={{ backgroundColor: surfaceBg }}
             {...surfaceHoverHandlers}
           >
-            Ver Tudo
+            {t.common.seeAll}
           </a>
           <button
             onClick={scrollLeft}

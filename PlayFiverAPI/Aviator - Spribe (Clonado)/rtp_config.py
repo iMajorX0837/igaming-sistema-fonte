@@ -40,6 +40,16 @@ _runtime = {
 _fetch_interval_ms = int(os.environ.get("AVIATOR_CONFIG_REFRESH_MS", "5000"))
 
 
+def _num(value, default: float | int) -> float:
+    """Converte número preservando 0 (não usar `x or default` — 0 é válido)."""
+    if value is None or value == "":
+        return float(default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
 def _bridge_url(path: str) -> str:
     base = os.environ.get("WALLET_BRIDGE_URL", "").rstrip("/")
     if not base:
@@ -85,24 +95,28 @@ def refresh_runtime(force: bool = False) -> dict:
         prev_version_key = str(_runtime.get("version_key") or "")
         new_engine_version = str(payload.get("engine_version") or "")
         new_config_version = str(payload.get("config_version") or "")
-        version_key = new_engine_version or new_config_version
+        # Inclui updated_at (config_version) para invalidar fila ao mudar só pct_vela_*
+        version_key = "|".join(p for p in (new_engine_version, new_config_version) if p)
         version_changed = bool(version_key and version_key != prev_version_key)
 
-        min_crash = float(payload.get("min_crash") or DEFAULT_MIN_CRASH)
-        max_crash = float(payload.get("max_crash") or DEFAULT_MAX_CRASH)
+        min_crash = _num(payload.get("min_crash"), DEFAULT_MIN_CRASH)
+        max_crash = _num(payload.get("max_crash"), DEFAULT_MAX_CRASH)
         _runtime.update(
             {
-                "rtp_geral": float(payload.get("rtp_geral") or payload.get("rtp_base") or DEFAULT_RTP_GERAL),
-                "pct_vela_azul": float(payload.get("pct_vela_azul") or DEFAULT_PCT_AZUL),
-                "pct_vela_roxa": float(payload.get("pct_vela_roxa") or DEFAULT_PCT_ROXA),
-                "pct_vela_rosa": float(payload.get("pct_vela_rosa") or DEFAULT_PCT_ROSA),
+                "rtp_geral": _num(
+                    payload.get("rtp_geral") if payload.get("rtp_geral") is not None else payload.get("rtp_base"),
+                    DEFAULT_RTP_GERAL,
+                ),
+                "pct_vela_azul": _num(payload.get("pct_vela_azul"), DEFAULT_PCT_AZUL),
+                "pct_vela_roxa": _num(payload.get("pct_vela_roxa"), DEFAULT_PCT_ROXA),
+                "pct_vela_rosa": _num(payload.get("pct_vela_rosa"), DEFAULT_PCT_ROSA),
                 "min_crash": min_crash,
                 "max_crash": max_crash,
-                "min_crash_mul": int(payload.get("min_crash_mul") or DEFAULT_MIN_CRASH_MUL),
-                "max_crash_mul": int(payload.get("max_crash_mul") or DEFAULT_MAX_CRASH_MUL),
-                "queue_size": int(payload.get("queue_size") or DEFAULT_QUEUE_SIZE),
+                "min_crash_mul": int(_num(payload.get("min_crash_mul"), DEFAULT_MIN_CRASH_MUL)),
+                "max_crash_mul": int(_num(payload.get("max_crash_mul"), DEFAULT_MAX_CRASH_MUL)),
+                "queue_size": int(_num(payload.get("queue_size"), DEFAULT_QUEUE_SIZE)),
                 "modo_geracao": str(payload.get("modo_geracao") or DEFAULT_MODO),
-                "crash_technical_max": float(payload.get("crash_technical_max") or 1000),
+                "crash_technical_max": _num(payload.get("crash_technical_max"), 1000),
                 "config_version": new_config_version,
                 "engine_version": new_engine_version,
                 "version_key": version_key,
@@ -156,9 +170,9 @@ def _tier_effective_range(
 def _pick_color_tier(cfg: dict, min_x: Decimal, max_x: Decimal) -> str:
     """Sorteia cor por peso, considerando apenas faixas válidas no intervalo global."""
     weights = {
-        "low": float(cfg.get("pct_vela_azul") or DEFAULT_PCT_AZUL),
-        "mid": float(cfg.get("pct_vela_roxa") or DEFAULT_PCT_ROXA),
-        "high": float(cfg.get("pct_vela_rosa") or DEFAULT_PCT_ROSA),
+        "low": _num(cfg.get("pct_vela_azul"), DEFAULT_PCT_AZUL),
+        "mid": _num(cfg.get("pct_vela_roxa"), DEFAULT_PCT_ROXA),
+        "high": _num(cfg.get("pct_vela_rosa"), DEFAULT_PCT_ROSA),
     }
     valid = {
         tier: w

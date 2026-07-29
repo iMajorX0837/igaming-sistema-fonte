@@ -11,6 +11,7 @@ import {
   isPlatformGameEnabled,
   isPlatformProviderEnabled,
 } from '../lib/platformGames';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 
 const createSlug = (text: string): string => {
   return text
@@ -44,9 +45,9 @@ const getProviderSlug = (providerName: string): string => {
 };
 
 const gameMapping: { [key: string]: { provider: string; image: string } } = {
-  Mines: { provider: 'Spribe', image: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/mines.svg' },
-  'Fortune Dragon': { provider: 'Pgsoft', image: 'https://imagensfivers.com/Games/Pgsoft/1695365.webp' },
-  'Fortune Tiger': { provider: 'Pgsoft', image: 'https://imagensfivers.com/Games/Pgsoft/126.webp' },
+  Mines: { provider: 'Spribe', image: GAME_IMAGE_FALLBACK_LG },
+  'Fortune Dragon': { provider: 'Pgsoft', image: GAME_IMAGE_FALLBACK_LG },
+  'Fortune Tiger': { provider: 'Pgsoft', image: GAME_IMAGE_FALLBACK_LG },
   Aviator: { provider: 'Spribe', image: AVIATOR_GAME_IMAGE },
 };
 

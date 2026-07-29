@@ -1,3 +1,6 @@
+import type { AppLanguage } from '../i18n/types';
+import { getAppCopy } from '../i18n';
+
 type AuthErrorLike = {
   message?: string;
   code?: string;
@@ -10,16 +13,17 @@ function normalize(value: string): string {
 }
 
 /**
- * Converte erros do Supabase Auth / proxy em mensagens claras em PT-BR.
+ * Converte erros do Supabase Auth / proxy em mensagens claras no idioma selecionado.
  */
 export function mapAuthError(
   error: AuthErrorLike | string | Error | unknown,
-  fallback: string
+  fallback: string,
+  lang: AppLanguage = 'pt',
 ): string {
   if (!error) return fallback;
 
   if (typeof error === 'string') {
-    return mapAuthErrorText(error, undefined, undefined, fallback);
+    return mapAuthErrorText(error, undefined, undefined, fallback, lang);
   }
 
   const message =
@@ -39,24 +43,26 @@ export function mapAuthError(
       ? Number((error as AuthErrorLike)?.status)
       : undefined;
 
-  return mapAuthErrorText(message, code, status, fallback);
+  return mapAuthErrorText(message, code, status, fallback, lang);
 }
 
 function mapAuthErrorText(
   message: string,
   code: string | undefined,
   status: number | undefined,
-  fallback: string
+  fallback: string,
+  lang: AppLanguage,
 ): string {
+  const auth = getAppCopy(lang).auth;
   const msg = normalize(message || '');
   const errCode = normalize(code || '');
 
   if (errCode === 'invalid_credentials' || msg.includes('invalid login credentials')) {
-    return 'Senha inválida. Verifique seus dados e tente novamente.';
+    return auth.invalidCredentials;
   }
 
   if (errCode === 'email_not_confirmed' || msg.includes('email not confirmed')) {
-    return 'Confirme seu e-mail antes de fazer login.';
+    return auth.emailNotConfirmed;
   }
 
   if (
@@ -65,7 +71,7 @@ function mapAuthErrorText(
     msg.includes('already been registered') ||
     msg.includes('email address is already registered')
   ) {
-    return 'Este e-mail já está cadastrado. Faça login ou use outro e-mail.';
+    return auth.userAlreadyExists;
   }
 
   if (
@@ -77,9 +83,9 @@ function mapAuthErrorText(
     if (msg.includes('at least')) {
       const match = message.match(/at least (\d+)/i);
       const min = match?.[1] ?? '6';
-      return `A senha deve ter pelo menos ${min} caracteres.`;
+      return auth.weakPasswordMin(min);
     }
-    return 'Senha muito fraca. Use uma combinação mais segura.';
+    return auth.weakPassword;
   }
 
   if (
@@ -88,7 +94,7 @@ function mapAuthErrorText(
     msg.includes('invalid email') ||
     (msg.includes('email address') && msg.includes('invalid'))
   ) {
-    return 'E-mail inválido. Verifique o endereço digitado.';
+    return auth.validationFailed;
   }
 
   if (
@@ -98,11 +104,11 @@ function mapAuthErrorText(
     msg.includes('too many requests') ||
     msg.includes('muitas requisições')
   ) {
-    return 'Muitas tentativas. Aguarde um momento e tente novamente.';
+    return auth.rateLimit;
   }
 
   if (errCode === 'signup_disabled' || msg.includes('signups not allowed')) {
-    return 'Cadastros temporariamente desativados. Tente mais tarde.';
+    return auth.signupDisabled;
   }
 
   if (
@@ -110,26 +116,25 @@ function mapAuthErrorText(
     msg.includes('user is banned') ||
     msg.includes('user banned')
   ) {
-    return 'Esta conta foi bloqueada. Entre em contato com o suporte.';
+    return auth.userBanned;
   }
 
   if (msg.includes('network') || msg.includes('failed to fetch')) {
-    return 'Falha de conexão. Verifique sua internet e tente novamente.';
+    return auth.networkError;
   }
 
   if (msg.includes('cpf') && (msg.includes('already') || msg.includes('já') || msg.includes('duplicate') || msg.includes('unique'))) {
-    return 'Este CPF já está cadastrado. Faça login ou recupere sua conta.';
+    return auth.cpfDuplicate;
   }
 
   if (msg.includes('phone') && (msg.includes('already') || msg.includes('duplicate') || msg.includes('unique'))) {
-    return 'Este telefone já está cadastrado. Use outro número ou faça login.';
+    return auth.phoneDuplicate;
   }
 
   if (status === 429) {
-    return 'Muitas tentativas. Aguarde um momento e tente novamente.';
+    return auth.rateLimit;
   }
 
-  // Mensagens já em português (proxy / validações locais)
   if (message && /[áàâãéêíóôõúç]|obrigat|inválid|senha|e-mail|email|conta|cadastro|tente/i.test(message)) {
     return message;
   }
@@ -158,6 +163,10 @@ function looksLikeEnglishAuthError(msg: string): boolean {
   );
 }
 
-export function getAuthErrorMessage(err: unknown, fallback: string): string {
-  return mapAuthError(err, fallback);
+export function getAuthErrorMessage(
+  err: unknown,
+  fallback: string,
+  lang: AppLanguage = 'pt',
+): string {
+  return mapAuthError(err, fallback, lang);
 }

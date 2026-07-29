@@ -63,8 +63,6 @@ export function usePaymentGatewayConfig() {
 
   const loadConfig = useCallback(async () => {
     try {
-      setLoading(true);
-
       const [gatewayRes, misticpayRes, bspayRes, veopagRes] = await Promise.all([
         supabase.rpc('obter_payment_gateway_admin'),
         supabase.rpc('obter_misticpay_config_admin'),

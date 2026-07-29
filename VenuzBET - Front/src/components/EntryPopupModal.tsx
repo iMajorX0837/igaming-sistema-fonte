@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useEntryPopupConfig } from '../hooks/useEntryPopupConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 const DISMISS_KEY = 'venuz-entry-popup-dismissed-v1';
 const MODAL_ANIM_MS = 320;
@@ -24,6 +25,7 @@ function persistDismissed() {
 
 export default function EntryPopupModal() {
   const { config, loading } = useEntryPopupConfig();
+  const { t } = useTranslation();
   const [isDismissed, setIsDismissed] = useState(readDismissed);
   const [shouldMount, setShouldMount] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -59,7 +61,7 @@ export default function EntryPopupModal() {
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Promoção"
+      aria-label={t.common.promotion}
     >
       <div
         className={`relative max-w-[min(90vw,480px)] w-full ${panelAnimation}`}
@@ -68,7 +70,7 @@ export default function EntryPopupModal() {
         <div className="relative overflow-hidden rounded-xl">
           <img
             src={config.imagem_url}
-            alt="Promoção"
+            alt={t.common.promotion}
             className="w-full h-auto object-contain max-h-[80vh]"
             loading="eager"
           />
@@ -76,7 +78,7 @@ export default function EntryPopupModal() {
             type="button"
             onClick={handleClose}
             className="absolute top-2 right-2 z-10 flex h-8 w-8 items-center justify-center text-white transition-opacity hover:opacity-70"
-            aria-label="Fechar popup"
+            aria-label={t.common.closePopup}
           >
             <X className="h-6 w-6" />
           </button>

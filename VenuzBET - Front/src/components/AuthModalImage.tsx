@@ -16,9 +16,15 @@ export default function AuthModalImage({
   containerClassName = 'relative flex w-full justify-center items-center overflow-hidden',
   containerStyle,
 }: AuthModalImageProps) {
-  const [loaded, setLoaded] = useState(() => isImagePreloaded(src));
+  const hasSrc = Boolean(src?.trim());
+  const [loaded, setLoaded] = useState(() => (hasSrc ? isImagePreloaded(src) : true));
 
   useEffect(() => {
+    if (!hasSrc) {
+      setLoaded(true);
+      return;
+    }
+
     if (isImagePreloaded(src)) {
       setLoaded(true);
       return;
@@ -34,7 +40,22 @@ export default function AuthModalImage({
     return () => {
       cancelled = true;
     };
-  }, [src]);
+  }, [src, hasSrc]);
+
+  if (!hasSrc) {
+    return (
+      <div
+        className={containerClassName}
+        style={{
+          ...containerStyle,
+          minHeight: 120,
+          background:
+            'linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 25%, #121319), #121319)',
+        }}
+        aria-hidden
+      />
+    );
+  }
 
   return (
     <div className={containerClassName} style={containerStyle}>

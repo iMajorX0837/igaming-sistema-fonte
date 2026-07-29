@@ -1,4 +1,4 @@
-export const VIP_IMAGE_BASE = 'https://cdn.royalbetsolutions.com/default/vip';
+export const VIP_IMAGE_BASE = '';
 
 export type VipNivelRow = {
   nivel: number;
@@ -50,8 +50,8 @@ export function formatBRL(value: number): string {
   }).format(value);
 }
 
-export function getVipImageUrl(grupo: string): string {
-  return `${VIP_IMAGE_BASE}/${grupo}.webp`;
+export function getVipImageUrl(_grupo: string): string {
+  return '';
 }
 
 export const VIP_PROFILE_UPDATED_EVENT = 'vipProfileUpdated';

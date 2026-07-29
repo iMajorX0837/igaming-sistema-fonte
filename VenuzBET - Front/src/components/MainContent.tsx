@@ -52,7 +52,7 @@ interface Provider {
 }
 
 export default function MainContent({ onGameSelect }: MainContentProps) {
-  const { sections: homeSections } = useHomeSections();
+  const { sections: homeSections, loading: sectionsLoading } = useHomeSections();
   const { gamesBySectionId } = useHomeSectionGames();
   const { providersBySectionId } = useHomeSectionProviders();
   const { config: homeConfig } = useHomeConfig();
@@ -208,6 +208,10 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
               </div>
             );
           })}
+
+          {sectionsLoading && homeSections.length === 0 ? (
+            <div className="mt-6 h-40 rounded-xl border border-white/5 bg-white/[0.03] animate-pulse" aria-hidden="true" />
+          ) : null}
         </div>
       </div>
 

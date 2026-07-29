@@ -2,12 +2,13 @@ import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
-    // Garante que o Iconify escaneia os ícones após renderizar
     const timer = setTimeout(() => {
       if ((window as any).Iconify) {
         (window as any).Iconify.scan();
@@ -21,11 +22,11 @@ export default function NotFoundPage() {
           <div className="max-w-5xl mx-auto px-6 py-8">
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
               <h1 className="text-white text-4xl md:text-5xl font-bold mb-4">
-                Esta página não foi encontrada
+                {t.navigation.notFoundTitle}
               </h1>
               
               <p className="text-slate-300 text-lg md:text-xl mb-8">
-                ESTE LINK PODE ESTAR CORROMPIDO
+                {t.navigation.notFoundSubtitle}
               </p>
 
               <button
@@ -34,7 +35,7 @@ export default function NotFoundPage() {
                 style={{ backgroundColor: 'var(--brand-primary)' }}
               >
                 <span className="iconify" data-icon="solar:home-bold" aria-hidden="true" style={{ fontSize: '20px' }}></span>
-                VOLTAR PARA PAGINA INICIAL
+                {t.navigation.notFoundBack}
               </button>
             </div>
           </div>
@@ -42,4 +43,3 @@ export default function NotFoundPage() {
     </AppPageScaffold>
   );
 }
-

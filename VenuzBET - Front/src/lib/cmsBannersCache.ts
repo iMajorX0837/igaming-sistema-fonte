@@ -21,8 +21,8 @@ export interface RecommendedBanner {
   ativo: boolean;
 }
 
-const HOME_KEY = 'venuz-home-banners-v1';
-const RECOMMENDED_KEY = 'venuz-recommended-banners-v1';
+const HOME_KEY = 'venuz-home-banners-v2';
+const RECOMMENDED_KEY = 'venuz-recommended-banners-v2';
 
 function readList<T>(key: string): T[] | null {
   if (typeof window === 'undefined') return null;

@@ -2,11 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { openCmsLink } from '../lib/cmsLink';
 import { useHomeBanners, type HomeBanner } from '../hooks/useHomeBanners';
+import { useTranslation } from '../hooks/useTranslation';
 
 const DRAG_THRESHOLD = 48;
 
 export default function Banner() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { banners, loading } = useHomeBanners();
   const [currentBanner, setCurrentBanner] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -185,7 +187,7 @@ export default function Banner() {
           >
             <img
               src={banner.imagem_url}
-              alt={banner.titulo || 'Banner'}
+              alt={banner.titulo || t.common.banner}
               draggable={false}
               className="w-full h-full object-cover pointer-events-none"
             />
@@ -205,7 +207,7 @@ export default function Banner() {
                   ? 'bg-white w-8'
                   : 'bg-white/50 w-2 hover:bg-white/70'
               }`}
-              aria-label={`Ir para banner ${index + 1}`}
+              aria-label={t.common.goToBanner(index + 1)}
             />
           ))}
         </div>

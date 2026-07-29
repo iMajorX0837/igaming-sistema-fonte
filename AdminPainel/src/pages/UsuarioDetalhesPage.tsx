@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
@@ -20,10 +20,8 @@ import {
   Hash,
   Loader2,
   Lock,
-  LogIn,
   Mail,
   Minus,
-  Monitor,
   Phone,
   Plus,
   Receipt,
@@ -46,6 +44,7 @@ import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
 import Modal from '../components/ui/Modal';
 import FormField from '../components/ui/FormField';
+import { formatBRL, maskBRLInput, parseBRLInput } from '../lib/currencyInput';
 
 interface UsuarioDetalhe {
   id: string;
@@ -56,7 +55,6 @@ interface UsuarioDetalhe {
   data_nascimento: string | null;
   pais: string;
   kyc_status: string;
-  verificado: boolean;
   ativo: boolean;
   cargo: string;
   saldo: number;
@@ -64,7 +62,6 @@ interface UsuarioDetalhe {
   total_depositado: number;
   created_at: string;
   ultimo_login: string | null;
-  sessoes: number;
 }
 
 interface Resumo {
@@ -83,14 +80,6 @@ interface Estatisticas {
   media_deposito: number;
   media_saque: number;
   media_aposta: number;
-}
-
-interface Sessao {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  user_agent: string | null;
-  ip: string | null;
 }
 
 interface Deposito {
@@ -251,22 +240,16 @@ const cargoLabel = (cargo: string) => {
   const map: Record<string, string> = {
     usuario: 'Usuário',
     admin: 'Administrador',
-    moderador: 'Moderador',
-    suporte: 'Suporte',
   };
   return map[cargo] || cargo;
 };
 
-const getStatusLabel = (ativo: boolean, verificado: boolean) => {
-  if (!ativo && !verificado) return 'Inativo (Não Verificado)';
-  if (!ativo) return 'Inativo';
-  if (!verificado) return 'Ativo (Não Verificado)';
-  return 'Ativo';
+const getStatusLabel = (ativo: boolean) => {
+  return ativo ? 'Ativo' : 'Inativo';
 };
 
-const getStatusBadge = (ativo: boolean, verificado: boolean) => {
+const getStatusBadge = (ativo: boolean) => {
   if (!ativo) return 'bg-admin-panel text-gray-500 border-admin-border';
-  if (!verificado) return 'bg-white/5 text-gray-300 border-admin-border';
   return 'bg-white/10 text-white border-admin-border-strong';
 };
 
@@ -278,17 +261,16 @@ export default function UsuarioDetalhesPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
 
   const [usuario, setUsuario] = useState<UsuarioDetalhe | null>(null);
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
   const [showEstatisticas, setShowEstatisticas] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('saldo');
-  const [showSessoes, setShowSessoes] = useState(false);
-  const [sessoes, setSessoes] = useState<Sessao[]>([]);
-  const [sessoesLoading, setSessoesLoading] = useState(false);
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [saques, setSaques] = useState<Saque[]>([]);
   const [apostas, setApostas] = useState<Aposta[]>([]);
@@ -297,6 +279,7 @@ export default function UsuarioDetalhesPage() {
   const [transPage, setTransPage] = useState(1);
   const [transTotals, setTransTotals] = useState({ depositos: 0, saques: 0, apostas: 0 });
   const [valorSaldo, setValorSaldo] = useState('');
+  const [showGerenciarSaldo, setShowGerenciarSaldo] = useState(false);
   const [rollover, setRollover] = useState<RolloverInfo | null>(null);
   const [rolloverLoading, setRolloverLoading] = useState(false);
   const [showRolloverManage, setShowRolloverManage] = useState(false);
@@ -323,14 +306,16 @@ export default function UsuarioDetalhesPage() {
     if (!userId) return;
 
     try {
-      setLoading(true);
       const { data, error } = await supabase.rpc('obter_detalhes_usuario_admin', {
         p_usuario_id: userId,
       });
 
       if (error) {
         console.error(error);
-        showToast('Erro ao carregar usuário. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
+        showToastRef.current(
+          'Erro ao carregar usuário. Execute deploy/supabase_nova_casa.sql no Supabase.',
+          'error',
+        );
         return;
       }
 
@@ -343,7 +328,7 @@ export default function UsuarioDetalhesPage() {
       };
 
       if (!result?.ok || !result.usuario) {
-        showToast(result?.error || 'Usuário não encontrado', 'error');
+        showToastRef.current(result?.error || 'Usuário não encontrado', 'error');
         navigate('/usuarios');
         return;
       }
@@ -361,11 +346,11 @@ export default function UsuarioDetalhesPage() {
         cargo: result.usuario.cargo || 'usuario',
       });
     } catch {
-      showToast('Erro ao carregar usuário.', 'error');
+      showToastRef.current('Erro ao carregar usuário.', 'error');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
-  }, [userId, navigate, showToast]);
+  }, [userId, navigate]);
 
   const loadTransacoes = useCallback(async () => {
     if (!userId) return;
@@ -421,13 +406,16 @@ export default function UsuarioDetalhesPage() {
 
       if (error) {
         console.error(error);
-        showToast('Erro ao carregar Indique e Ganhe. Execute deploy/supabase_nova_casa.sql no Supabase.', 'error');
+        showToastRef.current(
+          'Erro ao carregar Indique e Ganhe. Execute deploy/supabase_nova_casa.sql no Supabase.',
+          'error',
+        );
         return;
       }
 
       const result = data as { ok: boolean; error?: string } & IndicacaoUsuario;
       if (!result?.ok) {
-        showToast(result?.error || 'Erro ao carregar Indique e Ganhe.', 'error');
+        showToastRef.current(result?.error || 'Erro ao carregar Indique e Ganhe.', 'error');
         return;
       }
 
@@ -440,7 +428,7 @@ export default function UsuarioDetalhesPage() {
     } finally {
       setIndicacaoLoading(false);
     }
-  }, [userId, showToast]);
+  }, [userId]);
 
   const loadRollover = useCallback(async () => {
     if (!userId) return;
@@ -475,7 +463,7 @@ export default function UsuarioDetalhesPage() {
 
   useEffect(() => {
     void loadDetalhes();
-  }, [loadDetalhes]);
+  }, [userId, loadDetalhes]);
 
   useEffect(() => {
     void loadRollover();
@@ -495,7 +483,7 @@ export default function UsuarioDetalhesPage() {
     setTransPage(1);
   };
 
-  const handleStatusUpdate = async (ativo?: boolean, verificado?: boolean, kyc_status?: string) => {
+  const handleStatusUpdate = async (ativo?: boolean, kyc_status?: string) => {
     if (!userId) return;
 
     setSaving(true);
@@ -503,7 +491,7 @@ export default function UsuarioDetalhesPage() {
       const { data, error } = await supabase.rpc('atualizar_status_usuario_admin', {
         p_usuario_id: userId,
         p_ativo: ativo ?? null,
-        p_verificado: verificado ?? null,
+        p_verificado: null,
         p_kyc_status: kyc_status ?? null,
       });
 
@@ -519,30 +507,17 @@ export default function UsuarioDetalhesPage() {
       }
 
       showToast('Status atualizado!', 'success');
-      await loadDetalhes();
+      setUsuario((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(ativo !== undefined ? { ativo } : {}),
+              ...(kyc_status !== undefined ? { kyc_status } : {}),
+            }
+          : prev,
+      );
     } finally {
       setSaving(false);
-    }
-  };
-
-  const loadSessoes = async () => {
-    if (!userId) return;
-
-    setShowSessoes(true);
-    setSessoesLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('listar_sessoes_usuario_admin', {
-        p_usuario_id: userId,
-      });
-
-      if (error) {
-        showToast('Erro ao carregar sessões.', 'error');
-        return;
-      }
-
-      setSessoes((data as Sessao[]) || []);
-    } finally {
-      setSessoesLoading(false);
     }
   };
 
@@ -561,15 +536,25 @@ export default function UsuarioDetalhesPage() {
         return;
       }
 
-      const result = data as { success?: boolean; error?: string };
+      const result = data as {
+        success?: boolean;
+        error?: string;
+        saldo_atual?: number;
+        saldo_novo?: number;
+      };
       if (!result?.success) {
         showToast(result?.error || 'Erro ao atualizar saldo.', 'error');
         return;
       }
 
+      const saldoAtualizado = Number(result.saldo_atual ?? result.saldo_novo ?? novoSaldo);
+      setUsuario((prev) =>
+        prev ? { ...prev, saldo: Number.isFinite(saldoAtualizado) ? saldoAtualizado : novoSaldo } : prev,
+      );
+
       showToast(mensagem, 'success');
       setValorSaldo('');
-      await loadDetalhes();
+      setShowGerenciarSaldo(false);
     } finally {
       setSaving(false);
     }
@@ -578,7 +563,7 @@ export default function UsuarioDetalhesPage() {
   const handleAdicionarSaldo = async () => {
     if (!usuario || !valorSaldo) return;
 
-    const valor = parseFloat(valorSaldo);
+    const valor = parseBRLInput(valorSaldo);
     if (Number.isNaN(valor) || valor <= 0) {
       showToast('Digite um valor válido.', 'warning');
       return;
@@ -591,7 +576,7 @@ export default function UsuarioDetalhesPage() {
   const handleRemoverSaldo = async () => {
     if (!usuario || !valorSaldo) return;
 
-    const valor = parseFloat(valorSaldo);
+    const valor = parseBRLInput(valorSaldo);
     if (Number.isNaN(valor) || valor <= 0) {
       showToast('Digite um valor válido.', 'warning');
       return;
@@ -751,7 +736,20 @@ export default function UsuarioDetalhesPage() {
       }
 
       showToast('Perfil atualizado!', 'success');
-      await loadDetalhes();
+      setUsuario((prev) =>
+        prev
+          ? {
+              ...prev,
+              nome: perfilForm.nome,
+              email: perfilForm.email,
+              cpf: perfilForm.cpf,
+              telefone: perfilForm.telefone,
+              data_nascimento: perfilForm.data_nascimento || null,
+              pais: perfilForm.pais,
+              cargo: perfilForm.cargo,
+            }
+          : prev,
+      );
     } finally {
       setSaving(false);
     }
@@ -766,7 +764,7 @@ export default function UsuarioDetalhesPage() {
     }
   };
 
-  if (loading) {
+  if (initialLoading) {
     return <LoadingState message="Carregando detalhes do usuário..." />;
   }
 
@@ -787,12 +785,6 @@ export default function UsuarioDetalhesPage() {
   ];
 
   const transTotal = transTotals[transTipo];
-
-  const overviewStats = [
-    { label: 'Saldo atual', value: formatCurrency(usuario.saldo), icon: Wallet },
-    { label: 'Total depositado', value: formatCurrency(usuario.total_depositado), icon: ArrowDownCircle },
-    { label: 'Nível VIP', value: `Nível ${usuario.vip_nivel}`, icon: Crown },
-  ];
 
   const resumoCards = resumo
     ? [
@@ -818,13 +810,48 @@ export default function UsuarioDetalhesPage() {
     : [];
 
   const estatisticasItems = [
-    { label: 'Total Depositado', value: formatCurrency(estatisticas?.total_depositado ?? 0), icon: ArrowDownCircle },
-    { label: 'Total Retirado', value: formatCurrency(estatisticas?.total_retirado ?? 0), icon: ArrowUpCircle },
-    { label: 'Total Apostado', value: formatCurrency(estatisticas?.total_apostado ?? 0), icon: Trophy },
-    { label: 'Total Ganho', value: formatCurrency(estatisticas?.total_ganho ?? 0), icon: Wallet },
-    { label: 'Média por Depósito', value: formatCurrency(estatisticas?.media_deposito ?? 0), icon: ArrowDownCircle },
-    { label: 'Média por Saque', value: formatCurrency(estatisticas?.media_saque ?? 0), icon: ArrowUpCircle },
-    { label: 'Média por Aposta', value: formatCurrency(estatisticas?.media_aposta ?? 0), icon: Trophy },
+    {
+      label: 'Total Depositado',
+      value: formatCurrency(estatisticas?.total_depositado ?? 0),
+      hint: 'Depósitos aprovados',
+      icon: ArrowDownCircle,
+    },
+    {
+      label: 'Total Retirado',
+      value: formatCurrency(estatisticas?.total_retirado ?? 0),
+      hint: 'Saques aprovados',
+      icon: ArrowUpCircle,
+    },
+    {
+      label: 'Total Apostado',
+      value: formatCurrency(estatisticas?.total_apostado ?? 0),
+      hint: 'Soma de todas as apostas',
+      icon: Trophy,
+    },
+    {
+      label: 'Total Ganho',
+      value: formatCurrency(estatisticas?.total_ganho ?? 0),
+      hint: 'Retornos creditados em jogos',
+      icon: Wallet,
+    },
+    {
+      label: 'Média por Depósito',
+      value: formatCurrency(estatisticas?.media_deposito ?? 0),
+      hint: resumo ? `${resumo.total_depositos} depósito(s)` : undefined,
+      icon: ArrowDownCircle,
+    },
+    {
+      label: 'Média por Saque',
+      value: formatCurrency(estatisticas?.media_saque ?? 0),
+      hint: resumo ? `${resumo.total_saques} saque(s)` : undefined,
+      icon: ArrowUpCircle,
+    },
+    {
+      label: 'Média por Aposta',
+      value: formatCurrency(estatisticas?.media_aposta ?? 0),
+      hint: resumo ? `${resumo.total_apostas} aposta(s)` : undefined,
+      icon: Trophy,
+    },
   ];
 
   return (
@@ -853,14 +880,14 @@ export default function UsuarioDetalhesPage() {
               <p className="text-gray-500 text-sm truncate mt-1">{usuario.email}</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getStatusBadge(usuario.ativo, usuario.verificado)}`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getStatusBadge(usuario.ativo)}`}
                 >
                   {usuario.ativo ? (
                     <CheckCircle2 className="w-3 h-3 text-white" />
                   ) : (
                     <Ban className="w-3 h-3 text-admin-muted" />
                   )}
-                  {getStatusLabel(usuario.ativo, usuario.verificado)}
+                  {getStatusLabel(usuario.ativo)}
                 </span>
                 {usuario.cargo !== 'usuario' && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white/5 text-gray-300 border border-admin-border">
@@ -871,6 +898,10 @@ export default function UsuarioDetalhesPage() {
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white/5 text-gray-300 border border-admin-border">
                   <Crown className="w-3 h-3 text-white" />
                   VIP {usuario.vip_nivel}
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-white/5 text-gray-300 border border-admin-border">
+                  <Wallet className="w-3 h-3 text-white" />
+                  {formatCurrency(usuario.saldo)}
                 </span>
               </div>
             </div>
@@ -892,26 +923,6 @@ export default function UsuarioDetalhesPage() {
                 <Copy className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5 pt-5 border-t border-admin-border">
-            {overviewStats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div
-                  key={stat.label}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-admin-panel border border-admin-border"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-admin-panel border border-admin-border flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-gray-500 text-xs">{stat.label}</p>
-                    <p className="text-white font-semibold text-sm truncate">{stat.value}</p>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -943,7 +954,7 @@ export default function UsuarioDetalhesPage() {
 
           <div className="px-5 py-4 border-t border-admin-border">
             <h3 className="text-white text-sm font-semibold flex items-center gap-2 mb-3">
-              <Monitor className="w-4 h-4 text-white" />
+              <Shield className="w-4 h-4 text-white" />
               Ações rápidas
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -954,12 +965,6 @@ export default function UsuarioDetalhesPage() {
                   setActiveTab('transacoes');
                   handleTransTipoChange('depositos');
                 }}
-              />
-              <ActionButton icon={Monitor} label="Sessões" onClick={loadSessoes} />
-              <ActionButton
-                icon={LogIn}
-                label="Logar como"
-                onClick={() => showToast('Requer service role no Supabase. Em breve.', 'info')}
               />
               {!usuario.ativo ? (
                 <ActionButton
@@ -1049,53 +1054,29 @@ export default function UsuarioDetalhesPage() {
                 />
 
                 <div className="rounded-xl border border-admin-border p-5 bg-admin-panel">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-lg bg-white/5 border border-admin-border flex items-center justify-center">
-                      <Wallet className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-white font-semibold text-sm">Gerenciar saldo</h3>
-                      <p className="text-gray-500 text-xs">
-                        Saldo atual: {formatCurrency(usuario.saldo)} — informe o valor para adicionar ou remover
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
-                      <input
-                        type="number"
-                        value={valorSaldo}
-                        onChange={(e) => setValorSaldo(e.target.value)}
-                        placeholder="0,00"
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-white/30 border border-admin-border bg-admin-panel"
-                      />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-white/5 border border-admin-border flex items-center justify-center shrink-0">
+                        <Wallet className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-semibold text-sm">Gerenciar saldo</h3>
+                        <p className="text-gray-500 text-xs">
+                          Saldo atual:{' '}
+                          <span className="text-white font-medium">{formatCurrency(usuario.saldo)}</span>
+                        </p>
+                      </div>
                     </div>
                     <button
-                      onClick={handleAdicionarSaldo}
-                      disabled={saving || !valorSaldo}
-                      className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white hover:bg-gray-200 disabled:opacity-50 text-black rounded-lg text-sm font-medium transition-colors"
+                      type="button"
+                      onClick={() => {
+                        setValorSaldo('');
+                        setShowGerenciarSaldo(true);
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shrink-0 bg-white/5 hover:bg-white/10 border border-admin-border text-white"
                     >
-                      {saving ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4" />
-                      )}
-                      Adicionar
-                    </button>
-                    <button
-                      onClick={handleRemoverSaldo}
-                      disabled={saving || !valorSaldo}
-                      className="flex items-center justify-center gap-2 px-5 py-2.5 bg-admin-panel hover:bg-white/5 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors border border-admin-border"
-                    >
-                      {saving ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Minus className="w-4 h-4" />
-                      )}
-                      Remover
+                      <Wallet className="w-4 h-4" />
+                      Ajustar saldo
                     </button>
                   </div>
                 </div>
@@ -1236,7 +1217,7 @@ export default function UsuarioDetalhesPage() {
                       return (
                         <button
                           key={status}
-                          onClick={() => handleStatusUpdate(undefined, undefined, status)}
+                          onClick={() => handleStatusUpdate(undefined, status)}
                           disabled={saving}
                           className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all disabled:opacity-50 ${
                             isSelected
@@ -1269,34 +1250,34 @@ export default function UsuarioDetalhesPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white/5 border border-admin-border">
-                        {usuario.verificado ? (
+                        {usuario.ativo ? (
                           <CheckCircle2 className="w-5 h-5 text-white" />
                         ) : (
-                          <ShieldAlert className="w-5 h-5 text-white" />
+                          <Ban className="w-5 h-5 text-white" />
                         )}
                       </div>
                       <div>
-                        <p className="text-white font-medium">Verificação da conta</p>
+                        <p className="text-white font-medium">Conta {usuario.ativo ? 'ativa' : 'bloqueada'}</p>
                         <p className="text-gray-500 text-sm mt-0.5">
-                          {usuario.verificado
-                            ? 'Usuário verificado pelo administrador'
-                            : 'Usuário ainda não foi verificado'}
+                          {usuario.ativo
+                            ? 'O usuário pode acessar a plataforma normalmente.'
+                            : 'O usuário não consegue acessar a plataforma.'}
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleStatusUpdate(undefined, !usuario.verificado)}
+                      onClick={() => handleStatusUpdate(!usuario.ativo)}
                       disabled={saving}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors shrink-0 bg-white hover:bg-gray-200 text-black"
                     >
                       {saving ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : usuario.verificado ? (
-                        <XCircle className="w-4 h-4" />
+                      ) : usuario.ativo ? (
+                        <Ban className="w-4 h-4" />
                       ) : (
                         <CheckCircle2 className="w-4 h-4" />
                       )}
-                      {usuario.verificado ? 'Remover verificação' : 'Verificar conta'}
+                      {usuario.ativo ? 'Bloquear conta' : 'Ativar conta'}
                     </button>
                   </div>
                 </div>
@@ -1536,8 +1517,6 @@ export default function UsuarioDetalhesPage() {
                   >
                     <option value="usuario">Usuário</option>
                     <option value="admin">Administrador</option>
-                    <option value="moderador">Moderador</option>
-                    <option value="suporte">Suporte</option>
                   </select>
                 </div>
 
@@ -1567,6 +1546,10 @@ export default function UsuarioDetalhesPage() {
         icon={BarChart3}
         size="lg"
       >
+        <p className="text-gray-500 text-sm mb-4">
+          Valores calculados a partir de depósitos/saques aprovados e transações de jogos registradas no
+          banco.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {estatisticasItems.map((item) => {
             const Icon = item.icon;
@@ -1581,11 +1564,80 @@ export default function UsuarioDetalhesPage() {
                 <div className="min-w-0">
                   <p className="text-gray-500 text-xs">{item.label}</p>
                   <p className="text-white text-lg font-bold">{item.value}</p>
+                  {item.hint ? <p className="text-gray-600 text-xs mt-0.5">{item.hint}</p> : null}
                 </div>
               </div>
             );
           })}
         </div>
+      </Modal>
+
+      <Modal
+        open={showGerenciarSaldo}
+        onClose={() => {
+          if (!saving) {
+            setShowGerenciarSaldo(false);
+            setValorSaldo('');
+          }
+        }}
+        title="Gerenciar saldo"
+        description={`Saldo atual: ${formatBRL(usuario.saldo)}`}
+        icon={Wallet}
+        size="sm"
+        footer={
+          <div className="flex w-full flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowGerenciarSaldo(false);
+                setValorSaldo('');
+              }}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white border border-admin-border bg-admin-panel hover:bg-white/5 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleRemoverSaldo}
+              disabled={saving || !valorSaldo}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Minus className="w-4 h-4" />}
+              Remover
+            </button>
+            <button
+              type="button"
+              onClick={handleAdicionarSaldo}
+              disabled={saving || !valorSaldo}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Adicionar
+            </button>
+          </div>
+        }
+      >
+        <p className="text-gray-500 text-sm mb-4">
+          Informe o valor em reais (R$) para creditar ou debitar do saldo do usuário.
+        </p>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={valorSaldo}
+            onChange={(e) => setValorSaldo(maskBRLInput(e.target.value))}
+            placeholder="0,00"
+            autoFocus
+            className="w-full pl-10 pr-4 py-2.5 text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-white/30 border border-admin-border bg-admin-panel"
+          />
+        </div>
+        {valorSaldo ? (
+          <p className="text-gray-500 text-xs mt-2">
+            Valor: <span className="text-white font-medium">{formatBRL(parseBRLInput(valorSaldo) || 0)}</span>
+          </p>
+        ) : null}
       </Modal>
 
       <Modal
@@ -1651,61 +1703,6 @@ export default function UsuarioDetalhesPage() {
             Valor será ADICIONADO ao rollover existente.
           </p>
         </div>
-      </Modal>
-
-      <Modal
-        open={showSessoes}
-        onClose={() => setShowSessoes(false)}
-        title="Sessões ativas"
-        description={`${usuario.sessoes} sessão(ões) registrada(s)`}
-        icon={Monitor}
-        size="lg"
-      >
-              {sessoesLoading ? (
-                <div className="flex items-center justify-center py-8 gap-3">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
-                  <p className="text-gray-500 text-sm">Carregando sessões...</p>
-                </div>
-              ) : sessoes.length === 0 ? (
-                <div className="text-center py-10">
-                  <Monitor className="w-10 h-10 text-white mx-auto mb-3 opacity-40" />
-                  <p className="text-gray-500 text-sm">Nenhuma sessão encontrada.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sessoes.map((s, i) => (
-                    <div
-                      key={s.id}
-                      className="p-4 rounded-xl border border-admin-border bg-admin-panel"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Globe className="w-4 h-4 text-white shrink-0" />
-                        <p className="text-white text-sm font-medium">
-                          {s.ip || 'IP desconhecido'}
-                        </p>
-                        {i === 0 && (
-                          <span className="ml-auto px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-gray-300 border border-admin-border">
-                            Mais recente
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-gray-400 text-xs mb-2 break-all pl-6">
-                        {s.user_agent || 'User agent não disponível'}
-                      </p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 pl-6 text-gray-500 text-xs">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Criada: {formatDateTime(s.created_at)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Atualizada: {formatDateTime(s.updated_at)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
       </Modal>
     </div>
   );

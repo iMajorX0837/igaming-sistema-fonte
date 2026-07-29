@@ -12,7 +12,6 @@ import SiteLogo from './SiteLogo';
 import IconifyIcon from './IconifyIcon';
 import { SIDEBAR_WIDTH_COLLAPSED_PX, SIDEBAR_WIDTH_EXPANDED_PX } from './Sidebar';
 import { supabase } from '../lib/supabase';
-import { getVipImageUrl } from '../lib/vip';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { useAuthModalsConfig, useFooterConfig } from '../contexts/SiteConfigContext';
 import { preloadRegisterModalImage } from '../lib/authModalImages';
@@ -28,6 +27,7 @@ import {
   syncWalletPreference,
   type WalletView,
 } from '../lib/walletPreference';
+import { useTranslation } from '../hooks/useTranslation';
 
 const accountMenuItemClass =
   'flex items-center gap-3 px-4 py-1.5 text-sm text-[#CBD5E1] transition-colors duration-200 hover:text-white hover:no-underline';
@@ -63,14 +63,13 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
   const { config: headerConfig } = useHeaderConfig();
   const { language } = useSidebarLanguage();
   const copy = useMemo(() => getHeaderFooterCopy(language).header, [language]);
+  const { t } = useTranslation();
   const { profile: vipProfile, niveis } = useVipProfile();
-  const vipImage = vipProfile.vip_imagem || getVipImageUrl(vipProfile.vip_grupo);
+  const vipImage = vipProfile.vip_imagem || '';
   const proximoNivel = niveis.find((n) => n.nivel === vipProfile.proximo_nivel);
   const proximoNome = vipProfile.proximo_nome ?? proximoNivel?.nome ?? null;
-  const proximoImage =
-    proximoNivel?.imagem_url ||
-    (proximoNivel ? getVipImageUrl(proximoNivel.grupo) : null);
-  const proximoCor = proximoNivel?.cor || 'rgb(255, 146, 17)';
+  const proximoImage = proximoNivel?.imagem_url || '';
+  const proximoCor = proximoNivel?.cor || 'var(--brand-primary)';
   const { config: authModalsConfig } = useAuthModalsConfig();
   const { config: footerConfig } = useFooterConfig();
   const autoRegisterOpenedRef = useRef(false);
@@ -105,16 +104,6 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
       console.error('Erro ao fazer logout:', error);
     }
   };
-
-  useEffect(() => {
-    // Garante que o Iconify escaneia os ícones após renderizar
-    const timer = setTimeout(() => {
-      if ((window as any).Iconify) {
-        (window as any).Iconify.scan();
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [isAuthenticated]);
 
   useEffect(() => {
     if (authLoading || isAuthenticated || autoRegisterOpenedRef.current) return;
@@ -262,7 +251,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     if (toggleCooldownUntil !== null && now < toggleCooldownUntil) {
       const secs = Math.max(1, Math.ceil((toggleCooldownUntil - now) / 1000));
       setNotification(
-        `Aguarde ${secs}s para alternar entre saldo real e bônus.`,
+        t.wallet.toggleCooldown.replace('{seconds}', String(secs)),
       );
       return;
     }
@@ -278,10 +267,10 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     setToggleCooldownUntil(cooldownUntil);
     setNotification(
       nextView === 'real'
-        ? 'Saldo disponível (R$) em destaque.'
-        : 'Bônus disponível (B$) em destaque.',
+        ? t.wallet.balanceHighlight
+        : t.wallet.bonusBalance,
     );
-  }, [balanceView, toggleCooldownUntil, user?.id]);
+  }, [balanceView, toggleCooldownUntil, user?.id, t.wallet]);
 
   useEffect(() => {
     // Fecha o menu ao clicar fora dele
@@ -375,19 +364,19 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                   className="flex items-center justify-center transition-opacity hover:opacity-90"
                   aria-label={copy.promotionsAria}
                 >
-                  <span
-                    className="iconify i-noto:wrapped-gift"
-                    data-icon="noto:wrapped-gift"
-                    aria-hidden="true"
-                    style={{ fontSize: '22px' }}
-                  />
+                  <IconifyIcon icon="noto:wrapped-gift" style={{ fontSize: '22px' }} />
                 </a>
               </div>
             </div>
 
             {/* Direita: Saldo | Botão Depositar | Conta */}
             <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-            {isAuthenticated && user ? (
+            {authLoading ? (
+              <div className="flex items-center gap-2 md:gap-3 ml-auto" aria-hidden="true">
+                <div className="h-7 md:h-8 w-16 md:w-20 rounded-full bg-white/10 animate-pulse" />
+                <div className="h-10 w-[121px] rounded-lg bg-white/10 animate-pulse" />
+              </div>
+            ) : isAuthenticated && user ? (
               <>
                 <div className="flex items-center gap-1.5 rounded-lg px-1.5 py-0.5">
                   <button
@@ -396,21 +385,20 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                     className="group relative shrink-0 cursor-pointer"
                     aria-label={
                       balanceView === 'real'
-                        ? 'Alternar para bônus disponível'
-                        : 'Alternar para saldo disponível'
+                        ? t.wallet.toggleBonus
+                        : t.wallet.toggleBalance
                     }
                     title={
                       isBalanceToggleOnCooldown
-                        ? `Aguarde ${balanceToggleCooldownSeconds}s para alternar`
+                        ? t.wallet.toggleCooldown.replace('{seconds}', String(balanceToggleCooldownSeconds))
                         : balanceView === 'real'
-                          ? 'Clique para destacar bônus (B$)'
-                          : 'Clique para destacar saldo real (R$)'
+                          ? t.wallet.toggleBonus
+                          : t.wallet.toggleBalance
                     }
                   >
-                    <span
-                      className="iconify text-white transition-colors duration-200 group-hover:text-[var(--brand-primary)]"
-                      data-icon="fa6-solid:coins"
-                      aria-hidden="true"
+                    <IconifyIcon
+                      icon="fa6-solid:coins"
+                      className="text-white transition-colors duration-200 group-hover:text-[var(--brand-primary)]"
                       style={{ fontSize: '18px' }}
                     />
                     {isBalanceToggleOnCooldown ? (
@@ -434,7 +422,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                   </div>
                   <div className="relative ml-1">
                     <div className="pix rounded-full flex items-center justify-center gap-0.5 px-1 py-0.5 absolute -top-3 left-1/2 transform -translate-x-1/2 z-10" style={{ backgroundColor: '#FFD700', color: '#000000' }}>
-                      <span className="iconify i-ic:baseline-pix" data-icon="ic:baseline-pix" aria-hidden="true" style={{ fontSize: '8px', color: '#000000' }}></span> <span style={{ color: '#000000', fontSize: '9px', fontWeight: '600' }}>PIX</span>
+                      <IconifyIcon icon="ic:baseline-pix" style={{ fontSize: '8px', color: '#000000' }} /> <span style={{ color: '#000000', fontSize: '9px', fontWeight: '600' }}>PIX</span>
                     </div>
                     <button 
                       onClick={() => setIsDepositOpen(true)} 
@@ -461,7 +449,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                       e.currentTarget.style.backgroundColor = 'var(--brand-primary)';
                     }}
                   >
-                    <span className="iconify" data-icon="ic:baseline-add" aria-hidden="true" style={{ fontSize: '16px' }}></span>
+                    <IconifyIcon icon="ic:baseline-add" style={{ fontSize: '16px' }} />
                   </button>
                   </div>
                 </div>
@@ -476,9 +464,12 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                     aria-expanded={isAccountMenuOpen}
                   >
                     <img 
-                      src={vipImage}
+                      src={vipImage || undefined}
                       alt={vipProfile.vip_nome}
-                      className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                      className="w-6 h-6 rounded-full object-cover flex-shrink-0 bg-white/10"
+                      onError={(e) => {
+                        e.currentTarget.style.visibility = 'hidden';
+                      }}
                     />
                     <div className="hidden md:block text-left min-w-0">
                       <p className="text-white font-semibold text-xs leading-tight truncate">{user.name}</p>
@@ -493,9 +484,12 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                     <div className="p-4 pb-3" style={{ backgroundColor: headerConfig.fundo }}>
                       <div className="flex items-center gap-3">
                         <img 
-                          src={vipImage}
+                          src={vipImage || undefined}
                           alt={vipProfile.vip_nome}
-                          className="w-10 h-10 rounded-full object-cover"
+                          className="w-10 h-10 rounded-full object-cover bg-white/10"
+                          onError={(e) => {
+                            e.currentTarget.style.visibility = 'hidden';
+                          }}
                         />
                         <p className="text-white font-bold text-sm">{user.name}</p>
                       </div>
@@ -525,27 +519,27 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                     )}
                     <div className="py-1">
                       <a href="/profile" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
-                        <span className="iconify" data-icon="solar:user-bold-duotone" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="solar:user-bold-duotone" style={{ fontSize: '20px' }} />
                         <span>{copy.myAccount}</span>
                       </a>
                       <a href="/wallet" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
-                        <span className="iconify" data-icon="solar:wallet-bold-duotone" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="solar:wallet-bold-duotone" style={{ fontSize: '20px' }} />
                         <span>{copy.wallet}</span>
                       </a>
                       <a href="/help/vip" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
-                        <span className="iconify" data-icon="solar:crown-bold-duotone" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="solar:crown-bold-duotone" style={{ fontSize: '20px' }} />
                         <span>{copy.vipLevels}</span>
                       </a>
                       <button onClick={() => { handleOpenCoupon(); setIsAccountMenuOpen(false); }} className={accountMenuButtonClass}>
-                        <span className="iconify" data-icon="streamline:discount-percent-coupon-solid" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="streamline:discount-percent-coupon-solid" style={{ fontSize: '20px' }} />
                         <span>{copy.activateCoupon}</span>
                       </button>
                       <a href="/help/referral" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
-                        <span className="iconify" data-icon="solar:users-group-two-rounded-bold-duotone" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="solar:users-group-two-rounded-bold-duotone" style={{ fontSize: '20px' }} />
                         <span>{copy.referrals}</span>
                       </a>
                       <a href="/help/promotions" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
-                        <span className="iconify" data-icon="ph:gift-duotone" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="ph:gift-duotone" style={{ fontSize: '20px' }} />
                         <span>{copy.promotions}</span>
                       </a>
                       <a href="/help/mobile" onClick={() => setIsAccountMenuOpen(false)} className={accountMenuItemClass}>
@@ -575,7 +569,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
                         className="flex items-center gap-3 px-4 py-1.5 text-sm w-full text-left"
                         style={{ color: '#F87171', backgroundColor: 'transparent' }}
                       >
-                        <span className="iconify" data-icon="majesticons:door-exit" aria-hidden="true" style={{ fontSize: '20px' }}></span>
+                        <IconifyIcon icon="majesticons:door-exit" style={{ fontSize: '20px' }} />
                         <span>{copy.logout}</span>
                       </button>
                     </div>

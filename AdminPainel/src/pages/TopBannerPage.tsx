@@ -38,7 +38,6 @@ export default function TopBannerPage() {
 
   const loadConfig = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('site_config')
         .select(

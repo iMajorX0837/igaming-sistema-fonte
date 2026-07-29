@@ -5,6 +5,8 @@ import AppPageScaffold from './AppPageScaffold';
 import BackButton from './BackButton';
 import DepositModal from './DepositModal';
 import WithdrawModal from './WithdrawModal';
+import LoginModal from './LoginModal';
+import LoginRequiredPanel from './LoginRequiredPanel';
 import Notification from './Notification';
 import { useAuth } from '../contexts/AuthContext';
 import { useVipProfile } from '../hooks/useVipProfile';
@@ -21,6 +23,8 @@ import {
 import { resolveGameByGameCode } from '../utils/resolveGameBySlug';
 import { converterBonusSaldo, obterBonusUsuario } from '../lib/bonusWallet';
 import LoadingScreen from './LoadingScreen';
+import { useTranslation } from '../hooks/useTranslation';
+import type { WalletCopy } from '../i18n/wallet';
 import { appPageContainerClass } from '../constants/homeLayout';
 
 function WalletMobileField({ label, value }: { label: string; value: ReactNode }) {
@@ -38,13 +42,26 @@ function WalletTransactionMobileCard({
   backgroundColor,
   playingRodadaId,
   onPlayRodada,
+  columns,
+  playLabel,
+  openingLabel,
 }: {
   activeTab: string;
   item: Record<string, unknown>;
   backgroundColor: string;
   playingRodadaId: string | null;
   onPlayRodada: (bonus: FreeBonusItem) => void;
+  columns: WalletCopy['columns'];
+  playLabel: string;
+  openingLabel: string;
 }) {
+  const depositWithdrawStatusClass = (raw: string) =>
+    raw === 'aprovado'
+      ? 'bg-brand/20 text-brand-light'
+      : raw === 'rejeitado' || raw === 'falhou'
+        ? 'bg-red-500/20 text-red-400'
+        : 'bg-yellow-500/20 text-yellow-400';
+
   const statusBadge = (status: string, className = 'bg-brand/20 text-brand-light') => (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${className}`}>
       {status}
@@ -56,62 +73,58 @@ function WalletTransactionMobileCard({
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
         {activeTab === 'transacoes' && (
           <>
-            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
-            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
-            <WalletMobileField label="Jogo" value={String(item.jogo ?? '—')} />
-            <WalletMobileField label="Aposta" value={String(item.aposta ?? '—')} />
-            <WalletMobileField label="Retorno" value={String(item.retorno ?? '—')} />
-            <WalletMobileField label="Status" value={statusBadge(String(item.status ?? '—'))} />
-            <WalletMobileField label="Bônus" value={String(item.bonus ?? '—')} />
+            <WalletMobileField label={columns.id} value={String(item.id ?? '—')} />
+            <WalletMobileField label={columns.date} value={String(item.data ?? '—')} />
+            <WalletMobileField label={columns.game} value={String(item.jogo ?? '—')} />
+            <WalletMobileField label={columns.bet} value={String(item.aposta ?? '—')} />
+            <WalletMobileField label={columns.return} value={String(item.retorno ?? '—')} />
+            <WalletMobileField label={columns.status} value={statusBadge(String(item.status ?? '—'))} />
+            <WalletMobileField label={columns.bonus} value={String(item.bonus ?? '—')} />
           </>
         )}
         {(activeTab === 'saques' || activeTab === 'depositos') && (
           <>
-            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
-            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
-            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
+            <WalletMobileField label={columns.id} value={String(item.id ?? '—')} />
+            <WalletMobileField label={columns.date} value={String(item.data ?? '—')} />
+            <WalletMobileField label={columns.value} value={String(item.valor ?? '—')} />
             <WalletMobileField
-              label="Status"
+              label={columns.status}
               value={statusBadge(
                 String(item.status ?? '—'),
-                item.status === 'Aprovado'
-                  ? 'bg-brand/20 text-brand-light'
-                  : item.status === 'Rejeitado'
-                    ? 'bg-red-500/20 text-red-400'
-                    : 'bg-yellow-500/20 text-yellow-400',
+                depositWithdrawStatusClass(String(item.statusRaw ?? '')),
               )}
             />
           </>
         )}
         {activeTab === 'cupons' && (
           <>
-            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
-            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
-            <WalletMobileField label="Cupom" value={String(item.cupom ?? '—')} />
-            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
-            <WalletMobileField label="Status" value={statusBadge(String(item.status ?? '—'))} />
-            <WalletMobileField label="Bônus" value={String(item.bonus ?? '—')} />
+            <WalletMobileField label={columns.id} value={String(item.id ?? '—')} />
+            <WalletMobileField label={columns.date} value={String(item.data ?? '—')} />
+            <WalletMobileField label={columns.coupon} value={String(item.cupom ?? '—')} />
+            <WalletMobileField label={columns.value} value={String(item.valor ?? '—')} />
+            <WalletMobileField label={columns.status} value={statusBadge(String(item.status ?? '—'))} />
+            <WalletMobileField label={columns.bonus} value={String(item.bonus ?? '—')} />
           </>
         )}
         {activeTab === 'rodadas' && (
           <>
-            <WalletMobileField label="Identificador" value={String(item.id ?? '—')} />
-            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
-            <WalletMobileField label="Jogo" value={String(item.jogo ?? '—')} />
-            <WalletMobileField label="Restantes" value={String(item.restantes ?? '—')} />
-            <WalletMobileField label="Total" value={String(item.total ?? '—')} />
+            <WalletMobileField label={columns.id} value={String(item.id ?? '—')} />
+            <WalletMobileField label={columns.date} value={String(item.data ?? '—')} />
+            <WalletMobileField label={columns.game} value={String(item.jogo ?? '—')} />
+            <WalletMobileField label={columns.remaining} value={String(item.restantes ?? '—')} />
+            <WalletMobileField label={columns.total} value={String(item.total ?? '—')} />
             <WalletMobileField
-              label="Status"
+              label={columns.status}
               value={statusBadge(String(item.status ?? '—'), getFreeBonusStatusClass(String(item.statusApi ?? '')))}
             />
           </>
         )}
         {activeTab === 'bonus' && (
           <>
-            <WalletMobileField label="Tipo" value={String(item.tipo ?? '—')} />
-            <WalletMobileField label="Descrição" value={String(item.descricao ?? '—')} />
-            <WalletMobileField label="Valor" value={String(item.valor ?? '—')} />
-            <WalletMobileField label="Data" value={String(item.data ?? '—')} />
+            <WalletMobileField label={columns.type} value={String(item.tipo ?? '—')} />
+            <WalletMobileField label={columns.description} value={String(item.descricao ?? '—')} />
+            <WalletMobileField label={columns.value} value={String(item.valor ?? '—')} />
+            <WalletMobileField label={columns.date} value={String(item.data ?? '—')} />
           </>
         )}
       </div>
@@ -122,7 +135,7 @@ function WalletTransactionMobileCard({
           disabled={playingRodadaId === String(item.id)}
           className="mt-3 h-9 w-full rounded-lg bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-xs font-bold text-white transition-all"
         >
-          {playingRodadaId === String(item.id) ? 'Abrindo...' : 'Jogar'}
+          {playingRodadaId === String(item.id) ? openingLabel : playLabel}
         </button>
       )}
     </div>
@@ -131,6 +144,7 @@ function WalletTransactionMobileCard({
 
 export default function WalletPage() {
   const navigate = useNavigate();
+  const { t, locale, language } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const { profile: vipProfile } = useVipProfile();
   const { config: plataformaConfig, refresh: refreshPlataformaConfig } = usePlataformaConfig();
@@ -160,6 +174,7 @@ export default function WalletPage() {
   const [loadingFreeBonuses, setLoadingFreeBonuses] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [playingRodadaId, setPlayingRodadaId] = useState<string | null>(null);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const itemsPerPage = 10;
 
   // Função para buscar saques do usuário
@@ -287,7 +302,7 @@ export default function WalletPage() {
   // Formatar data para exibição
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('pt-BR', {
+    return new Intl.DateTimeFormat(locale, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -299,7 +314,7 @@ export default function WalletPage() {
 
   // Formatar valor monetário
   const formatCurrency = (valor: number): string => {
-    return new Intl.NumberFormat('pt-BR', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 2,
@@ -362,7 +377,7 @@ export default function WalletPage() {
     try {
       const result = await converterBonusSaldo();
       if (!result.ok) {
-        setNotification(result.msg || 'Não foi possível converter o bônus.');
+        setNotification(result.msg || t.wallet.bonusConvertFailed);
         return;
       }
 
@@ -370,13 +385,11 @@ export default function WalletPage() {
       setSaldoBonus(0);
       setRolloverBonusPendente(0);
       setPodeConverterBonus(false);
-      setNotification(
-        `Bônus convertido: ${formatCurrency(result.valorConvertido ?? 0)} adicionados ao saldo disponível.`,
-      );
+      setNotification(t.wallet.bonusConverted);
       void fetchBonusConversoes();
     } catch (error) {
       console.error('Erro ao converter bônus:', error);
-      setNotification('Erro ao converter bônus. Tente novamente.');
+      setNotification(t.wallet.bonusConvertError);
     } finally {
       setConvertingBonus(false);
     }
@@ -514,15 +527,32 @@ export default function WalletPage() {
     };
   }, [isAuthenticated, user, fetchTransacoesJogos, fetchBonusStatus]);
 
-  // Formatar saldo para exibição
-  const formatSaldo = (valor: number): string => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(valor);
+  const formatSaldo = formatCurrency;
+
+  const mapWithdrawalStatus = (status: string) => {
+    switch (status) {
+      case 'aprovado':
+        return t.wallet.status.approved;
+      case 'rejeitado':
+        return t.wallet.status.rejected;
+      case 'falhou':
+        return t.wallet.status.failed;
+      case 'processando':
+        return t.wallet.status.processing;
+      default:
+        return t.wallet.status.pending;
+    }
   };
+
+  const mapDepositStatus = (status: string) =>
+    status === 'aprovado' ? t.wallet.status.approved : t.wallet.status.pending;
+
+  const depositWithdrawStatusClass = (raw: string) =>
+    raw === 'aprovado'
+      ? 'bg-brand/20 text-brand-light'
+      : raw === 'rejeitado' || raw === 'falhou'
+        ? 'bg-red-500/20 text-red-400'
+        : 'bg-yellow-500/20 text-yellow-400';
 
   const openDepositModal = () => {
     void refreshPlataformaConfig();
@@ -532,43 +562,37 @@ export default function WalletPage() {
   const openWithdrawModal = () => {
     void refreshPlataformaConfig();
     if (saldo < plataformaConfig.saque_minimo) {
-      setNotification('Saldo insuficiente para realizar um saque.');
+      setNotification(t.depositWithdraw.insufficientForWithdraw);
       return;
     }
     setIsWithdrawModalOpen(true);
   };
 
   // Preparar dados formatados para exibição
-  const withdrawalsFormatted = saques.map(saque => ({
+  const withdrawalsFormatted = saques.map((saque) => ({
     id: saque.id,
     valor: formatCurrency(saque.valor),
-    status:
-      saque.status === 'aprovado'
-        ? 'Aprovado'
-        : saque.status === 'rejeitado'
-          ? 'Rejeitado'
-          : saque.status === 'falhou'
-            ? 'Falhou'
-            : saque.status === 'processando'
-              ? 'Processando'
-              : 'Pendente',
+    statusRaw: saque.status,
+    status: mapWithdrawalStatus(saque.status),
     data: formatDate(saque.data_hora),
   }));
 
-  const depositsFormatted = depositos.map(deposito => ({
+  const depositsFormatted = depositos.map((deposito) => ({
     id: deposito.id,
     valor: formatCurrency(deposito.valor),
-    status: deposito.status === 'aprovado' ? 'Aprovado' : 'Pendente',
+    statusRaw: deposito.status,
+    status: mapDepositStatus(deposito.status),
     data: formatDate(deposito.data_hora),
   }));
 
-  const transactionsFormatted = transacoesJogos.map(transacao => ({
+  const transactionsFormatted = transacoesJogos.map((transacao) => ({
     id: transacao.txn_id || transacao.id,
-    jogo: transacao.jogo || 'Jogo Desconhecido',
+    jogo: transacao.jogo || t.games.gameNotFound,
     aposta: formatCurrency(transacao.valor || 0),
     retorno: formatCurrency(transacao.retorno || 0),
-    status: transacao.status === 'Finalizado' ? 'Aprovado' : transacao.status || 'Aprovado',
-    bonus: transacao.com_bonus || 'Não',
+    status:
+      transacao.status === 'Finalizado' ? t.wallet.status.approved : transacao.status || t.wallet.status.approved,
+    bonus: transacao.com_bonus === 'Sim' ? t.common.yes : transacao.com_bonus === 'Não' ? t.common.no : transacao.com_bonus || t.common.no,
     data: formatDate(transacao.data || transacao.created_at),
   }));
 
@@ -579,7 +603,7 @@ export default function WalletPage() {
       cupom: cupom.cupom,
       valor: formatCurrency(cupom.valor),
       status: cupom.status,
-      bonus: 'Saldo Real',
+      bonus: t.wallet.status.realBalance,
       data: cupom.data,
     }));
 
@@ -588,16 +612,16 @@ export default function WalletPage() {
       .filter((transacao) => transacao.com_bonus === 'Sim')
       .map((transacao) => ({
         id: transacao.txn_id || transacao.id,
-        tipo: 'Ganho',
-        descricao: transacao.jogo || 'Rodadas grátis',
+        tipo: t.wallet.status.win,
+        descricao: transacao.jogo || t.wallet.freeSpinsDesc,
         valor: formatCurrency(transacao.retorno || 0),
         data: formatDate(transacao.data || transacao.created_at),
         sortDate: transacao.data || transacao.created_at,
       })),
     ...bonusConversoes.map((conversao) => ({
       id: conversao.id,
-      tipo: 'Conversão',
-      descricao: 'Convertido para saldo disponível',
+      tipo: t.wallet.status.conversion,
+      descricao: t.wallet.convertedToBalance,
       valor: formatCurrency(conversao.valor),
       data: formatDate(conversao.created_at),
       sortDate: conversao.created_at,
@@ -607,17 +631,23 @@ export default function WalletPage() {
   const rodadasFormatted = freeBonuses.map((bonus) => ({
     id: String(bonus.id),
     jogo: bonus.game_name,
-    restantes: `${bonus.rounds} giros`,
-    total: `${bonus.total_rounds} giros`,
-    status: getFreeBonusStatusLabel(bonus.status),
+    restantes: `${bonus.rounds} ${t.wallet.freeSpinsDesc.toLowerCase()}`,
+    total: `${bonus.total_rounds} ${t.wallet.freeSpinsDesc.toLowerCase()}`,
+    status: getFreeBonusStatusLabel(bonus.status, language),
     statusApi: bonus.status,
     data: formatDate(bonus.created_at),
     raw: bonus,
   }));
 
+  const mobileCardProps = {
+    columns: t.wallet.columns,
+    playLabel: t.common.play,
+    openingLabel: t.common.opening,
+  };
+
   const handleJogarRodadas = async (bonus: FreeBonusItem) => {
     if (!isAuthenticated || !user?.email) {
-      setNotification('Faça login para jogar.');
+      setNotification(t.wallet.loginToPlay);
       return;
     }
 
@@ -630,7 +660,7 @@ export default function WalletPage() {
     try {
       const resolved = await resolveGameByGameCode(bonus.game_id);
       if (!resolved) {
-        setNotification('Jogo não encontrado na API PlayFivers.');
+        setNotification(t.wallet.gameNotFound);
         return;
       }
 
@@ -648,7 +678,7 @@ export default function WalletPage() {
       navigate(`/${resolved.provider_slug}/${resolved.game_slug}`);
     } catch (error) {
       console.error('Erro ao abrir jogo com rodadas grátis:', error);
-      setNotification('Erro ao abrir o jogo. Tente novamente.');
+      setNotification(t.wallet.openGameError);
     } finally {
       setPlayingRodadaId(null);
     }
@@ -682,11 +712,17 @@ export default function WalletPage() {
     />
     <AppPageScaffold>
       <div className={`flex flex-col min-h-full ${appPageContainerClass}`}>
+        {!isAuthenticated ? (
+          <LoginRequiredPanel
+            message={t.wallet.loginRequired}
+            onLogin={() => setIsLoginOpen(true)}
+          />
+        ) : (
         <div className="flex-1 py-4 sm:py-6 max-md:pb-2">
             <BackButton onClick={() => navigate('/')} className="md:hidden mb-4 -mt-1" />
             <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
               <span className="iconify i-solar:wallet-bold-duotone shrink-0" aria-hidden="true" style={{ fontSize: '28px' }}></span>
-              <h1 className="text-white text-xl md:text-2xl font-bold">Carteira</h1>
+              <h1 className="text-white text-xl md:text-2xl font-bold">{t.wallet.title}</h1>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-4 md:mb-6">
@@ -735,7 +771,7 @@ export default function WalletPage() {
                       </svg>
                     <div className="min-w-0">
                       <p className="text-white font-bold text-lg md:text-xl truncate">{formatSaldo(saldo)}</p>
-                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">Saldo disponível</p>
+                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">{t.wallet.availableBalance}</p>
                     </div>
                   </div>
                 </div>
@@ -745,10 +781,10 @@ export default function WalletPage() {
                     onClick={openWithdrawModal}
                     className="flex-1 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition-all"
                   >
-                    Sacar
+                    {t.wallet.withdraw}
                   </button>
                   <button type="button" onClick={openDepositModal} className="flex-1 h-9 rounded-lg bg-brand hover:bg-brand-hover text-white text-xs font-bold transition-all">
-                    Depositar
+                    {t.wallet.deposit}
                   </button>
                 </div>
               </div>
@@ -940,7 +976,7 @@ export default function WalletPage() {
                       <p className="text-white font-bold text-lg md:text-xl">
                         {loadingBonus ? '...' : formatSaldo(saldoBonus)}
                       </p>
-                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">Bônus disponível</p>
+                      <p className="text-slate-400 text-[10px] md:text-xs uppercase">{t.wallet.bonusBalance}</p>
                     </div>
                   </div>
                 </div>
@@ -960,7 +996,7 @@ export default function WalletPage() {
                         : 'bg-slate-600 text-slate-400 cursor-not-allowed opacity-50'
                     }`}
                   >
-                    {convertingBonus ? 'Convertendo...' : 'Converter'}
+                    {convertingBonus ? t.wallet.converting : t.wallet.convert}
                   </button>
                 </div>
               </div>
@@ -988,14 +1024,14 @@ export default function WalletPage() {
                     <div className="min-w-0">
                       <p className="text-white font-bold text-lg md:text-xl">R$ 0,00</p>
                       <p className="text-slate-400 text-[10px] md:text-xs uppercase">
-                        Cashback ({vipProfile.cashback_pct}% VIP)
+                        {t.wallet.cashback} ({vipProfile.cashback_pct}% VIP)
                       </p>
                     </div>
                   </div>
                 </div>
                 <div>
                   <button type="button" disabled className="w-full h-9 rounded-lg bg-slate-600 text-slate-400 text-xs font-bold transition-all cursor-not-allowed opacity-50">
-                    Converter
+                    {t.wallet.convert}
                   </button>
                 </div>
               </div>
@@ -1003,7 +1039,7 @@ export default function WalletPage() {
 
             <div className="rounded-xl overflow-hidden border border-slate-700/50">
               <div className="p-3 md:p-4 border-b border-slate-700/50">
-                <h2 className="text-white font-bold text-base md:text-lg">Histórico de transações</h2>
+                <h2 className="text-white font-bold text-base md:text-lg">{t.wallet.tabs.transactions}</h2>
               </div>
 
               <div className="border-b border-slate-700/50">
@@ -1014,7 +1050,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'transacoes' ? 1 : 0.5 }}
                   >
-                    Transações
+                    {t.wallet.tabs.transactions}
                   </button>
                   <button
                     type="button"
@@ -1022,7 +1058,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'depositos' ? 1 : 0.5 }}
                   >
-                    Depósitos
+                    {t.wallet.tabs.deposits}
                   </button>
                   <button
                     type="button"
@@ -1030,7 +1066,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'saques' ? 1 : 0.5 }}
                   >
-                    Saques
+                    {t.wallet.tabs.withdrawals}
                   </button>
                   <button
                     type="button"
@@ -1038,7 +1074,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'cupons' ? 1 : 0.5 }}
                   >
-                    Cupons
+                    {t.wallet.tabs.coupons}
                   </button>
                   <button
                     type="button"
@@ -1046,7 +1082,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'bonus' ? 1 : 0.5 }}
                   >
-                    Bônus
+                    {t.wallet.tabs.bonus}
                   </button>
                   <button
                     type="button"
@@ -1054,7 +1090,7 @@ export default function WalletPage() {
                     className="shrink-0 whitespace-nowrap px-3 md:px-4 h-8 rounded-lg text-xs font-bold transition-all"
                     style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: activeTab === 'rodadas' ? 1 : 0.5 }}
                   >
-                    Rodadas Grátis
+                    {t.wallet.tabs.freeSpins}
                   </button>
                 </div>
               </div>
@@ -1065,7 +1101,7 @@ export default function WalletPage() {
                     <LoadingScreen variant="inline" className="py-12 md:py-20" />
                   ) : bonusFormatted.length === 0 ? (
                     <div className="py-12 md:py-20 px-3">
-                      <p className="text-slate-400 text-xs md:text-sm text-center">Nenhum registro encontrado</p>
+                      <p className="text-slate-400 text-xs md:text-sm text-center">{t.wallet.empty.bonus}</p>
                     </div>
                   ) : (
                     <>
@@ -1078,16 +1114,17 @@ export default function WalletPage() {
                             backgroundColor={index % 2 === 0 ? homeConfig.fundo : walletRowAltBg}
                             playingRodadaId={playingRodadaId}
                             onPlayRodada={handleJogarRodadas}
+                            {...mobileCardProps}
                           />
                         ))}
                       </div>
                       <table className="hidden md:table w-full">
                         <thead>
                           <tr className="border-b border-slate-700/50 bg-slate-800/30">
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Tipo</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Descrição</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Valor</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.type}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.description}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.value}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.date}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1107,25 +1144,25 @@ export default function WalletPage() {
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'transacoes' && transactionsFormatted.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma transação encontrada</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">{t.wallet.empty.transactions}</p>
                   </div>
                 ) : (activeTab === 'saques' && loadingSaques) ? (
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'saques' && saques.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhum saque encontrado</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">{t.wallet.empty.withdrawals}</p>
                   </div>
                 ) : (activeTab === 'cupons' && loadingCupons) ? (
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'cupons' && currentData.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhum cupom encontrado</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">{t.wallet.empty.coupons}</p>
                   </div>
                 ) : (activeTab === 'rodadas' && loadingFreeBonuses) ? (
                   <LoadingScreen variant="inline" className="py-12 md:py-20" />
                 ) : (activeTab === 'rodadas' && rodadasFormatted.length === 0) ? (
                   <div className="py-12 md:py-20 px-3">
-                    <p className="text-slate-400 text-xs md:text-sm text-center">Nenhuma rodada grátis encontrada</p>
+                    <p className="text-slate-400 text-xs md:text-sm text-center">{t.wallet.empty.freeSpins}</p>
                   </div>
                 ) : (
                   <>
@@ -1138,6 +1175,7 @@ export default function WalletPage() {
                         backgroundColor={index % 2 === 0 ? homeConfig.fundo : walletRowAltBg}
                         playingRodadaId={playingRodadaId}
                         onPlayRodada={handleJogarRodadas}
+                        {...mobileCardProps}
                       />
                     ))}
                   </div>
@@ -1146,39 +1184,39 @@ export default function WalletPage() {
                       <tr className="border-b border-slate-700/50 bg-slate-800/30">
                         {activeTab === 'transacoes' ? (
                           <>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Identificador</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Jogo</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Aposta</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Retorno</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Bônus</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.id}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.game}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.bet}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.return}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.status}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.bonus}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.date}</th>
                           </>
                         ) : activeTab === 'cupons' ? (
                           <>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Identificador</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Cupom</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Valor</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Bônus</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.id}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.coupon}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.value}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.status}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.bonus}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.date}</th>
                           </>
                         ) : activeTab === 'rodadas' ? (
                           <>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Identificador</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Jogo</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Restantes</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Total</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Ação</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.id}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.game}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.remaining}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.total}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.status}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.date}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.action}</th>
                           </>
                         ) : (
                           <>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Identificador</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Valor</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Status</th>
-                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">Data</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.id}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.value}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.status}</th>
+                            <th className="px-2 py-2 md:px-4 md:py-3 text-left text-[10px] md:text-xs font-bold text-slate-400 uppercase whitespace-nowrap">{t.wallet.columns.date}</th>
                           </>
                         )}
                       </tr>
@@ -1205,13 +1243,7 @@ export default function WalletPage() {
                               <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-slate-300 font-mono max-w-[76px] md:max-w-none truncate align-middle" title={String(item.id)}>{item.id}</td>
                               <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-white whitespace-nowrap align-middle">{item.valor}</td>
                               <td className="px-2 py-2 md:px-4 md:py-3 align-middle">
-                                <span className={`inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
-                                  item.status === 'Aprovado'
-                                    ? 'bg-brand/20 text-brand-light'
-                                    : item.status === 'Rejeitado'
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : 'bg-yellow-500/20 text-yellow-400'
-                                }`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${depositWithdrawStatusClass(String(item.statusRaw ?? ''))}`}>
                                   {item.status}
                                 </span>
                               </td>
@@ -1250,7 +1282,7 @@ export default function WalletPage() {
                                     disabled={playingRodadaId === item.id}
                                     className="h-7 rounded-lg bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed px-2.5 text-[10px] md:text-xs font-bold text-white transition-all"
                                   >
-                                    {playingRodadaId === item.id ? 'Abrindo...' : 'Jogar'}
+                                    {playingRodadaId === item.id ? t.common.opening : t.common.play}
                                   </button>
                                 ) : (
                                   <span className="text-[10px] md:text-xs text-slate-500">—</span>
@@ -1262,11 +1294,7 @@ export default function WalletPage() {
                               <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-slate-300 font-mono max-w-[76px] md:max-w-none truncate align-middle" title={String(item.id)}>{item.id}</td>
                               <td className="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-white whitespace-nowrap align-middle">{item.valor}</td>
                               <td className="px-2 py-2 md:px-4 md:py-3 align-middle">
-                                <span className={`inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${
-                                  item.status === 'Aprovado'
-                                    ? 'bg-brand/20 text-brand-light'
-                                    : 'bg-red-500/20 text-red-400'
-                                }`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold ${depositWithdrawStatusClass(String(item.statusRaw ?? ''))}`}>
                                   {item.status}
                                 </span>
                               </td>
@@ -1334,7 +1362,7 @@ export default function WalletPage() {
                     )}
                   </div>
                   <p className="text-xs sm:text-sm text-slate-400 text-center sm:text-left">
-                    Exibindo {startIndex + 1} a {Math.min(endIndex, currentData.length)} de {currentData.length} {currentData.length === 1 ? 'registro' : 'registros'}
+                    {t.common.showingRecords(startIndex + 1, Math.min(endIndex, currentData.length), currentData.length)}
                   </p>
                 </div>
               )}
@@ -1342,6 +1370,7 @@ export default function WalletPage() {
 
             <div className="max-md:min-h-[6vh] md:min-h-[20vh]" />
         </div>
+        )}
 
         <Footer containerClassName="w-full" />
       </div>
@@ -1364,6 +1393,10 @@ export default function WalletPage() {
           fetchSaldo();
           fetchSaques();
         }} 
+      />
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
       />
     </>
   );

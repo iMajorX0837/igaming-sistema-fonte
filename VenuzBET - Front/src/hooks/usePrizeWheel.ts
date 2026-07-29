@@ -86,8 +86,10 @@ export function usePrizeWheel(isAuthenticated: boolean): UsePrizeWheelResult {
     centro: config?.centro_imagem_url || defaults.centro,
   };
 
+  const hasWidgetArt = Boolean(images.widget || images.roleta);
+
   return {
-    enabled,
+    enabled: enabled && hasWidgetArt,
     loading,
     config,
     segments,

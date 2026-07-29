@@ -71,7 +71,6 @@ export default function CuponsPage() {
 
   const loadCupons = async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data, error: fetchError } = await supabase
         .from('cupons')

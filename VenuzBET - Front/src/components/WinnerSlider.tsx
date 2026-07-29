@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import IconifyIcon from './IconifyIcon';
 import LoadingScreen from './LoadingScreen';
@@ -52,11 +53,12 @@ interface Winner {
 }
 
 function WinnerSectionTitle() {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 mb-4">
       <IconifyIcon icon="twemoji:trophy" style={{ fontSize: '24px', color: '#FFD700' }} />
       <h4 className="text-white font-bold text-lg md:text-xl tracking-tight">
-        Últimos Ganhadores de Hoje
+        {t.home.lastWinnersToday}
       </h4>
     </div>
   );
@@ -96,13 +98,11 @@ const generateRandomAmount = (): string => {
 };
 
 // Função para gerar tempos aleatórios
-const generateRandomTime = (): string => {
-  const minutes = Math.floor(Math.random() * 30) + 1;
-  return `Há ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
-};
+const generateRandomMinutes = (): number => Math.floor(Math.random() * 30) + 1;
 
 export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
   const [winners, setWinners] = useState<Winner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -155,7 +155,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
       const generatedWinners: Winner[] = selectedGames.map(game => ({
         name: generateRandomName(),
         amount: generateRandomAmount(),
-        time: generateRandomTime(),
+        time: t.home.minutesAgo(generateRandomMinutes()),
         game: game.name,
         image: game.image,
         game_code: game.game_code,
@@ -169,7 +169,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t.home]);
 
   useEffect(() => {
     fetchGames();
@@ -214,7 +214,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
       <div>
         <WinnerSectionTitle />
         <WinnerBarShell backgroundColor={homeConfig.fundo}>
-          <LoadingScreen title="Carregando ganhadores..." variant="compact" />
+          <LoadingScreen title={t.common.loadingWinners} variant="compact" />
         </WinnerBarShell>
       </div>
     );
@@ -226,7 +226,7 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
         <WinnerSectionTitle />
         <WinnerBarShell backgroundColor={homeConfig.fundo}>
           <div className="flex items-center justify-center py-6 sm:py-8">
-            <p className="text-sm text-slate-400">Nenhum ganhador encontrado</p>
+            <p className="text-sm text-slate-400">{t.common.noWinners}</p>
           </div>
         </WinnerBarShell>
       </div>

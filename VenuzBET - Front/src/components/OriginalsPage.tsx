@@ -9,6 +9,8 @@ import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
 import { getOriginaisLabel } from '../lib/siteBrand';
+import { useTranslation } from '../hooks/useTranslation';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 
 interface OriginalsPageProps {
   onBack: () => void;
@@ -16,9 +18,9 @@ interface OriginalsPageProps {
 }
 
 const originalGameDefs = [
-  { name: 'Crash', image: 'https://i.ibb.co/8n08ZyVs/Chat-GPT-Image-3-de-nov-de-2025-20-44-01.png', category: 'crash' },
-  { name: 'Double', image: 'https://i.ibb.co/fzksfGFj/Chat-GPT-Image-3-de-nov-de-2025-20-44-08.png', category: 'slots' },
-  { name: 'Mines', image: 'https://i.ibb.co/8gGgt9GJ/Chat-GPT-Image-3-de-nov-de-2025-20-44-14.png', category: 'crash' },
+  { name: 'Crash', image: GAME_IMAGE_FALLBACK_LG, category: 'crash' },
+  { name: 'Double', image: GAME_IMAGE_FALLBACK_LG, category: 'slots' },
+  { name: 'Mines', image: GAME_IMAGE_FALLBACK_LG, category: 'crash' },
 ];
 
 const baseProviders = [
@@ -40,14 +42,15 @@ const baseProviders = [
 ];
 
 const categories = [
-  { id: 'all', name: 'Todos' },
-  { id: 'crash', name: 'Crash Games' },
-  { id: 'slots', name: 'Slots' },
+  { id: 'all', nameKey: 'all' as const },
+  { id: 'crash', nameKey: 'crash' as const },
+  { id: 'slots', nameKey: 'slots' as const },
 ];
 
 export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: OriginalsPageProps) {
   const { config: homeConfig } = useHomeConfig();
   const { nomeBet } = useSiteBrand();
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -59,14 +62,23 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
     [nomeBet],
   );
 
+  const categoryOptions = useMemo(
+    () =>
+      categories.map((category) => ({
+        id: category.id,
+        name: t.games.categories[category.nameKey],
+      })),
+    [t.games.categories],
+  );
+
   const providers = useMemo(
     () =>
       baseProviders.map((provider) => {
-        if (provider.id === 'all') return { ...provider, name: 'Todos' };
+        if (provider.id === 'all') return { ...provider, name: t.common.all };
         if (provider.id === 'venuzbet') return { ...provider, name: nomeBet };
         return { id: provider.id, name: provider.name!, count: provider.count };
       }),
-    [nomeBet],
+    [nomeBet, t.common.all],
   );
 
   useEffect(() => {
@@ -101,8 +113,8 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
   const currentGames = filteredGames.slice(0, visibleCount);
   const hasMoreGames = currentGames.length < filteredGames.length;
 
-  const selectedProviderName = providers.find((p) => p.id === selectedProvider)?.name || 'Todos';
-  const selectedCategoryName = categories.find((c) => c.id === selectedCategory)?.name || 'Todos';
+  const selectedProviderName = providers.find((p) => p.id === selectedProvider)?.name || t.common.all;
+  const selectedCategoryName = categoryOptions.find((c) => c.id === selectedCategory)?.name || t.common.all;
 
   return (
     <AppPageScaffold>
@@ -141,7 +153,7 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
             />
             <FilterDropdown
               icon={Grid3x3}
-              items={categories.map((category) => ({ id: category.id, label: category.name }))}
+              items={categoryOptions.map((category) => ({ id: category.id, label: category.name }))}
               onSelect={setSelectedCategory}
               selectedLabel={selectedCategoryName}
             />
@@ -170,7 +182,7 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
                           <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                             <path d="M8 5v14l11-7z" />
                           </svg>
-                          JOGAR
+                          {t.common.playUpper}
                         </button>
                       </div>
                     </div>
@@ -179,7 +191,7 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
               </div>
             ) : (
               <div className="flex items-center justify-center min-h-[360px]">
-                <p className="text-slate-400 text-lg">Não possui jogos ativos.</p>
+                <p className="text-slate-400 text-lg">{t.games.noActiveGames}</p>
               </div>
             )}
           </div>
@@ -187,13 +199,13 @@ export default function OriginalsPage({ onBack, onGameSelect: _onGameSelect }: O
           {hasMoreGames && (
             <div className="flex flex-col items-center gap-4 mb-8">
               <p className="text-slate-400 text-sm">
-                Mostrando {currentGames.length} de {filteredGames.length} jogos
+                {t.games.showingGames(currentGames.length, filteredGames.length)}
               </p>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
               >
-                Carregar mais
+                {t.common.loadMore}
               </button>
             </div>
           )}

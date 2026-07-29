@@ -36,6 +36,7 @@ import { normalizeInternalHref } from './lib/cmsLink';
 import { isLiveSupportHref, openLiveSupportWhatsapp } from './lib/liveSupport';
 import { useFooterConfig } from './hooks/useFooterConfig';
 import LiveSupportRedirect from './components/LiveSupportRedirect';
+import { useTranslation } from './hooks/useTranslation';
 
 export interface GameInfo {
   name: string;
@@ -52,6 +53,7 @@ interface StoredGameData extends GameInfo {
 function GameRoute() {
   const navigate = useNavigate();
   const { providerSlug, gameSlug } = useParams();
+  const { t } = useTranslation();
   const [gameData, setGameData] = useState<GameInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ function GameRoute() {
 
         const resolved = await resolveGameBySlug(gameSlug, providerSlug);
         if (!resolved) {
-          throw new Error('Jogo não encontrado');
+          throw new Error(t.games.gameNotFound);
         }
 
         const resolvedGame: GameInfo = {
@@ -108,7 +110,7 @@ function GameRoute() {
         setIsLoading(false);
       } catch (err: any) {
         console.error('Erro ao buscar jogo:', err);
-        setError(err.message || 'Erro ao carregar o jogo');
+        setError(err.message || t.games.gameLoadError);
         setIsLoading(false);
         // Redirecionar para home após 2 segundos
         setTimeout(() => {
@@ -118,12 +120,12 @@ function GameRoute() {
     };
 
     fetchGameFromApi();
-  }, [providerSlug, gameSlug, navigate]);
+  }, [providerSlug, gameSlug, navigate, t.games.gameNotFound, t.games.gameLoadError]);
   
   if (isLoading) {
     return (
       <AppPageScaffold>
-        <LoadingScreen title="Carregando jogo..." variant="page" />
+        <LoadingScreen title={t.games.loadingGame} variant="page" />
       </AppPageScaffold>
     );
   }
@@ -133,7 +135,7 @@ function GameRoute() {
       <AppPageScaffold>
         <div className="py-20 flex flex-col items-center justify-center gap-4 px-4">
           <div className="text-red-400 text-lg">{error}</div>
-          <div className="text-slate-400 text-sm">Redirecionando...</div>
+          <div className="text-slate-400 text-sm">{t.common.redirecting}</div>
         </div>
       </AppPageScaffold>
     );

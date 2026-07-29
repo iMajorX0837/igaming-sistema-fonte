@@ -7,6 +7,7 @@ import { resolveLoginModalImageUrl } from '../lib/authModalImages';
 import { getAuthErrorMessage } from '../lib/authErrors';
 import AuthModalImage from './AuthModalImage';
 import { useModalAnimation } from '../hooks/useModalAnimation';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ function modalInputStyle(fundo: string): React.CSSProperties {
 
 export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalProps) {
   const { login } = useAuth();
+  const { t, language } = useTranslation();
+  const auth = t.auth;
   const { config: homeConfig } = useHomeConfig();
   const { config: authModalsConfig } = useAuthModalsConfig();
   const [showPassword, setShowPassword] = useState(false);
@@ -53,23 +56,23 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
     const password = formData.password;
 
     if (!email && !password) {
-      setError('Informe seu e-mail e senha para continuar.');
+      setError(auth.emailPasswordRequired);
       return;
     }
     if (!email) {
-      setError('Informe o e-mail da sua conta.');
+      setError(auth.emailRequired);
       return;
     }
     if (!password) {
-      setError('Informe sua senha.');
+      setError(auth.passwordRequired);
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('E-mail inválido. Verifique o endereço digitado.');
+      setError(auth.invalidEmail);
       return;
     }
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+      setError(auth.passwordMinLength);
       return;
     }
 
@@ -80,7 +83,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
       setFormData({ email: '', password: '' });
       onClose();
     } catch (err) {
-      setError(getAuthErrorMessage(err, 'Não foi possível fazer login. Tente novamente.'));
+      setError(getAuthErrorMessage(err, auth.loginFallbackError, language));
     } finally {
       setLoading(false);
     }
@@ -110,7 +113,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
 
         <AuthModalImage
           src={loginImageUrl}
-          alt="Login"
+          alt={auth.loginAlt}
           className="w-full h-auto max-h-[160px] md:max-h-[180px] object-contain object-center"
           containerClassName="relative flex w-full shrink-0 justify-center items-center overflow-hidden"
           containerStyle={{ backgroundColor: homeConfig.fundo }}
@@ -125,7 +128,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
               <input
                 type="email"
                 name="email"
-                placeholder="E-mail"
+                placeholder={auth.email}
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full h-10 pl-10 pr-4 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
@@ -140,7 +143,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
-                placeholder="Digite sua senha"
+                placeholder={auth.passwordPlaceholder}
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full h-10 pl-10 pr-10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
@@ -167,7 +170,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
 
             <div className="text-right">
               <button type="button" className="text-xs text-brand-light font-bold hover:underline">
-                Esqueci a senha
+                {auth.forgotPassword}
               </button>
             </div>
 
@@ -176,11 +179,11 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
               disabled={loading}
               className="w-full h-10 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Entrando...' : 'ENTRAR'}
+              {loading ? auth.loggingIn : auth.login}
             </button>
 
             <div className="text-center">
-              <p className="text-xs text-slate-400 mb-1.5">Ou entre com</p>
+              <p className="text-xs text-slate-400 mb-1.5">{auth.orLoginWith}</p>
               <div className="flex gap-2 justify-center">
                 <button
                   type="button"
@@ -230,10 +233,10 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
 
             <div className="text-center">
               <p className="text-xs text-white font-bold">
-                Ainda n?o tem uma conta?
+                {auth.noAccount}
               </p>
               <button type="button" onClick={handleSwitchRegister} className="text-brand-light font-bold text-xs hover:underline mt-1">
-                Criar uma conta gr?tis
+                {auth.createFreeAccount}
               </button>
             </div>
           </form>

@@ -29,7 +29,6 @@ export default function EntryPopupPage({ embedded = false }: { embedded?: boolea
 
   const loadConfig = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('site_config')
         .select('entry_popup_ativo, entry_popup_imagem_url')

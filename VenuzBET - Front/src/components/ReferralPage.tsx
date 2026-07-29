@@ -1,6 +1,8 @@
 import { Copy } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
+import LoginModal from './LoginModal';
+import LoginRequiredPanel from './LoginRequiredPanel';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -9,15 +11,17 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
 import { buildReferralLink } from '../lib/siteBrand';
+import { useTranslation } from '../hooks/useTranslation';
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formatCurrency = (value: number, locale: string) =>
+  new Intl.NumberFormat(locale, { style: 'currency', currency: 'BRL' }).format(value);
 
 export default function ReferralPage() {
   const { user, isAuthenticated } = useAuth();
   const { config: homeConfig } = useHomeConfig();
   const { config: plataformaConfig } = usePlataformaConfig();
   const { nomeBet, siteDominio } = useSiteBrand();
+  const { t, locale } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +30,7 @@ export default function ReferralPage() {
   const [ganhosTotais, setGanhosTotais] = useState(0);
   const [recompensa, setRecompensa] = useState(plataformaConfig.indicacao_recompensa);
   const [depositoMinimo, setDepositoMinimo] = useState(plataformaConfig.indicacao_deposito_minimo);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   const referralLink = buildReferralLink(siteDominio, referralCode);
   const cardBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
@@ -120,11 +125,19 @@ export default function ReferralPage() {
   };
 
   return (
+    <>
     <AppPageScaffold>
       <div
         className={`flex flex-col min-h-full ${appPageContainerClass}`}
         style={{ backgroundColor: homeConfig.fundo }}
       >
+        {!isAuthenticated ? (
+          <LoginRequiredPanel
+            message={t.referral.loginRequired}
+            onLogin={() => setIsLoginOpen(true)}
+          />
+        ) : (
+        <>
         <div className="flex-1 py-4 sm:py-6 max-md:pb-2">
           <div className="space-y-5 md:space-y-6">
               <div>
@@ -274,23 +287,12 @@ export default function ReferralPage() {
                     </g>
                   </svg>
                   <h1 className="text-white text-base sm:text-xl font-bold leading-snug">
-                    Ganhe {formatCurrency(recompensa)} de SALDO REAL
+                    {t.referral.headline}
                   </h1>
                 </div>
 
                 <p className="text-slate-300 leading-relaxed text-sm max-md:text-[13px]">
-                  {recompensa > 0 ? (
-                    <>
-                      Indique seus amigos para a {nomeBet} e receba{' '}
-                      <span className="text-brand-light font-bold">{formatCurrency(recompensa)}</span> em
-                      saldo real por cada um que se cadastrar com o seu link e fizer o primeiro depósito de
-                      no mínimo{' '}
-                      <span className="text-brand-light font-bold">{formatCurrency(depositoMinimo)}</span>.
-                      A recompensa cai direto na sua carteira e pode ser sacada.
-                    </>
-                  ) : (
-                    <>O programa Indique e Ganhe está temporariamente desativado. Volte em breve!</>
-                  )}
+                  {recompensa > 0 ? t.referral.description : t.referral.programDisabled}
                 </p>
               </div>
 
@@ -298,7 +300,7 @@ export default function ReferralPage() {
                 <div className="flex flex-col max-md:gap-2 sm:flex-row gap-2 mb-4">
                   <input
                     type="text"
-                    value={loading ? 'Carregando...' : referralLink}
+                    value={loading ? t.referral.loading : referralLink}
                     readOnly
                     disabled={loading}
                     className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-brand/30 text-slate-300 font-mono text-xs focus:outline-none disabled:opacity-50"
@@ -311,7 +313,7 @@ export default function ReferralPage() {
                     style={{ backgroundColor: 'var(--brand-primary)' }}
                   >
                     <Copy className="w-4 h-4" />
-                    {copied ? 'Link Copiado!' : 'Copiar link'}
+                    {copied ? t.referral.linkCopied : t.referral.copyLink}
                   </button>
                 </div>
 
@@ -321,7 +323,7 @@ export default function ReferralPage() {
                       <span className="iconify" data-icon="fa6-solid:money-bill-trend-up" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>
-                      <p className="text-slate-400 text-xs">Indicações qualificadas</p>
+                      <p className="text-slate-400 text-xs">{t.referral.qualifiedReferrals}</p>
                       <p className="text-white text-sm font-bold">{loading ? '...' : qualifiedReferrals}</p>
                     </div>
                   </div>
@@ -331,7 +333,7 @@ export default function ReferralPage() {
                       <span className="iconify" data-icon="material-symbols:person-add-rounded" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>
-                      <p className="text-slate-400 text-xs">Registros ao seu link</p>
+                      <p className="text-slate-400 text-xs">{t.referral.linkRegistrations}</p>
                       <p className="text-white text-sm font-bold">{loading ? '...' : totalReferrals}</p>
                     </div>
                   </div>
@@ -341,9 +343,9 @@ export default function ReferralPage() {
                       <span className="iconify" data-icon="fluent:person-money-24-filled" aria-hidden="true" style={{ fontSize: '20px', color: '#fff' }}></span>
                     </div>
                     <div>
-                      <p className="text-slate-400 text-xs">Seus ganhos totais</p>
+                      <p className="text-slate-400 text-xs">{t.referral.totalEarnings}</p>
                       <p className="text-white text-sm font-bold">
-                        {loading ? '...' : formatCurrency(ganhosTotais)}
+                        {loading ? '...' : formatCurrency(ganhosTotais, locale)}
                       </p>
                     </div>
                   </div>
@@ -353,9 +355,16 @@ export default function ReferralPage() {
           </div>
 
           <div className="max-md:min-h-[6vh] md:min-h-[20vh]" aria-hidden="true" />
+        </>
+        )}
 
         <Footer containerClassName="w-full" />
       </div>
     </AppPageScaffold>
+    <LoginModal
+      isOpen={isLoginOpen}
+      onClose={() => setIsLoginOpen(false)}
+    />
+    </>
   );
 }

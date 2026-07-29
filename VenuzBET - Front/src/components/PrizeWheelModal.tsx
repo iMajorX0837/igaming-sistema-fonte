@@ -15,9 +15,7 @@ import {
 import { grantPrizeWheelBonus } from '../lib/freeBonus';
 import { resolveFreeBonusGameBySlug } from '../utils/resolveGameBySlug';
 import { useModalAnimation } from '../hooks/useModalAnimation';
-
-
-
+import { useTranslation } from '../hooks/useTranslation';
 const WHEEL_SIZE = 434;
 
 const CENTER_SIZE = 120;
@@ -83,6 +81,9 @@ interface PrizeWheelModalProps {
 export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProps) {
 
   const { isAuthenticated, user } = useAuth();
+  const { t, language } = useTranslation();
+  const nav = t.navigation;
+  const prizeWheel = t.prizeWheel;
 
   const { segments, status, images, refreshStatus } = usePrizeWheel(isAuthenticated);
 
@@ -142,7 +143,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
     if (!isAuthenticated) {
 
-      setErrorMessage('Faça login para girar a roleta.');
+      setErrorMessage(prizeWheel.loginRequired);
 
       return;
 
@@ -160,7 +161,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
     if (!result.ok || result.winner_index == null) {
       setIsSpinning(false);
-      setErrorMessage(getPrizeWheelErrorMessage(result.error));
+      setErrorMessage(getPrizeWheelErrorMessage(result.error, language));
       return;
     }
 
@@ -173,12 +174,12 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
       if (rounds > 0) {
         if (!result.cupom_uso_id) {
-          result.grant_error = 'Prêmio registrado, mas falta identificador do cupom para ativar as rodadas.';
+          result.grant_error = prizeWheel.missingCouponId;
         } else {
         const resolved = jogoSlug ? await resolveFreeBonusGameBySlug(jogoSlug, providerSlug) : null;
 
         if (!resolved?.game_code) {
-          result.grant_error = `Não foi possível identificar o jogo "${jogoNome || jogoSlug || 'desconhecido'}" na PlayFivers.`;
+          result.grant_error = prizeWheel.gameNotIdentified(jogoNome || jogoSlug || prizeWheel.unknownGame);
         } else {
           const grantResult = await grantPrizeWheelBonus({
             userCode: user.email,
@@ -190,12 +191,12 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
           if (!grantResult.ok) {
             result.grant_error =
               grantResult.msg ||
-              'Prêmio sorteado, mas não foi possível enviar as rodadas grátis. Verifique em Rodadas Grátis na carteira.';
+              prizeWheel.grantFailed;
           }
         }
         }
       } else {
-        result.grant_error = 'Quantidade de rodadas do prêmio inválida.';
+        result.grant_error = prizeWheel.invalidRounds;
       }
     }
 
@@ -263,7 +264,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
           className="absolute right-0 top-0 z-10 rounded-lg p-1 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
 
-          aria-label="Fechar roleta"
+          aria-label={nav.closePrizeWheel}
 
         >
 
@@ -283,7 +284,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
                 src={images.titulo}
 
-                alt="Roleta Diária de Prêmios"
+                alt={prizeWheel.altDaily}
 
                 width={TITLE_SIZE.width}
 
@@ -305,7 +306,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
                 src={images.banner}
 
-                alt="Seu Prêmio"
+                alt={prizeWheel.altPrize}
 
                 width={BANNER_SIZE.width}
 
@@ -337,7 +338,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
                 src={images.roleta}
 
-                alt="Roleta Urano"
+                alt={prizeWheel.altWheel}
 
                 width={WHEEL_SIZE}
 
@@ -373,7 +374,7 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
                 className={`prize-wheel-modal__spin-btn ${isSpinning ? 'is-spinning' : ''} ${!canSpin && !isSpinning ? 'is-unavailable' : ''}`}
 
-                aria-label={isSpinning ? 'Roleta girando' : 'Girar roleta'}
+                aria-label={isSpinning ? nav.spinningPrizeWheel : nav.spinPrizeWheel}
 
               >
 
@@ -405,14 +406,14 @@ export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProp
 
               {!isAuthenticated && (
 
-                <p className="text-sm text-amber-300">Faça login para girar a roleta.</p>
+                <p className="text-sm text-amber-300">{prizeWheel.loginRequired}</p>
 
               )}
 
               {errorMessage && <p className="text-sm text-red-400">{errorMessage}</p>}
 
               {prizeResult?.ok && (
-                <p className="text-sm font-medium text-green-300">{formatPrizeMessage(prizeResult)}</p>
+                <p className="text-sm font-medium text-green-300">{formatPrizeMessage(prizeResult, language)}</p>
               )}
 
               {prizeResult?.grant_error && (

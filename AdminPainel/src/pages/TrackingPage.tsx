@@ -62,7 +62,6 @@ export default function TrackingPage() {
 
   const loadData = useCallback(async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('tracking_pixels')
         .select('*')

@@ -1,3 +1,5 @@
+import { getAppCopy } from '../i18n';
+import type { AppLanguage } from '../i18n/types';
 import { supabase } from './supabase';
 
 export interface FreeBonusItem {
@@ -123,11 +125,12 @@ export async function activateCupomFreeBonus(params: {
   return grantPrizeWheelBonus(params);
 }
 
-export function getFreeBonusStatusLabel(status: string): string {
+export function getFreeBonusStatusLabel(status: string, lang: AppLanguage = 'pt'): string {
+  const labels = getAppCopy(lang).freeBonus;
   const normalized = status.toLowerCase();
-  if (normalized === 'pending') return 'Disponível';
-  if (normalized === 'completed' || normalized === 'used') return 'Finalizado';
-  if (normalized === 'active') return 'Em uso';
+  if (normalized === 'pending') return labels.available;
+  if (normalized === 'completed' || normalized === 'used') return labels.finished;
+  if (normalized === 'active') return labels.inUse;
   return status;
 }
 

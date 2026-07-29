@@ -80,7 +80,6 @@ export default function ConfiguracoesPage() {
 
   const loadConfig = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase.rpc('obter_config_plataforma');
 
       if (error) {

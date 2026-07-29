@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AVIATOR_GAME_IMAGE } from '../lib/proprietaryCatalog';
 
 export type HomeQuickNavLinkTipo = 'href' | 'game';
 
@@ -15,130 +14,7 @@ export interface HomeQuickNavItem {
   ativo: boolean;
 }
 
-export const DEFAULT_HOME_QUICK_NAV: HomeQuickNavItem[] = [
-  {
-    id: 'default-1',
-    titulo: 'Esportes',
-    imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717288225.avif',
-    link_tipo: 'href',
-    href: '/esportes',
-    game_name: null,
-    ordem: 1,
-    ativo: true,
-  },
-  {
-    id: 'default-2',
-    titulo: 'Apostas Ao Vivo',
-    imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717475647.avif',
-    link_tipo: 'href',
-    href: '/esportes',
-    game_name: null,
-    ordem: 2,
-    ativo: true,
-  },
-  {
-    id: 'default-3',
-    titulo: 'Cassino',
-    imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717511316.avif',
-    link_tipo: 'href',
-    href: '/games',
-    game_name: null,
-    ordem: 3,
-    ativo: true,
-  },
-  {
-    id: 'default-4',
-    titulo: 'Cassino Ao Vivo',
-    imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/royalbetsolutions-com-images/images/1757717475647.avif',
-    link_tipo: 'href',
-    href: '/provider/pragmatic',
-    game_name: null,
-    ordem: 4,
-    ativo: true,
-  },
-  {
-    id: 'default-5',
-    titulo: 'Mines',
-    imagem_url: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/mines.svg',
-    link_tipo: 'game',
-    href: null,
-    game_name: 'Mines',
-    ordem: 5,
-    ativo: true,
-  },
-  {
-    id: 'default-6',
-    titulo: 'Fortune Tiger',
-    imagem_url: 'https://imagensfivers.com/Games/Pgsoft/126.webp',
-    link_tipo: 'game',
-    href: null,
-    game_name: 'Fortune Tiger',
-    ordem: 6,
-    ativo: true,
-  },
-  {
-    id: 'default-7',
-    titulo: 'Aviator',
-    imagem_url: AVIATOR_GAME_IMAGE,
-    link_tipo: 'game',
-    href: null,
-    game_name: 'Aviator',
-    ordem: 7,
-    ativo: true,
-  },
-  {
-    id: 'default-8',
-    titulo: 'Spaceman',
-    imagem_url: 'https://imagensfivers.com/Games/Pragmatic/2201.webp',
-    link_tipo: 'href',
-    href: '/pragmatic/spaceman',
-    game_name: null,
-    ordem: 8,
-    ativo: true,
-  },
-  {
-    id: 'default-9',
-    titulo: 'Blackjack Ao Vivo',
-    imagem_url: 'https://imagensfivers.com/Games/Pragmatic/901.webp',
-    link_tipo: 'href',
-    href: '/pragmatic/live-one-blackjack',
-    game_name: null,
-    ordem: 9,
-    ativo: true,
-  },
-  {
-    id: 'default-10',
-    titulo: 'Roleta Ao Vivo',
-    imagem_url: 'https://imagensfivers.com/Games/Pragmatic/203.webp',
-    link_tipo: 'href',
-    href: '/pragmatic/roleta-brasileira',
-    game_name: null,
-    ordem: 10,
-    ativo: true,
-  },
-  {
-    id: 'default-11',
-    titulo: 'Football Studio',
-    imagem_url: 'https://imagensfivers.com/Games/Evolution/football-studio.webp',
-    link_tipo: 'href',
-    href: '/evolution/football-studio',
-    game_name: null,
-    ordem: 11,
-    ativo: true,
-  },
-  {
-    id: 'default-12',
-    titulo: 'Fortune Fruits',
-    imagem_url: 'https://imagensfivers.com/Games/Pgsoft/1543462.webp',
-    link_tipo: 'href',
-    href: '/games',
-    game_name: null,
-    ordem: 12,
-    ativo: true,
-  },
-];
-
-const STORAGE_KEY = 'venuz-home-quick-nav-v1';
+const STORAGE_KEY = 'venuz-home-quick-nav-v2';
 
 function readCachedItems(): HomeQuickNavItem[] | null {
   if (typeof window === 'undefined') return null;
@@ -181,27 +57,14 @@ export function useHomeQuickNav() {
 
       if (error) {
         console.error('Erro ao buscar atalhos da home:', error);
-        if (!hasCachedItems) {
-          setItems(DEFAULT_HOME_QUICK_NAV);
-        }
         return;
       }
 
-      if (!data || data.length === 0) {
-        if (!hasCachedItems) {
-          setItems(DEFAULT_HOME_QUICK_NAV);
-        }
-        return;
-      }
-
-      const nextItems = data as HomeQuickNavItem[];
+      const nextItems = (data ?? []) as HomeQuickNavItem[];
       setItems(nextItems);
       persistItems(nextItems);
     } catch (err) {
       console.error('Erro ao buscar atalhos da home:', err);
-      if (!hasCachedItems) {
-        setItems(DEFAULT_HOME_QUICK_NAV);
-      }
     } finally {
       setLoading(false);
     }

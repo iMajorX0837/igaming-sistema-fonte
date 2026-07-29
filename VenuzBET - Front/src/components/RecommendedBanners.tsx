@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { openCmsLink } from '../lib/cmsLink';
 import { useRecommendedBanners, type RecommendedBanner } from '../hooks/useRecommendedBanners';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 const MOBILE_BANNER_WIDTH = 249;
 const MOBILE_SCROLL_GAP = 8;
@@ -15,10 +16,12 @@ const bannersLayoutClass =
 const bannerItemClass =
   'max-md:shrink-0 max-md:snap-start max-md:w-[249px] max-md:h-[74px] md:w-auto md:shrink';
 
-export default function RecommendedBanners({ title = 'Recomendados' }: { title?: string }) {
+export default function RecommendedBanners({ title }: { title?: string }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { banners, loading } = useRecommendedBanners();
   const { config: homeConfig } = useHomeConfig();
+  const sectionTitle = title ?? t.home.recommended;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -110,7 +113,7 @@ export default function RecommendedBanners({ title = 'Recomendados' }: { title?:
           <source media="(max-width: 767px)" srcSet={mobileImage} />
           <img
             src={banner.imagem_url}
-            alt={banner.titulo || 'Banner recomendado'}
+            alt={banner.titulo || t.home.recommendedBanner}
             className="h-full w-full object-cover md:h-auto"
             loading="lazy"
           />
@@ -125,7 +128,7 @@ export default function RecommendedBanners({ title = 'Recomendados' }: { title?:
   if (loading) {
     return (
       <div>
-        <h4 className="text-white font-bold text-xl tracking-tight mb-4 mt-0">{title}</h4>
+        <h4 className="text-white font-bold text-xl tracking-tight mb-4 mt-0">{sectionTitle}</h4>
         <div className={bannersLayoutClass}>
           {[1, 2, 3].map((item) => (
             <div
@@ -145,14 +148,14 @@ export default function RecommendedBanners({ title = 'Recomendados' }: { title?:
   return (
     <div>
       <div className="mb-4 mt-0 flex items-center justify-between gap-3">
-        <h4 className="text-white font-bold text-xl tracking-tight">{title}</h4>
+        <h4 className="text-white font-bold text-xl tracking-tight">{sectionTitle}</h4>
         {showMobileArrows && (
           <div className="flex shrink-0 items-center gap-2 md:hidden">
             <button
               type="button"
               onClick={scrollLeft}
               disabled={!canScrollLeft}
-              aria-label="Banner anterior"
+              aria-label={t.common.previousBanner}
               className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
                 canScrollLeft
                   ? 'cursor-pointer text-slate-300 hover:text-slate-100'
@@ -167,7 +170,7 @@ export default function RecommendedBanners({ title = 'Recomendados' }: { title?:
               type="button"
               onClick={scrollRight}
               disabled={!canScrollRight}
-              aria-label="Próximo banner"
+              aria-label={t.common.nextBanner}
               className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
                 canScrollRight
                   ? 'cursor-pointer text-slate-300 hover:text-slate-100'

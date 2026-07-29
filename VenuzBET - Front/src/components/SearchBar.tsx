@@ -17,6 +17,8 @@ import {
   isPlatformGameEnabled,
   isPlatformProviderEnabled,
 } from '../lib/platformGames';
+import { useTranslation } from '../hooks/useTranslation';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 
 interface SearchBarProps {
   onGameSelect: (game: GameInfo) => void;
@@ -67,29 +69,28 @@ const getCategoryFromProvider = (providerName: string, gameName?: string): strin
   return 'slots';
 };
 
-const matchesCategory = (game: SearchGame, category: string): boolean => {
-  switch (category) {
-    case 'Todos':
+const matchesCategory = (game: SearchGame, categoryId: string): boolean => {
+  switch (categoryId) {
+    case 'todos':
       return true;
-    case 'Slots':
+    case 'slots':
       return game.category === 'slots';
-    case 'Jogos com bônus':
+    case 'bonus':
       return game.rounds_free === true;
-    case 'Novos jogos':
+    case 'novos':
       return game.original === true;
-    case 'Jogos de torneio':
+    case 'torneio':
       return game.category === 'crash';
-    case 'Mais jogados da semana':
+    case 'mais-jogados':
       return game.category === 'slots';
-    case 'Cassino ao vivo':
+    case 'ao-vivo':
       return game.category === 'live';
     default:
       return true;
   }
 };
 
-const GAME_PLACEHOLDER =
-  'https://via.placeholder.com/300x400/1e293b/64748b?text=Game';
+const GAME_PLACEHOLDER = GAME_IMAGE_FALLBACK_LG;
 
 const SEARCH_OPEN_WIDTH_PX = HOME_PAGE_WIDTH_PX;
 const SEARCH_OPEN_HEIGHT_PX = 42;
@@ -98,9 +99,11 @@ const SEARCH_CARD_GAP_PX = 12;
 
 export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchBarProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
+  const gamesCopy = t.games;
   const [searchValue, setSearchValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  const [selectedCategory, setSelectedCategory] = useState('todos');
   const [allGames, setAllGames] = useState<SearchGame[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [overlayInsets, setOverlayInsets] = useState({ top: 0, bottom: 0, left: 0 });
@@ -152,13 +155,13 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
   }, []);
 
   const categories = [
-    { id: 'todos', label: 'Todos' },
-    { id: 'slots', label: 'Slots' },
-    { id: 'bonus', label: 'Jogos com bônus' },
-    { id: 'novos', label: 'Novos jogos' },
-    { id: 'torneio', label: 'Jogos de torneio' },
-    { id: 'mais-jogados', label: 'Mais jogados da semana' },
-    { id: 'ao-vivo', label: 'Cassino ao vivo' },
+    { id: 'todos', label: gamesCopy.categories.all },
+    { id: 'slots', label: gamesCopy.categories.slots },
+    { id: 'bonus', label: gamesCopy.categories.bonus },
+    { id: 'novos', label: gamesCopy.categories.new },
+    { id: 'torneio', label: gamesCopy.categories.tournament },
+    { id: 'mais-jogados', label: gamesCopy.categories.mostPlayed },
+    { id: 'ao-vivo', label: gamesCopy.categories.liveCasino },
   ];
 
   const fetchAllGames = useCallback(async () => {
@@ -376,7 +379,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
       <input
         ref={inputRef}
         type="text"
-        placeholder="Pesquise um jogo de cassino..."
+        placeholder={gamesCopy.searchPlaceholder}
         value={searchValue}
         onChange={(e) => setSearchValue(e.target.value)}
         onFocus={(e) => {
@@ -405,7 +408,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
           type="button"
           onClick={handleClear}
           className="absolute right-4 w-5 h-5 text-slate-400 hover:text-slate-200 transition-colors z-10"
-          aria-label="Fechar pesquisa"
+          aria-label={t.common.closeSearch}
         >
           <X className="w-5 h-5" />
         </button>
@@ -418,12 +421,12 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
       {categories.map((category) => (
         <button
           key={category.id}
-          onClick={() => setSelectedCategory(category.label)}
+          onClick={() => setSelectedCategory(category.id)}
           className="px-4 h-8 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-shrink-0"
           style={{
             backgroundColor: 'var(--brand-primary)',
             color: '#ffffff',
-            opacity: selectedCategory === category.label ? 1 : 0.5,
+            opacity: selectedCategory === category.id ? 1 : 0.5,
           }}
         >
           {category.label}
@@ -435,7 +438,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
   const gamesGrid = (
     <div>
       {isLoading ? (
-        <LoadingScreen title="Carregando jogos..." variant="inline" />
+        <LoadingScreen title={gamesCopy.loadingGames} variant="inline" />
       ) : displayGames.length > 0 ? (
         <div
           style={{
@@ -476,7 +479,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
                     <svg viewBox="0 0 24 24" className="w-2.5 h-2.5" fill="currentColor">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    JOGAR
+                    {t.common.playUpper}
                   </span>
                 </div>
               </div>
@@ -485,7 +488,7 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
         </div>
       ) : (
         <div className="py-12 text-center">
-          <p className="text-slate-400 text-sm">Nenhum jogo encontrado</p>
+          <p className="text-slate-400 text-sm">{gamesCopy.noGamesFound}</p>
         </div>
       )}
 
@@ -495,11 +498,8 @@ export default function SearchBar({ onGameSelect, onSearchStateChange }: SearchB
           style={{ borderTop: SEARCH_PANEL_BORDER }}
         >
           <p className="text-slate-400 text-xs">
-            Mostrando {displayGames.length}
-            {filteredGames.length > displayGames.length
-              ? ` de ${filteredGames.length}`
-              : ''}{' '}
-            {filteredGames.length === 1 ? 'jogo' : 'jogos'}
+            {gamesCopy.showingGames(displayGames.length, filteredGames.length > displayGames.length ? filteredGames.length : undefined)}{' '}
+            {filteredGames.length === 1 ? gamesCopy.game : gamesCopy.games}
           </p>
         </div>
       )}

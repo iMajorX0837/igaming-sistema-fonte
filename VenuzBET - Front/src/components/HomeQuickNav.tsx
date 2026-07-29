@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { navigateToGameByName } from '../utils/navigateToGameByName';
 import { useHomeQuickNav, type HomeQuickNavItem } from '../hooks/useHomeQuickNav';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 const RGB_CARD_COUNT = 3;
 
@@ -24,9 +25,11 @@ const cardTitleStyle: CSSProperties = {
 function QuickNavCardContent({
   item,
   homeFundo,
+  playNowLabel,
 }: {
   item: HomeQuickNavItem;
   homeFundo: string;
+  playNowLabel: string;
 }) {
   return (
     <>
@@ -52,7 +55,7 @@ function QuickNavCardContent({
             lineHeight: 'normal',
           }}
         >
-          Jogue Agora
+          {playNowLabel}
         </span>
         <span className="line-clamp-2" style={cardTitleStyle}>
           {item.titulo}
@@ -67,13 +70,15 @@ function QuickNavCard({
   onGameClick,
   homeFundo,
   rgbHighlight = false,
+  playNowLabel,
 }: {
   item: HomeQuickNavItem;
   onGameClick: (gameName: string) => void;
   homeFundo: string;
   rgbHighlight?: boolean;
+  playNowLabel: string;
 }) {
-  const content = <QuickNavCardContent item={item} homeFundo={homeFundo} />;
+  const content = <QuickNavCardContent item={item} homeFundo={homeFundo} playNowLabel={playNowLabel} />;
 
   const className = rgbHighlight
     ? innerCardClass
@@ -103,6 +108,7 @@ export default function HomeQuickNav() {
   const navigate = useNavigate();
   const { items, loading } = useHomeQuickNav();
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
 
   const handleGameClick = async (gameName: string) => {
     const ok = await navigateToGameByName(gameName, navigate);
@@ -121,7 +127,7 @@ export default function HomeQuickNav() {
     <div className="overflow-x-auto pb-1 pt-0.5 scrollbar-hide animate-page-enter">
       <nav
         className="flex w-max min-w-full justify-start gap-2 px-1.5 sm:gap-2.5"
-        aria-label="Atalhos de jogos e categorias"
+        aria-label={t.home.quickNavAria}
       >
         {items.map((item, index) => (
           <QuickNavCard
@@ -130,6 +136,7 @@ export default function HomeQuickNav() {
             onGameClick={handleGameClick}
             homeFundo={homeConfig.fundo}
             rgbHighlight={index < RGB_CARD_COUNT}
+            playNowLabel={t.home.playNow}
           />
         ))}
       </nav>

@@ -15,6 +15,7 @@ import {
 import { getSidebarMenuLabel, useSidebarMenu, type SidebarMenuItem } from '../hooks/useSidebarMenu';
 import { useSidebarConfig } from '../hooks/useSidebarConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { useTranslation } from '../hooks/useTranslation';
 import IconifyIcon from './IconifyIcon';
 import {
   getSidebarMenuItemHref,
@@ -215,6 +216,7 @@ function SidebarPromoCardContent({
 
 export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
   const { language, setLanguage } = useSidebarLanguage();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [sectionsExpanded, setSectionsExpanded] = useState<Record<string, boolean>>({});
   const { cards: promoCards } = useSidebarPromoCards();
@@ -343,7 +345,7 @@ export default function Sidebar({ isOpen, onCloseMobileDrawer }: SidebarProps) {
         <button
           type="button"
           className="fixed inset-0 z-[45] bg-black/60 md:hidden"
-          aria-label="Fechar menu"
+          aria-label={t.headerFooter.header.closeMenu}
           onClick={() => onCloseMobileDrawer?.()}
         />
       ) : null}

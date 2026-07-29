@@ -1,3 +1,5 @@
+import { getAppCopy } from '../i18n';
+import type { AppLanguage } from '../i18n/types';
 import { supabase } from './supabase';
 
 export type CupomErrorCode =
@@ -79,32 +81,19 @@ export interface CupomHistoricoItem {
   data: string;
 }
 
-const ERROR_MESSAGES: Record<CupomErrorCode, string> = {
-  not_authenticated: 'Faça login para usar cupons.',
-  empty_code: 'Informe o código do cupom.',
-  invalid_coupon: 'Cupom inválido ou expirado!',
-  usage_limit_reached: 'Este cupom atingiu o limite total de uso.',
-  user_limit_reached: 'Você já utilizou este cupom.',
-  min_deposit_not_met: 'O valor do depósito não atinge o mínimo exigido pelo cupom.',
-  requires_deposit: 'Este cupom deve ser usado durante um depósito.',
-  zero_bonus: 'Este cupom não gera bônus.',
-  deposit_not_found: 'Depósito não encontrado.',
-  deposit_not_approved: 'O depósito ainda não foi aprovado.',
-  forbidden: 'Operação não permitida.',
-  invalid_spin_coupon_type: 'Cupom de rodadas inválido.',
-  missing_game: 'Cupom de rodadas sem jogo configurado.',
-  game_not_allowed: 'Jogo não permitido para cupons de rodadas.',
-  invalid_spin_count: 'Quantidade de giros inválida.',
-};
-
-export function getCupomErrorMessage(error?: string, depositoMinimo?: number): string {
+export function getCupomErrorMessage(
+  error?: string,
+  depositoMinimo?: number,
+  lang: AppLanguage = 'pt',
+): string {
+  const coupon = getAppCopy(lang).coupon;
   if (error === 'min_deposit_not_met' && depositoMinimo != null) {
-    return `Depósito mínimo de R$ ${depositoMinimo.toFixed(2)} para este cupom.`;
+    return coupon.minDeposit(depositoMinimo.toFixed(2).replace('.', ','));
   }
   if (error === 'requires_deposit' && depositoMinimo != null && depositoMinimo > 0) {
-    return `Este cupom requer depósito mínimo de R$ ${depositoMinimo.toFixed(2)}.`;
+    return coupon.requiresDepositMin(depositoMinimo.toFixed(2).replace('.', ','));
   }
-  return ERROR_MESSAGES[error as CupomErrorCode] ?? 'Cupom inválido ou expirado!';
+  return coupon.errors[error as CupomErrorCode] ?? coupon.invalidFallback;
 }
 
 export async function validarCupom(codigo: string, valorDeposito?: number): Promise<ValidarCupomResult> {
@@ -172,9 +161,12 @@ export function formatCupomBonus(valor: number): string {
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
-export function formatCupomGiros(quantidade: number, jogoNome?: string): string {
-  const giros = `${quantidade} giros`;
-  return jogoNome ? `${giros} em ${jogoNome}` : giros;
+export function formatCupomGiros(
+  quantidade: number,
+  jogoNome?: string,
+  lang: AppLanguage = 'pt',
+): string {
+  return getAppCopy(lang).coupon.formatSpins(quantidade, jogoNome);
 }
 
 export async function marcarRodadasGratisUsadas(

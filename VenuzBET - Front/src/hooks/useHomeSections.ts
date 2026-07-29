@@ -14,14 +14,28 @@ export interface HomeSection {
   use_green_button: boolean;
 }
 
-export const DEFAULT_HOME_SECTIONS: HomeSection[] = [
-  { id: 'default-recomendados', slug: 'recomendados', titulo: 'Recomendados', tipo: 'recomendados', ordem: 1, ativo: true, view_all_link: null, use_green_button: false },
-  { id: 'default-jogos-semana', slug: 'jogos-semana', titulo: '+ Jogados da Semana', tipo: 'jogos_semana', ordem: 2, ativo: true, view_all_link: '/games', use_green_button: false },
-  { id: 'default-jogos-pg', slug: 'jogos-pg', titulo: 'Jogos da PG', tipo: 'jogos_pg', ordem: 3, ativo: true, view_all_link: '/provider/pgsoft', use_green_button: false },
-  { id: 'default-jogos-mesa', slug: 'jogos-mesa', titulo: 'Jogos de Mesa', tipo: 'jogos_mesa', ordem: 4, ativo: true, view_all_link: '/provider/pgsoft', use_green_button: false },
-  { id: 'default-jogos-turbo', slug: 'jogos-turbo', titulo: 'Jogos Turbo', tipo: 'jogos_turbo', ordem: 5, ativo: true, view_all_link: '/provider/pragmatic', use_green_button: true },
-  { id: 'default-estudios', slug: 'estudios', titulo: 'Estúdios', tipo: 'estudios', ordem: 6, ativo: true, view_all_link: '/providers', use_green_button: false },
-];
+const STORAGE_KEY = 'venuz-home-sections-v2';
+
+function readCachedSections(): HomeSection[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as HomeSection[];
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistSections(sections: HomeSection[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sections));
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 function normalizeSection(row: Record<string, unknown>): HomeSection {
   const tipo = row.tipo;
@@ -48,11 +62,13 @@ function normalizeSection(row: Record<string, unknown>): HomeSection {
 }
 
 export function useHomeSections() {
-  const [sections, setSections] = useState<HomeSection[]>(DEFAULT_HOME_SECTIONS);
-  const [loading, setLoading] = useState(true);
+  const [sections, setSections] = useState<HomeSection[]>(() => readCachedSections() ?? []);
+  const [loading, setLoading] = useState(() => !readCachedSections());
 
   const fetchSections = useCallback(async () => {
-    setLoading(true);
+    const hasCache = (readCachedSections()?.length ?? 0) > 0;
+    if (!hasCache) setLoading(true);
+
     try {
       const { data, error } = await supabase
         .from('home_sections')
@@ -62,19 +78,16 @@ export function useHomeSections() {
 
       if (error) {
         console.error('Erro ao buscar seções da home:', error);
-        setSections(DEFAULT_HOME_SECTIONS);
+        if (!hasCache) setSections([]);
         return;
       }
 
-      if (!data?.length) {
-        setSections(DEFAULT_HOME_SECTIONS);
-        return;
-      }
-
-      setSections(data.map((row) => normalizeSection(row as Record<string, unknown>)));
+      const next = (data ?? []).map((row) => normalizeSection(row as Record<string, unknown>));
+      setSections(next);
+      persistSections(next);
     } catch (err) {
       console.error('Erro ao buscar seções da home:', err);
-      setSections(DEFAULT_HOME_SECTIONS);
+      if (!hasCache) setSections([]);
     } finally {
       setLoading(false);
     }

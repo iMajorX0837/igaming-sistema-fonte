@@ -20,6 +20,7 @@ import { appPageContainerClass } from '../constants/homeLayout';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import { isLiveProviderName, isSportGameCode } from '../api/playfiversCache';
 import { isOfficialSpribeGameCode } from '../lib/officialSpribe';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface GamePageProps {
   gameName: string;
@@ -85,6 +86,7 @@ function GameInformationBar({
   onToggleFullscreen,
   isFullscreen = false,
 }: GameInformationBarProps) {
+  const { t } = useTranslation();
   if (isFullscreen) return null;
 
   return (
@@ -102,8 +104,8 @@ function GameInformationBar({
             type="button"
             onClick={onToggleFullscreen}
             className="shrink-0 flex items-center justify-center rounded-lg p-1.5 text-slate-300 transition-colors duration-200 hover:text-white hover:bg-slate-800/60"
-            aria-label={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-            title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+            aria-label={isFullscreen ? t.games.exitFullscreen : t.games.fullscreen}
+            title={isFullscreen ? t.games.exitFullscreen : t.games.fullscreen}
           >
             <span
               className="iconify i-mingcute:fullscreen-fill"
@@ -119,13 +121,14 @@ function GameInformationBar({
 }
 
 function FullscreenExitButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
       onClick={onClick}
       className="absolute top-3 right-3 z-30 flex items-center justify-center rounded-lg bg-black/55 p-2 text-white opacity-90 transition-opacity hover:opacity-100 hover:bg-black/70 max-md:hidden"
-      aria-label="Sair da tela cheia"
-      title="Sair da tela cheia"
+      aria-label={t.games.exitFullscreen}
+      title={t.games.exitFullscreen}
     >
       <span
         className="iconify i-mingcute:fullscreen-exit-fill"
@@ -141,39 +144,44 @@ function MobileGameTopBar({
   gameName,
   gameProvider,
   onClose,
+  hideDetails = false,
 }: {
   gameName: string;
   gameProvider: string;
   onClose: () => void;
+  hideDetails?: boolean;
 }) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
 
   return (
     <div
       className="shrink-0 border-b border-white/10 px-3 pb-2.5 pt-[max(0.5rem,env(safe-area-inset-top))]"
       style={{ backgroundColor: homeConfig.fundo }}
     >
-      <div className="flex items-start justify-between gap-3 min-w-0">
-        <div className="min-w-0 flex-1 flex flex-col gap-0">
-          <p
-            className="truncate text-base font-bold leading-tight text-white"
-            style={{ fontFamily: 'Montserrat, sans-serif' }}
-          >
-            {gameName}
-          </p>
-          <p
-            className="truncate text-xs font-normal leading-tight text-slate-400"
-            style={{ fontFamily: 'Montserrat, sans-serif' }}
-          >
-            {gameProvider}
-          </p>
-        </div>
+      <div className={`flex min-w-0 items-start gap-3 ${hideDetails ? 'justify-end' : 'justify-between'}`}>
+        {!hideDetails && (
+          <div className="min-w-0 flex-1 flex flex-col gap-0">
+            <p
+              className="truncate text-base font-bold leading-tight text-white"
+              style={{ fontFamily: 'Montserrat, sans-serif' }}
+            >
+              {gameName}
+            </p>
+            <p
+              className="truncate text-xs font-normal leading-tight text-slate-400"
+              style={{ fontFamily: 'Montserrat, sans-serif' }}
+            >
+              {gameProvider}
+            </p>
+          </div>
+        )}
         <button
           type="button"
           onClick={onClose}
           className="-mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/90 transition-colors hover:bg-white/10 hover:text-white"
-          aria-label="Fechar jogo"
-          title="Fechar jogo"
+          aria-label={t.games.closeGame}
+          title={t.games.closeGame}
         >
           <X className="h-5 w-5" strokeWidth={2.25} />
         </button>
@@ -245,6 +253,7 @@ function GameBackRow({
 }
 
 function LoginRequiredPrompt({ onLogin }: { onLogin: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 md:gap-6 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950/90 backdrop-blur-lg px-4">
       <span
@@ -253,7 +262,7 @@ function LoginRequiredPrompt({ onLogin }: { onLogin: () => void }) {
         aria-hidden="true"
         style={{ fontSize: '45px' }}
       />
-      <p className="text-white text-lg md:text-2xl font-bold">Você precisa entrar para jogar.</p>
+      <p className="text-white text-lg md:text-2xl font-bold">{t.games.loginToPlay}</p>
 
       <button
         onClick={onLogin}
@@ -287,7 +296,7 @@ function LoginRequiredPrompt({ onLogin }: { onLogin: () => void }) {
             aria-hidden="true"
             style={{ fontSize: '24px' }}
           />
-          Entrar
+          {t.auth.login}
         </span>
       </button>
     </div>
@@ -340,13 +349,11 @@ function InsufficientBalanceOverlay({
   onDeposit: () => void;
   onPlay: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 md:gap-5 bg-gradient-to-b from-slate-950/40 via-slate-950/70 to-slate-950/90 backdrop-blur-lg px-4 text-center">
       <InsufficientBalanceIllustration />
-      <h2 className="text-white text-lg md:text-2xl font-bold">Depósito necessário</h2>
-      <p className="text-slate-300 text-sm md:text-base max-w-md leading-relaxed">
-        Parece que o seu saldo é insuficiente para jogar este jogo. Você gostaria de depositar e começar a jogar?
-      </p>
+      <h2 className="text-white text-lg md:text-2xl font-bold">{t.games.depositRequired}</h2>
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -354,7 +361,7 @@ function InsufficientBalanceOverlay({
           className="h-8 px-5 rounded-full text-white text-sm font-semibold transition-all duration-200 hover:opacity-90"
           style={{ backgroundColor: 'var(--brand-primary)' }}
         >
-          Depositar
+          {t.games.deposit}
         </button>
         <button
           type="button"
@@ -362,7 +369,7 @@ function InsufficientBalanceOverlay({
           className="h-8 px-5 rounded-full text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 border"
           style={{ backgroundColor: 'transparent', borderColor: 'var(--brand-primary)' }}
         >
-          Jogar
+          {t.common.play}
         </button>
       </div>
     </div>
@@ -443,6 +450,7 @@ export default function GamePage({
   const { config: homeConfig } = useHomeConfig();
   const { nomeBet, siteTitulo } = useSiteBrand();
   const { isAuthenticated, user } = useAuth();
+  const { t, language } = useTranslation();
   const prevGameCodeRef = useRef(gameCode);
   const launchInFlightRef = useRef<string | null>(null);
   const lastLaunchKeyRef = useRef<string | null>(null);
@@ -554,7 +562,7 @@ export default function GamePage({
       const userData = await fetchSaldo();
       
       if (!userData) {
-        throw new Error('Erro ao buscar dados do usuário');
+        throw new Error(t.games.userDataFetchError);
       }
 
       // Usar email do usuário como identificador na Play Fiver
@@ -564,7 +572,7 @@ export default function GamePage({
       const gameLaunchUrl = import.meta.env.VITE_GAME_LAUNCH_URL?.trim() || '/api/game_launch';
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session?.user) {
-        throw new Error('Sessão expirada. Faça login novamente.');
+        throw new Error(t.games.sessionExpired);
       }
 
       const response = await fetch(gameLaunchUrl, {
@@ -583,13 +591,13 @@ export default function GamePage({
             isSportGameCode(gameCode) ||
             isLiveProviderName(gameProvider) ||
             isOfficialSpribeGameCode(gameCode),
-          lang: 'pt',
+          lang: language,
         }),
       });
 
       if (!response.ok) {
         const errBody = (await response.json().catch(() => null)) as { msg?: string } | null;
-        throw new Error(errBody?.msg || `Erro ao lançar jogo (${response.status})`);
+        throw new Error(errBody?.msg || t.games.launchGameStatusError(response.status));
       }
 
       const data: GameLaunchResponse = await response.json();
@@ -606,12 +614,12 @@ export default function GamePage({
           return launchUrl;
         });
       } else {
-        throw new Error(data.msg || 'Erro ao lançar jogo');
+        throw new Error(data.msg || t.games.launchGameError);
       }
     } catch (err: any) {
       console.error('Erro ao lançar jogo:', err);
       if (!background) {
-        setError(err.message || 'Erro ao carregar o jogo. Tente novamente.');
+        setError(err.message || t.games.gameLoadError);
       }
     } finally {
       if (launchInFlightRef.current === launchKey) {
@@ -620,7 +628,7 @@ export default function GamePage({
       lastLaunchKeyRef.current = launchKey;
       setIsLoading(false);
     }
-  }, [gameCode, isAuthenticated, user, fetchSaldo, launchProvider, gameOriginal]);
+  }, [gameCode, isAuthenticated, user, fetchSaldo, launchProvider, gameOriginal, language, t.games, t.common]);
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -733,6 +741,7 @@ export default function GamePage({
   }, []);
 
   const effectiveFullscreen = fullscreen || isMobile;
+  const isSportsPage = isSportGameCode(gameCode);
   const iframeScrollable =
     isSportGameCode(gameCode ?? '') || gameOriginal || (fullscreen && isMobile);
 
@@ -785,6 +794,7 @@ export default function GamePage({
         gameName={gameName}
         gameProvider={gameProvider}
         onClose={onBack}
+        hideDetails={isSportsPage}
       />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {content}
@@ -832,7 +842,7 @@ export default function GamePage({
                         <FullscreenExitButton onClick={togglePlayerFullscreen} />
                       )}
                     </div>
-                    <GameInformationBar {...gameInfoBarProps} />
+                    {!isSportsPage && <GameInformationBar {...gameInfoBarProps} />}
                   </GamePlayerShell>
                 </div>
                 )
@@ -858,12 +868,12 @@ export default function GamePage({
                           <FullscreenExitButton onClick={togglePlayerFullscreen} />
                         )}
                       </div>
-                      <GameInformationBar {...gameInfoBarProps} />
+                      {!isSportsPage && <GameInformationBar {...gameInfoBarProps} />}
                     </GamePlayerShell>
                   </div>
                 </div>
               )}
-              {!isMobile && <Footer containerClassName={appPageContainerClass} />}
+              {!isMobile && !isSportsPage && <Footer containerClassName={appPageContainerClass} />}
             </div>
           ) : (
             <div className={`flex flex-col w-full ${isMobile ? 'flex-1 min-h-0' : ''}`}>
@@ -877,14 +887,14 @@ export default function GamePage({
                     </svg>
                   </div>
                   <div className="text-center space-y-2 md:space-y-3">
-                    <p className="text-white text-lg md:text-2xl font-bold">Erro ao carregar jogo</p>
+                    <p className="text-white text-lg md:text-2xl font-bold">{t.games.gameLoadFailed}</p>
                     <p className="text-red-400 text-xs md:text-sm">{error}</p>
                   </div>
                   <button
                     onClick={() => launchGame({ force: true })}
                     className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                   >
-                    Tentar novamente
+                    {t.common.tryAgain}
                   </button>
                 </div>
               )}
@@ -963,7 +973,7 @@ export default function GamePage({
                             <FullscreenExitButton onClick={togglePlayerFullscreen} />
                           )}
                         </div>
-                        <GameInformationBar {...gameInfoBarProps} />
+                        {!isSportsPage && <GameInformationBar {...gameInfoBarProps} />}
                       </GamePlayerShell>
                     </div>
                     )
@@ -1008,7 +1018,7 @@ export default function GamePage({
                             <FullscreenExitButton onClick={togglePlayerFullscreen} />
                           )}
                         </div>
-                        <GameInformationBar {...gameInfoBarProps} />
+                        {!isSportsPage && <GameInformationBar {...gameInfoBarProps} />}
                       </GamePlayerShell>
                     </div>
                   </div>
@@ -1027,13 +1037,13 @@ export default function GamePage({
                     </svg>
                   </div>
                   <div className="text-center space-y-2 md:space-y-3">
-                    <p className="text-white text-lg md:text-2xl font-bold">Jogo não disponível</p>
-                    <p className="text-slate-300 text-xs md:text-sm">Este jogo não pode ser carregado no momento</p>
+                    <p className="text-white text-lg md:text-2xl font-bold">{t.games.gameNotFound}</p>
+                    <p className="text-slate-300 text-xs md:text-sm">{t.games.gameLoadError}</p>
                   </div>
                 </div>
               )}
 
-              {!isMobile && <Footer containerClassName={appPageContainerClass} />}
+              {!isMobile && !isSportsPage && <Footer containerClassName={appPageContainerClass} />}
             </div>
           )}
     </div>

@@ -18,6 +18,25 @@ function buildAviatorTxnId(usuarioId, roundId, betId, suffix) {
   return `aviator_${usuarioId}_${roundId || 0}_${betId || 1}_${suffix}`;
 }
 
+function parseComBonusFlag(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === 'sim' || raw === 's' || raw === 'true' || raw === '1' || raw === 'yes') return true;
+  if (raw === 'não' || raw === 'nao' || raw === 'n' || raw === 'false' || raw === '0') return false;
+  return null;
+}
+
+async function resolveBetWalletBonus(supabase, usuarioId, roundId, betId) {
+  const betTxnId = buildAviatorTxnId(usuarioId, roundId, betId, 'bet');
+  const { data, error } = await supabase
+    .from('transacoes_jogos')
+    .select('com_bonus')
+    .eq('txn_id', betTxnId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return parseComBonusFlag(data.com_bonus);
+}
+
 function mapRpcError(result, fallbackGold = 0) {
   const err = result?.error;
   if (err === 'INVALID_USER') {
@@ -161,6 +180,7 @@ export function createAviatorWallet(supabase, rounds = null) {
 
     const winReal = goldToReal(winGold);
     const txnId = buildAviatorTxnId(usuario.id, roundId, betId, txnSuffix || 'win');
+    const betWalletBonus = await resolveBetWalletBonus(supabase, usuario.id, roundId, betId);
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc('aviator_creditar_saldo', {
       p_email: userCode,
@@ -168,6 +188,7 @@ export function createAviatorWallet(supabase, rounds = null) {
       p_txn_id: txnId,
       p_bet_valor: goldToReal(betGold || 0),
       p_tipo: tipo,
+      p_usa_bonus: betWalletBonus,
     });
 
     if (rpcError) {
@@ -247,11 +268,13 @@ export function createAviatorWallet(supabase, rounds = null) {
 
     const refundReal = goldToReal(refundGold);
     const txnId = buildAviatorTxnId(usuario.id, roundId, betId, 'refund');
+    const betWalletBonus = await resolveBetWalletBonus(supabase, usuario.id, roundId, betId);
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc('aviator_reembolsar_saldo', {
       p_email: userCode,
       p_valor: refundReal,
       p_txn_id: txnId,
+      p_usa_bonus: betWalletBonus,
     });
 
     if (rpcError) {

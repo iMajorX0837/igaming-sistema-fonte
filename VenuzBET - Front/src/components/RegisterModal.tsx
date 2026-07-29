@@ -5,6 +5,8 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
 import { resolveRegisterModalImageUrl } from '../lib/authModalImages';
 import { getAuthErrorMessage } from '../lib/authErrors';
+import type { AuthCopy } from '../i18n/auth';
+import { useTranslation } from '../hooks/useTranslation';
 import AuthModalImage from './AuthModalImage';
 import { useModalAnimation } from '../hooks/useModalAnimation';
 
@@ -56,17 +58,17 @@ function isValidCpf(value: string): boolean {
   return d1 === Number(cpf[9]) && d2 === Number(cpf[10]);
 }
 
-function mapCpfLookupError(data: CpfHubResponse): string {
+function mapCpfLookupError(data: CpfHubResponse, auth: AuthCopy): string {
   if (data.code === 'cpf_in_use') {
-    return data.message || 'Este CPF já está cadastrado. Faça login ou recupere sua conta.';
+    return data.message || auth.cpfAlreadyRegistered;
   }
   if (data.code === 'cpf_invalid') {
-    return data.message || 'CPF inválido.';
+    return data.message || auth.cpfInvalid;
   }
   if (data.message?.trim()) {
     return data.message;
   }
-  return 'CPF não encontrado ou inválido.';
+  return auth.cpfNotFound;
 }
 
 function maskFullName(fullName: string): string {
@@ -93,6 +95,7 @@ function maskBirthLine(day: number, year: number): string {
 export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegisterSuccess }: RegisterModalProps) {
   const { register } = useAuth();
   const { config: homeConfig } = useHomeConfig();
+  const { t, language } = useTranslation();
   const { config: authModalsConfig } = useAuthModalsConfig();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -176,7 +179,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
         setCpfVerified(false);
         setMaskedNameLine('');
         setMaskedBirthLine('');
-        setCpfLookupError('CPF inválido.');
+        setCpfLookupError(t.auth.cpfInvalid);
         setCpfLookupLoading(false);
         return;
       }
@@ -197,7 +200,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
           setCpfVerified(false);
           setMaskedNameLine('');
           setMaskedBirthLine('');
-          setCpfLookupError(mapCpfLookupError(data));
+          setCpfLookupError(mapCpfLookupError(data, t.auth));
         }
       } catch {
         lastLookupCpfRef.current = '';
@@ -205,12 +208,12 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
         setCpfVerified(false);
         setMaskedNameLine('');
         setMaskedBirthLine('');
-        setCpfLookupError('Não foi possível validar o CPF. Tente novamente.');
+        setCpfLookupError(t.auth.cpfValidationError);
       } finally {
         setCpfLookupLoading(false);
       }
     },
-    [fetchCpfData]
+    [fetchCpfData, t.auth]
   );
 
   runCpfLookupRef.current = runCpfLookup;
@@ -294,13 +297,13 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     setError('');
 
     if (!termsAccepted) {
-      setError('Você precisa aceitar os termos e condições para continuar.');
+      setError(t.auth.termsRequired);
       return;
     }
 
     const cpfClean = formData.cpf.replace(/\D/g, '');
     if (!cpfVerified || cpfClean !== lastLookupCpfRef.current) {
-      setError('Valide seu CPF antes de continuar.');
+      setError(t.auth.cpfValidationError);
       return;
     }
 
@@ -309,27 +312,27 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
     const password = formData.password;
 
     if (!email) {
-      setError('Informe um e-mail válido para criar sua conta.');
+      setError(t.auth.validEmailRequired);
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('E-mail inválido. Verifique o endereço digitado.');
+      setError(t.auth.invalidEmail);
       return;
     }
     if (!phoneClean) {
-      setError('Informe seu telefone com DDD.');
+      setError(t.auth.invalidPhone);
       return;
     }
     if (phoneClean.length < 10 || phoneClean.length > 11) {
-      setError('Telefone inválido. Use DDD + número (10 ou 11 dígitos).');
+      setError(t.auth.invalidPhone);
       return;
     }
     if (!password) {
-      setError('Crie uma senha para proteger sua conta.');
+      setError(t.auth.passwordRequired);
       return;
     }
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+      setError(t.auth.passwordMinLength);
       return;
     }
 
@@ -353,7 +356,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
       onClose();
       onRegisterSuccess?.();
     } catch (err) {
-      setError(getAuthErrorMessage(err, 'Não foi possível criar sua conta. Tente novamente.'));
+      setError(getAuthErrorMessage(err, t.auth.registerFallbackError, language));
     } finally {
       setLoading(false);
     }
@@ -396,23 +399,23 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 <AlertTriangle className="w-16 h-16 text-amber-400" />
               </div>
               <h3 className="text-lg font-bold text-white">
-                Tem certeza que deseja cancelar seu registro?
+                {t.auth.cancelRegistration}
               </h3>
               <p className="text-sm text-slate-300">
-                Cadastre-se agora para concorrer a bônus exclusivos e rodadas grátis imperdíveis!
+                {t.auth.cancelRegistrationMessage}
               </p>
               <div className="flex flex-col gap-2 pt-4">
                 <button
                   onClick={handleCancelClose}
                   className="w-full h-10 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 active:scale-[0.98] flex items-center justify-center gap-2"
                 >
-                  Continuar <ArrowRight className="w-4 h-4" />
+                  {t.auth.continueRegistration} <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleConfirmClose}
                   className="w-full h-8 text-slate-400 font-medium text-xs transition-all duration-200 flex items-center justify-center gap-1 hover:text-slate-100"
                 >
-                  <X className="w-3 h-3" /> Sim quero cancelar
+                  <X className="w-3 h-3" /> {t.auth.cancel}
                 </button>
               </div>
             </div>
@@ -421,7 +424,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
 
         <AuthModalImage
           src={resolveRegisterModalImageUrl(authModalsConfig)}
-          alt="Registro"
+          alt={t.auth.register}
           className="w-full h-auto object-contain md:h-full md:object-cover md:object-center"
           containerClassName="relative flex w-full shrink-0 justify-center items-center overflow-hidden md:h-[200px]"
           containerStyle={{ backgroundColor: homeConfig.fundo }}
@@ -458,7 +461,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 />
                 {cpfLookupLoading && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-brand-light pointer-events-none">
-                    Consultando...
+                    {t.auth.consultingCpf}
                   </span>
                 )}
               </div>
@@ -474,7 +477,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               <input
                 type="email"
                 name="email"
-                placeholder="E-mail"
+                placeholder={t.auth.email}
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full h-10 pl-10 pr-4 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
@@ -505,7 +508,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
-                placeholder="Digite sua senha"
+                placeholder={t.auth.passwordPlaceholder}
                 value={formData.password}
                 onChange={handleChange}
                 className="w-full h-10 pl-10 pr-10 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all input-autofill-reset"
@@ -539,9 +542,9 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 className="w-4 h-4 rounded bg-slate-900 accent-brand cursor-pointer mt-0.5 flex-shrink-0"
               />
               <label htmlFor="terms" className="text-xs text-slate-300 leading-tight cursor-pointer">
-                Confirmo que <span className="font-bold text-brand-light">tenho mais de 18 anos</span> e aceito os{' '}
-                <a href="/help/terms" className="text-brand-light font-bold hover:underline">Termos de Condições</a> e a{' '}
-                <a href="/help/privacy" className="text-brand-light font-bold hover:underline">Política de Privacidade</a>.
+                {t.auth.termsPrefix}
+                <span className="font-bold text-brand-light">{t.auth.termsLink}</span>
+                {t.auth.termsSuffix}
               </label>
             </div>
 
@@ -551,11 +554,11 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
               className="w-full h-10 rounded-lg text-white font-bold text-sm transition-opacity duration-200 disabled:opacity-50 disabled:cursor-not-allowed btn-brand-submit"
               style={{ backgroundColor: 'var(--brand-primary)' }}
             >
-              {loading ? 'Criando conta...' : 'CADASTRE-SE'}
+              {loading ? t.auth.registering : t.auth.registerUpper}
             </button>
 
             <div className="text-center pt-1">
-              <p className="text-xs text-slate-400 mb-2">Ou cadastre-se com</p>
+              <p className="text-xs text-slate-400 mb-2">{t.auth.orRegisterWith}</p>
               <div className="flex gap-2 justify-center">
                 <button
                   type="button"
@@ -605,7 +608,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
 
             <div className="text-center pt-1 pb-1">
               <p className="text-xs text-white font-bold mt-2">
-                Já possui uma conta?
+                {t.auth.hasAccount}
               </p>
               <button 
                 type="button" 
@@ -615,7 +618,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin, onRegi
                 }}
                 className="text-brand-light font-bold text-xs underline mt-2 hover:opacity-90"
               >
-                Faça login aqui
+                {t.auth.loginHere}
               </button>
             </div>
           </form>

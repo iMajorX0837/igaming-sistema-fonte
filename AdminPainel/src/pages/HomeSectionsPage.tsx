@@ -139,7 +139,6 @@ export default function HomeSectionsPage({ embedded = false }: { embedded?: bool
 
   const loadSections = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('home_sections')
         .select('*')

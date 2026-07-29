@@ -31,7 +31,6 @@ export default function VipNiveisPage() {
 
   const loadNiveis = async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data, error: fetchError } = await supabase
         .from('vip_niveis')

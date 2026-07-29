@@ -117,7 +117,6 @@ export default function RoletaPage() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
       setError(null);
 
       const [configRes, segmentsRes, cuponsRes] = await Promise.all([

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Footer from './Footer';
 import AppPageScaffold from './AppPageScaffold';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
+import LoginRequiredPanel from './LoginRequiredPanel';
 import { useAuth } from '../contexts/AuthContext';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useUserProfileData } from '../hooks/useUserProfileData';
@@ -11,6 +12,7 @@ import { useBetHistory } from '../hooks/useBetHistory';
 import { MODAL_ANIM_MS } from '../hooks/useModalAnimation';
 import type { BetHistoryItem, UserProfileData } from '../lib/userProfileCache';
 import LoadingScreen from './LoadingScreen';
+import { useTranslation } from '../hooks/useTranslation';
 import { appPageContainerClass } from '../constants/homeLayout';
 
 interface ProfilePageProps {
@@ -18,74 +20,34 @@ interface ProfilePageProps {
 }
 
 function ProfileLoginRequired({ onLogin }: { onLogin: () => void }) {
+  const { t } = useTranslation();
   return (
-    <div className="relative min-h-[320px] md:min-h-[420px] flex flex-col items-center justify-center gap-4 md:gap-6 px-4 py-12">
-      <span
-        className="iconify i-solar:shield-warning-bold-duotone"
-        data-icon="solar:shield-warning-bold-duotone"
-        aria-hidden="true"
-        style={{ fontSize: '45px' }}
-      />
-      <p className="text-white text-lg md:text-2xl font-bold text-center px-2">
-        Você precisa estar logado para acessar esta página.
-      </p>
-
-      <button
-        type="button"
-        onClick={onLogin}
-        className="relative isolate overflow-hidden rounded-lg text-white text-sm font-semibold transition-all duration-200 hover:opacity-90 flex items-center justify-center"
-        style={{
-          backgroundColor: 'var(--brand-primary)',
-          minWidth: '156px',
-          height: '48px',
-          paddingInline: '18px',
-          boxShadow:
-            '0 0 14px rgb(var(--brand-primary-rgb) / 0.48), 0 0 28px rgb(var(--brand-primary-rgb) / 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
-        }}
-      >
-        <div className="sidebar-promo-bloom-layer" aria-hidden="true">
-          <span
-            className="sidebar-promo-bloom sidebar-promo-bloom-1"
-            style={{ backgroundColor: '#C084FC' }}
-          />
-          <span
-            className="sidebar-promo-bloom sidebar-promo-bloom-2"
-            style={{ backgroundColor: '#C084FC' }}
-          />
-          <span
-            className="sidebar-promo-bloom sidebar-promo-bloom-3"
-            style={{ backgroundColor: '#C084FC' }}
-          />
-        </div>
-        <span className="relative z-10 flex items-center gap-2">
-          <span
-            className="iconify i-solar:login-3-broken"
-            data-icon="solar:login-3-broken"
-            aria-hidden="true"
-            style={{ fontSize: '24px' }}
-          />
-          Entrar agora
-        </span>
-      </button>
-    </div>
+    <LoginRequiredPanel message={t.profile.loginRequired} onLogin={onLogin} />
   );
 }
 
-const PROFILE_TABS = [
-  { id: 'minha-conta', label: 'Minha conta', icon: 'solar:user-bold-duotone' },
-  { id: 'seguranca', label: 'Segurança e login', icon: 'material-symbols:security' },
-  { id: 'historico', label: 'Histórico de jogo', icon: 'iconamoon:history-duotone' },
-  { id: 'verificacao', label: 'Verificação KYC', icon: 'hugeicons:face-id' },
-  { id: 'recesso', label: 'Recesso / Pausa', icon: 'material-symbols:autopause' },
-  { id: 'auto-exclusao', label: 'Auto-exclusão', icon: 'solar:user-block-rounded-bold-duotone' },
+const PROFILE_TAB_IDS = [
+  { id: 'minha-conta', tabKey: 'account' as const, icon: 'solar:user-bold-duotone' },
+  { id: 'seguranca', tabKey: 'security' as const, icon: 'material-symbols:security' },
+  { id: 'historico', tabKey: 'history' as const, icon: 'iconamoon:history-duotone' },
+  { id: 'verificacao', tabKey: 'kyc' as const, icon: 'hugeicons:face-id' },
+  { id: 'recesso', tabKey: 'recess' as const, icon: 'material-symbols:autopause' },
+  { id: 'auto-exclusao', tabKey: 'selfExclusion' as const, icon: 'solar:user-block-rounded-bold-duotone' },
 ] as const;
 
 function BetHistoryMobileCard({
   item,
   backgroundColor,
+  labels,
 }: {
   item: BetHistoryItem;
   backgroundColor: string;
+  labels: {
+    value: string;
+    return: string;
+    status: string;
+    withBonus: string;
+  };
 }) {
   return (
     <div
@@ -119,19 +81,19 @@ function BetHistoryMobileCard({
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
         <div>
-          <p className="text-slate-500 mb-0.5">Valor</p>
+          <p className="text-slate-500 mb-0.5">{labels.value}</p>
           <p style={{ color: '#DCDDDE' }}>R$ {item.valor.toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 mb-0.5">Retorno</p>
+          <p className="text-slate-500 mb-0.5">{labels.return}</p>
           <p style={{ color: '#DCDDDE' }}>{item.retorno > 0 ? `R$ ${item.retorno.toFixed(2)}` : 'R$ 0,00'}</p>
         </div>
         <div>
-          <p className="text-slate-500 mb-0.5">Status</p>
+          <p className="text-slate-500 mb-0.5">{labels.status}</p>
           <p style={{ color: '#DCDDDE' }}>{item.status}</p>
         </div>
         <div>
-          <p className="text-slate-500 mb-0.5">c/ bônus</p>
+          <p className="text-slate-500 mb-0.5">{labels.withBonus}</p>
           <p style={{ color: '#DCDDDE' }}>{item.bonus}</p>
         </div>
       </div>
@@ -141,6 +103,15 @@ function BetHistoryMobileCard({
 
 export default function ProfilePage({ onBack }: ProfilePageProps) {
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
+  const profileTabs = useMemo(
+    () =>
+      PROFILE_TAB_IDS.map((tab) => ({
+        ...tab,
+        label: t.profile.tabs[tab.tabKey],
+      })),
+    [t.profile.tabs],
+  );
   const { config: homeConfig } = useHomeConfig();
   const profileInputBg = `color-mix(in srgb, ${homeConfig.fundo} 90%, white)`;
   const profileRowAltBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
@@ -227,13 +198,13 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 aria-hidden="true"
                 style={{ fontSize: '28px' }}
               />
-              <h1 className="text-white text-xl font-bold">Perfil</h1>
+              <h1 className="text-white text-xl font-bold">{t.profile.title}</h1>
             </div>
 
             <div className="flex flex-col md:flex-row gap-3 md:gap-6">
               <div className="w-full md:w-48 flex-shrink-0 max-md:mb-1">
                 <div className="flex md:flex-col gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide -mx-0.5 px-0.5 md:mx-0 md:px-0 md:space-y-1.5 md:overflow-visible max-md:flex-nowrap max-md:snap-x max-md:snap-mandatory max-md:rounded-xl max-md:border max-md:border-white/10 max-md:p-1 max-md:bg-black/15">
-                  {PROFILE_TABS.map((tab) => (
+                  {profileTabs.map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
@@ -260,22 +231,22 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {isAuthenticated && activeTab === 'minha-conta' && (
                   <div className="space-y-3">
                     <div>
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Dados da conta</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">{t.profile.accountData}</h1>
                     </div>
 
                     <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
-                      <h2 className="text-white text-base md:text-lg font-semibold mb-2">Dados pessoais</h2>
+                      <h2 className="text-white text-base md:text-lg font-semibold mb-2">{t.profile.personalData}</h2>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Nome completo</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.fullName}</label>
                           <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                               <User className="w-4 h-4 text-white" />
                             </div>
                             <input
                               type="text"
-                              value={isLoadingUserData ? 'Carregando...' : formatName(fullNameFromRow(userData) || null)}
+                              value={isLoadingUserData ? t.common.loading : formatName(fullNameFromRow(userData) || null)}
                               readOnly
                               className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
@@ -284,7 +255,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>CPF</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.cpf}</label>
                           <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -294,7 +265,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             </div>
                             <input
                               type="text"
-                              value={isLoadingUserData ? 'Carregando...' : formatCPF(userData.cpf)}
+                              value={isLoadingUserData ? t.common.loading : formatCPF(userData.cpf)}
                               readOnly
                               className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
@@ -306,15 +277,15 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                     <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                        <h2 className="text-white text-base md:text-lg font-semibold">Contato</h2>
+                        <h2 className="text-white text-base md:text-lg font-semibold">{t.profile.contact}</h2>
                         <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
-                          Alterar
+                          {t.profile.editContact}
                         </button>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Telefone</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.phone}</label>
                           <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -324,7 +295,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             </div>
                             <input
                               type="text"
-                              value={isLoadingUserData ? 'Carregando...' : formatPhone(userData.telefone)}
+                              value={isLoadingUserData ? t.common.loading : formatPhone(userData.telefone)}
                               readOnly
                               className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
@@ -333,7 +304,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>E-mail</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.email}</label>
                           <div className="relative">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -343,7 +314,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             </div>
                             <input
                               type="text"
-                              value={isLoadingUserData ? 'Carregando...' : (userData.email || '')}
+                              value={isLoadingUserData ? t.common.loading : (userData.email || '')}
                               readOnly
                               className="w-full h-11 pl-10 pr-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand"
                               style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
@@ -355,38 +326,38 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                     <div className={`${profileSectionClass} max-md:mb-0 pt-2 md:pt-2`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-                        <h2 className="text-white text-base md:text-lg font-semibold">Endereço</h2>
+                        <h2 className="text-white text-base md:text-lg font-semibold">{t.profile.address}</h2>
                         <button type="button" className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto">
-                          Alterar
+                          {t.profile.editContact}
                         </button>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-3">
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>CEP</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.zip}</label>
                           <input
                             type="text"
-                            placeholder="CEP"
+                            placeholder={t.profile.zip}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Cidade</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.city}</label>
                           <input
                             type="text"
-                            placeholder="Cidade"
+                            placeholder={t.profile.city}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Estado</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.state}</label>
                           <input
                             type="text"
-                            placeholder="Estado"
+                            placeholder={t.profile.state}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
@@ -395,30 +366,30 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Rua</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.street}</label>
                           <input
                             type="text"
-                            placeholder="Rua"
+                            placeholder={t.profile.street}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Número</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.number}</label>
                           <input
                             type="text"
-                            placeholder="Número"
+                            placeholder={t.profile.number}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
                         </div>
 
                         <div>
-                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>Bairro</label>
+                          <label className="text-sm mb-1 block" style={{ color: '#FFFFFF' }}>{t.profile.neighborhood}</label>
                           <input
                             type="text"
-                            placeholder="Bairro"
+                            placeholder={t.profile.neighborhood}
                             className="w-full h-11 px-4 border border-brand/40 rounded-lg text-sm focus:outline-none focus:border-brand placeholder-slate-600"
                             style={{ backgroundColor: profileInputBg, color: '#FFFFFF' }}
                           />
@@ -431,7 +402,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {isAuthenticated && activeTab === 'seguranca' && (
                   <div className="space-y-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">Segurança e login</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-1">{t.profile.security}</h1>
                       {showPasswordChange && (
                         <button
                           onClick={() => {
@@ -443,7 +414,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           }}
                           className="text-brand-light text-sm font-semibold hover:text-brand-light transition-colors self-start sm:self-auto"
                         >
-                          Cancelar
+                          {t.profile.cancel}
                         </button>
                       )}
                     </div>
@@ -452,7 +423,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
-                            <h3 className="text-white font-semibold mb-0.5">Alterar senha de segurança</h3>
+                            <h3 className="text-white font-semibold mb-0.5">{t.profile.changePassword}</h3>
                             <p className="text-slate-500 text-sm">••••••••••••</p>
                           </div>
                           <button
@@ -461,27 +432,27 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             className="text-sm font-semibold hover:opacity-80 transition-colors self-start sm:self-auto flex-shrink-0"
                             style={{ color: 'var(--brand-primary)' }}
                           >
-                            Alterar
+                            {t.profile.editContact}
                           </button>
                         </div>
                       </div>
                     ) : (
                       <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
-                        <h3 className="text-white font-semibold mb-1">Alterar senha de segurança</h3>
+                        <h3 className="text-white font-semibold mb-1">{t.profile.changePassword}</h3>
                         <p className="text-slate-400 text-sm mb-4">
-                          Aqui você pode atualizar a senha da sua conta. Certifique-se de que a nova senha criada é forte e segura
+                          {t.profile.passwordHint}
                         </p>
 
                         <div className="space-y-3">
                           <div>
-                            <label className="text-white text-sm mb-1 block">Senha atual</label>
+                            <label className="text-white text-sm mb-1 block">{t.profile.currentPassword}</label>
                             <div className="relative">
                               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white">
                                 <Lock className="w-4 h-4" />
                               </div>
                               <input
                                 type={showCurrentPassword ? 'text' : 'password'}
-                                placeholder="Informe a senha atual"
+                                placeholder={t.profile.currentPasswordPlaceholder}
                                 value={passwordData.currentPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                                 className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
@@ -502,14 +473,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           </div>
 
                           <div>
-                            <label className="text-white text-sm mb-1 block">Nova senha</label>
+                            <label className="text-white text-sm mb-1 block">{t.profile.newPassword}</label>
                             <div className="relative">
                               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white">
                                 <Lock className="w-4 h-4" />
                               </div>
                               <input
                                 type={showNewPassword ? 'text' : 'password'}
-                                placeholder="Informe sua nova senha"
+                                placeholder={t.profile.newPasswordPlaceholder}
                                 value={passwordData.newPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                                 className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
@@ -530,14 +501,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                           </div>
 
                           <div>
-                            <label className="text-white text-sm mb-1 block">Confirmar senha</label>
+                            <label className="text-white text-sm mb-1 block">{t.profile.confirmPassword}</label>
                             <div className="relative">
                               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white">
                                 <Lock className="w-4 h-4" />
                               </div>
                               <input
                                 type={showConfirmPassword ? 'text' : 'password'}
-                                placeholder="Confirme sua nova senha"
+                                placeholder={t.profile.confirmPasswordPlaceholder}
                                 value={passwordData.confirmPassword}
                                 onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                                 className="w-full h-11 pl-10 pr-10 border border-brand/40 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
@@ -574,7 +545,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             }`}
                             style={{ backgroundColor: homeConfig.fundo }}
                           >
-                            Alterar
+                            {t.profile.editContact}
                           </button>
                         </div>
                       </div>
@@ -583,20 +554,20 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                     <div className={profileSectionClass} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">Autenticação de dois fatores (2FA)</h3>
-                          <p className="text-slate-500 text-sm">Desativado</p>
+                          <h3 className="text-white font-semibold mb-0.5 text-sm md:text-base">{t.profile.twoFactorAuth}</h3>
+                          <p className="text-slate-500 text-sm">{t.profile.disabled}</p>
                         </div>
-                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>Em breve</span>
+                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>{t.profile.comingSoon}</span>
                       </div>
                     </div>
 
                     <div className={`${profileSectionClass} max-md:mb-0`} style={{ borderColor: 'var(--brand-primary)' }}>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <h3 className="text-white font-semibold mb-0.5">Contas Redes Sociais</h3>
-                          <p className="text-slate-500 text-sm">Desativado</p>
+                          <h3 className="text-white font-semibold mb-0.5">{t.profile.socialAccounts}</h3>
+                          <p className="text-slate-500 text-sm">{t.profile.disabled}</p>
                         </div>
-                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>Em breve</span>
+                        <span className="text-sm flex-shrink-0" style={{ color: 'var(--brand-primary)' }}>{t.profile.comingSoon}</span>
                       </div>
                     </div>
                   </div>
@@ -605,7 +576,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {isAuthenticated && activeTab === 'historico' && (
                   <div className="space-y-4 md:space-y-6">
                     <div>
-                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">Histórico de apostas</h1>
+                      <h1 className="text-white text-xl md:text-2xl font-bold mb-2">{t.profile.betHistory}</h1>
                     </div>
 
                     <div className="flex gap-2 mb-4 md:mb-6 max-md:flex-nowrap max-md:overflow-x-auto max-md:scrollbar-hide max-md:-mx-1 max-md:px-1 max-md:pb-1">
@@ -614,40 +585,40 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'hoje' ? 1 : 0.5 }}
                       >
-                        Somente hoje
+                        {t.profile.history.today}
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('ontem'); setCurrentPage(1); }}
                         className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'ontem' ? 1 : 0.5 }}
                       >
-                        Somente ontem
+                        {t.profile.history.yesterday}
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('7dias'); setCurrentPage(1); }}
                         className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '7dias' ? 1 : 0.5 }}
                       >
-                        Últimos 7 dias
+                        {t.profile.history.last7Days}
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('30dias'); setCurrentPage(1); }}
                         className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === '30dias' ? 1 : 0.5 }}
                       >
-                        Últimos 30 dias
+                        {t.profile.history.last30Days}
                       </button>
                       <button
                         onClick={() => { setSelectedPeriod('total'); setCurrentPage(1); }}
                         className="shrink-0 whitespace-nowrap px-4 h-8 rounded-lg text-xs font-bold transition-all"
                         style={{ backgroundColor: 'var(--brand-primary)', color: '#ffffff', opacity: selectedPeriod === 'total' ? 1 : 0.5 }}
                       >
-                        Período total
+                        {t.profile.history.total}
                       </button>
                     </div>
 
                     {isLoadingHistory && betHistory.length === 0 && (
-                      <LoadingScreen title="Carregando histórico..." variant="inline" className="py-8" />
+                      <LoadingScreen title={t.profile.history.loading} variant="inline" className="py-8" />
                     )}
 
                     <div className="rounded-xl overflow-hidden max-md:border max-md:border-white/10">
@@ -655,7 +626,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                       <div className="space-y-2 p-1 md:hidden">
                         {betHistory.length === 0 ? (
                           <div className="px-3 py-12 text-center">
-                            <p className="text-xs" style={{ color: '#DCDDDE' }}>Nenhum registro encontrado</p>
+                            <p className="text-xs" style={{ color: '#DCDDDE' }}>{t.common.noRecords}</p>
                           </div>
                         ) : (
                           currentBets.map((item, index) => (
@@ -663,6 +634,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                               key={`${item.jogo}-${item.data}-${index}`}
                               item={item}
                               backgroundColor={index % 2 === 0 ? homeConfig.fundo : profileRowAltBg}
+                              labels={t.profile.history}
                             />
                           ))
                         )}
@@ -673,20 +645,20 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                         <table className="w-full">
                           <thead style={{ backgroundColor: profileInputBg }}>
                             <tr>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Tipo</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Jogo</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Valor</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Retorno</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Status</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>c/ bônus</th>
-                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>Data</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.type}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.game}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.value}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.return}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.status}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.withBonus}</th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold whitespace-nowrap" style={{ color: '#DCDDDE' }}>{t.profile.history.date}</th>
                             </tr>
                           </thead>
                           <tbody>
                             {betHistory.length === 0 ? (
                               <tr>
                                 <td colSpan={7} className="px-3 md:px-4 py-12 md:py-20 text-center">
-                                  <p className="text-xs md:text-sm" style={{ color: '#DCDDDE' }}>Nenhum registro encontrado</p>
+                                  <p className="text-xs md:text-sm" style={{ color: '#DCDDDE' }}>{t.common.noRecords}</p>
                                 </td>
                               </tr>
                             ) : (
@@ -783,7 +755,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                             </button>
                           </div>
                           <p className="text-xs sm:text-sm text-center sm:text-left" style={{ color: '#DCDDDE' }}>
-                            Exibindo {startIndex + 1} a {Math.min(endIndex, betHistory.length)} de {betHistory.length} registros
+                            {t.common.showingRecords(startIndex + 1, Math.min(endIndex, betHistory.length), betHistory.length)}
                           </p>
                         </div>
                       )}
@@ -794,7 +766,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                 {isAuthenticated &&
                   (activeTab === 'verificacao' || activeTab === 'recesso' || activeTab === 'auto-exclusao') && (
                   <div className="p-6 md:p-8 text-center max-md:rounded-xl max-md:border max-md:border-white/10">
-                    <p className="text-slate-400 text-base md:text-lg">Em construção</p>
+                    <p className="text-slate-400 text-base md:text-lg">{t.common.underConstruction}</p>
                   </div>
                 )}
               </div>

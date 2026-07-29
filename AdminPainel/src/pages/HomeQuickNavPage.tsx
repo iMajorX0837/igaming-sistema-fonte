@@ -175,7 +175,6 @@ export default function HomeQuickNavPage({ embedded = false }: { embedded?: bool
 
   const loadItems = async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data, error: fetchError } = await supabase
         .from('cms_items')

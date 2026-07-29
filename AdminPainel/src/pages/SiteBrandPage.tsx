@@ -45,7 +45,6 @@ export default function SiteBrandPage() {
 
   const loadConfig = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('site_config')
         .select('header_logo_url, site_favicon_url, nome_bet, site_titulo, site_dominio, header_fundo')

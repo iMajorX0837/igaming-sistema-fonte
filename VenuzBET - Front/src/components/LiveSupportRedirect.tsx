@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFooterConfig } from '../hooks/useFooterConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { openLiveSupportWhatsapp } from '../lib/liveSupport';
 import LoadingScreen from './LoadingScreen';
 import AppPageScaffold from './AppPageScaffold';
@@ -9,6 +10,7 @@ import AppPageScaffold from './AppPageScaffold';
 export default function LiveSupportRedirect() {
   const navigate = useNavigate();
   const { config } = useFooterConfig();
+  const { t } = useTranslation();
 
   useEffect(() => {
     openLiveSupportWhatsapp(config.whatsapp.url);
@@ -17,7 +19,7 @@ export default function LiveSupportRedirect() {
 
   return (
     <AppPageScaffold>
-      <LoadingScreen title="Abrindo suporte..." variant="page" />
+      <LoadingScreen title={t.common.openingSupport} variant="page" />
     </AppPageScaffold>
   );
 }

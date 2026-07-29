@@ -58,18 +58,17 @@ export interface SiteTheme {
   brandColors: BrandColorsConfig;
 }
 
-export const DEFAULT_AUTH_MODAL_IMAGE =
-  'https://i.ibb.co/YgXq6QP/Gemini-Generated-Image-39fib539fib539fi.png';
+export const DEFAULT_AUTH_MODAL_IMAGE = '';
 
 export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   fundo: '#121319',
-  logo_url: '/assets/logo.png',
+  logo_url: '/assets/logo.svg',
 };
 
 export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
   fundo: '#121319',
-  instagram: { ativo: true, url: 'https://instagram.com/royalbet_oficial' },
-  telegram: { ativo: true, url: 'https://t.me/royalbet_oficial' },
+  instagram: { ativo: false, url: '' },
+  telegram: { ativo: false, url: '' },
   whatsapp: { ativo: false, url: '' },
 };
 
@@ -106,7 +105,7 @@ export const DEFAULT_SITE_THEME: SiteTheme = {
   brandColors: DEFAULT_BRAND_COLORS,
 };
 
-const STORAGE_KEY = 'venuz-site-theme-v10';
+const STORAGE_KEY = 'venuz-site-theme-v11';
 
 export { STORAGE_KEY as SITE_THEME_STORAGE_KEY };
 
@@ -181,9 +180,9 @@ function normalizeSidebar(row: Record<string, unknown> | null | undefined): Side
 function normalizeAuthModals(row: Record<string, unknown> | null | undefined): AuthModalsConfig {
   if (!row) return DEFAULT_AUTH_MODALS_CONFIG;
   return {
-    login_imagem_url: String(row.login_imagem_url || DEFAULT_AUTH_MODALS_CONFIG.login_imagem_url),
-    register_imagem_url: String(row.register_imagem_url || DEFAULT_AUTH_MODALS_CONFIG.register_imagem_url),
-    deposit_imagem_url: String(row.deposit_imagem_url ?? DEFAULT_AUTH_MODALS_CONFIG.deposit_imagem_url).trim(),
+    login_imagem_url: String(row.login_imagem_url ?? '').trim(),
+    register_imagem_url: String(row.register_imagem_url ?? '').trim(),
+    deposit_imagem_url: String(row.deposit_imagem_url ?? '').trim(),
   };
 }
 

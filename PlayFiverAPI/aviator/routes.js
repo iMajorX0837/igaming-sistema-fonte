@@ -499,16 +499,6 @@ export function mountAviatorRoutes(app, { supabase, enabled = true }) {
     }
   });
 
-  // RTP page (legado — preferir painel admin)
-  app.get('/rtp', (req, res, next) => {
-    if (process.env.AVIATOR_RTP_PAGE_ENABLED !== 'true') {
-      return res.status(404).json({ ok: false, error: 'Página RTP desabilitada' });
-    }
-    const rtpPath = path.join(AVIATOR_DIR, 'rtp.html');
-    if (fs.existsSync(rtpPath)) return res.sendFile(rtpPath);
-    next();
-  });
-
   // Arquivos estáticos do jogo
   if (fs.existsSync(AVIATOR_DIR)) {
     app.use('/aviator', express.static(AVIATOR_DIR, { index: 'index.html' }));

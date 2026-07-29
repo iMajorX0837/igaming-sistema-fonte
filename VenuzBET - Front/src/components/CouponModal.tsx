@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import Notification from './Notification';
 import SiteLogo from './SiteLogo';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +25,7 @@ interface CouponModalProps {
 export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { config: homeConfig } = useHomeConfig();
+  const { t, language } = useTranslation();
   const [couponCode, setCouponCode] = useState('');
   const [validating, setValidating] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -72,7 +74,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
     if (!couponCode.trim() || validating || activating) return;
 
     if (!isAuthenticated) {
-      setNotification({ message: 'Faça login para usar cupons.', type: 'error' });
+      setNotification({ message: t.coupon.loginRequired, type: 'error' });
       return;
     }
 
@@ -84,7 +86,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
 
       if (!result.ok) {
         setNotification({
-          message: getCupomErrorMessage(result.error, result.deposito_minimo),
+          message: getCupomErrorMessage(result.error, result.deposito_minimo, language),
           type: 'error',
         });
         return;
@@ -92,7 +94,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
 
       if (result.requer_deposito) {
         setNotification({
-          message: result.mensagem ?? 'Este cupom deve ser usado durante um depósito.',
+          message: result.mensagem ?? t.coupon.requiresDeposit,
           type: 'error',
         });
         return;
@@ -101,14 +103,16 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
       setValidated(true);
       const preview =
         result.tipo_bonus === 'giros_gratis'
-          ? `Cupom válido! ${formatCupomGiros(result.quantidade_giros ?? 0, result.jogo_nome)}.`
-          : `Cupom válido! Bônus de ${formatCupomBonus(result.bonus_calculado ?? 0)}.`;
+          ? t.coupon.validPreviewSpins(
+              formatCupomGiros(result.quantidade_giros ?? 0, result.jogo_nome, language)
+            )
+          : t.coupon.validPreviewBalance(formatCupomBonus(result.bonus_calculado ?? 0));
       setNotification({
         message: preview,
         type: 'success',
       });
     } catch {
-      setNotification({ message: 'Erro ao validar cupom. Tente novamente.', type: 'error' });
+      setNotification({ message: t.coupon.validateError, type: 'error' });
     } finally {
       setValidating(false);
     }
@@ -120,7 +124,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
     if (!couponCode.trim() || activating || validating) return;
 
     if (!isAuthenticated) {
-      setNotification({ message: 'Faça login para usar cupons.', type: 'error' });
+      setNotification({ message: t.coupon.loginRequired, type: 'error' });
       return;
     }
 
@@ -131,7 +135,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
 
       if (!result.ok) {
         setNotification({
-          message: getCupomErrorMessage(result.error),
+          message: getCupomErrorMessage(result.error, undefined, language),
           type: 'error',
         });
         return;
@@ -157,9 +161,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
 
           if (!grantResult.ok) {
             setNotification({
-              message:
-                grantResult.msg ||
-                'Cupom ativado, mas não foi possível enviar as rodadas grátis à PlayFivers.',
+              message: grantResult.msg || t.coupon.spinsGrantFailed,
               type: 'error',
             });
             return;
@@ -169,8 +171,10 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
 
       const successMessage =
         result.tipo_bonus === 'giros_gratis'
-          ? `Cupom ativado! ${formatCupomGiros(result.quantidade_giros ?? 0, result.jogo_nome)} disponíveis.`
-          : `Cupom ativado! ${formatCupomBonus(result.valor_bonus ?? 0)} creditados no seu saldo.`;
+          ? t.coupon.activatedSpins(
+              formatCupomGiros(result.quantidade_giros ?? 0, result.jogo_nome, language)
+            )
+          : t.coupon.activatedBalance(formatCupomBonus(result.valor_bonus ?? 0));
 
       setNotification({
         message: successMessage,
@@ -183,7 +187,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
         handleClose();
       }, 2000);
     } catch {
-      setNotification({ message: 'Erro ao ativar cupom. Tente novamente.', type: 'error' });
+      setNotification({ message: t.coupon.activateError, type: 'error' });
     } finally {
       setActivating(false);
     }
@@ -223,14 +227,14 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
           </button>
 
           <div className="flex h-[80px] w-full shrink-0 items-center justify-center">
-            <SiteLogo alt="Cupom" className="h-12 object-contain" />
+            <SiteLogo alt={t.coupon.title} className="h-12 object-contain" />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
             <form onSubmit={handleActivate} className="flex h-full min-h-0 flex-col gap-3">
               <div className="shrink-0">
-                <h2 className="text-[20px] font-bold text-white">Cupom</h2>
-                <p className="mt-0.5 text-[14px] text-slate-400">Ative um cupom na sua conta</p>
+                <h2 className="text-[20px] font-bold text-white">{t.coupon.title}</h2>
+                <p className="mt-0.5 text-[14px] text-slate-400">{t.coupon.subtitle}</p>
               </div>
 
               <div className="shrink-0">
@@ -250,7 +254,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
                       setCouponCode(e.target.value.toUpperCase());
                       setValidated(false);
                     }}
-                    placeholder="Insira o código do cupom"
+                    placeholder={t.coupon.placeholder}
                     className="h-[49px] w-full rounded-lg border-2 border-brand pl-10 pr-24 text-sm text-white placeholder-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-brand/50"
                     style={{ backgroundColor: homeConfig.fundo }}
                   />
@@ -259,11 +263,11 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
                     onClick={handleValidate}
                     className="absolute right-1.5 top-1/2 flex h-[31px] w-[75px] -translate-y-1/2 items-center justify-center rounded-md bg-brand text-xs font-bold text-white transition-all duration-200 hover:bg-brand-hover"
                   >
-                    {validating ? 'Validando...' : 'Validar'}
+                    {validating ? t.coupon.validating : t.coupon.validate}
                   </button>
                 </div>
                 {validated && (
-                  <p className="mt-1.5 text-xs font-medium text-green-400">Cupom validado com sucesso!</p>
+                  <p className="mt-1.5 text-xs font-medium text-green-400">{t.coupon.validatedSuccess}</p>
                 )}
                 <div className="mt-3 h-px bg-white/10" />
               </div>
@@ -292,7 +296,7 @@ export default function CouponModal({ isOpen, onClose }: CouponModalProps) {
                   />
                 </div>
                 <span className="relative z-10">
-                  {activating ? 'Ativando...' : 'Ativar cupom'}
+                  {activating ? t.coupon.activating : t.coupon.activate}
                 </span>
               </button>
             </form>

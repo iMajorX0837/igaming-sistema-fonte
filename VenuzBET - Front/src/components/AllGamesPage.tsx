@@ -11,6 +11,8 @@ import { GameInfo } from '../App';
 import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { useAllGamesPageConfig } from '../hooks/useAllGamesPageConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 import { appPageContainerClass } from '../constants/homeLayout';
 
 interface AllGamesPageProps {
@@ -88,24 +90,25 @@ const getCategoryFromProvider = (providerName: string, gameName?: string): strin
     return 'table';
   }
   
-  // Por padrão, a maioria dos jogos são slots
+  // Por padrï¿½o, a maioria dos jogos sï¿½o slots
   return 'slots';
 };
 
-// Função para criar slug de URL (normalizar para URL-friendly)
+// Funï¿½ï¿½o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres não alfanuméricos por hífen
-    .replace(/^-+|-+$/g, ''); // Remove hífens do início e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres nï¿½o alfanumï¿½ricos por hï¿½fen
+    .replace(/^-+|-+$/g, ''); // Remove hï¿½fens do inï¿½cio e fim
 };
 
 export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPageProps) {
   const navigate = useNavigate();
   const { pageConfig, providers, categories } = useAllGamesPageConfig();
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -166,7 +169,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
       setAllGames(gamesResults.flat());
     } catch (err) {
       console.error('Erro ao buscar jogos:', err);
-      setError('Erro ao carregar jogos. Tente novamente.');
+      setError(t.games.loadGamesError);
       setAllGames([]);
     } finally {
       setIsLoading(false);
@@ -201,7 +204,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
     const matchesSearch = game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          game.provider.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Normalizar comparação de provider
+    // Normalizar comparaï¿½ï¿½o de provider
     let matchesProvider = true;
     if (selectedProvider !== 'all') {
       const selectedProviderObj = providers.find(p => p.slug === selectedProvider);
@@ -225,8 +228,8 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
   const currentGames = filteredGames.slice(0, visibleCount);
   const hasMoreGames = currentGames.length < filteredGames.length;
 
-  const selectedProviderName = providers.find(p => p.slug === selectedProvider)?.nome || 'Todos';
-  const selectedCategoryName = categories.find(c => c.slug === selectedCategory)?.nome || 'Todos';
+  const selectedProviderName = providers.find(p => p.slug === selectedProvider)?.nome || t.common.all;
+  const selectedCategoryName = categories.find(c => c.slug === selectedCategory)?.nome || t.common.all;
 
   return (
     <AppPageScaffold>
@@ -272,7 +275,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
             </div>
 
             {isInitialLoading && (
-              <LoadingScreen title="Carregando jogos..." variant="page" />
+              <LoadingScreen title={t.games.loadingGames} variant="page" />
             )}
 
             {error && !isLoading && allGames.length === 0 && (
@@ -282,7 +285,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                   onClick={() => fetchAllGames()}
                   className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
-                  Tentar novamente
+                  {t.common.tryAgain}
                 </button>
               </div>
             )}
@@ -319,7 +322,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                               alt={game.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x400/1e293b/64748b?text=Game';
+                                (e.target as HTMLImageElement).src = GAME_IMAGE_FALLBACK_LG;
                               }}
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
@@ -331,7 +334,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                                   <path d="M8 5v14l11-7z"/>
                                 </svg>
-                                JOGAR
+                                {t.common.playUpper}
                               </button>
                             </div>
                           </div>
@@ -341,7 +344,7 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
                   </div>
                 ) : (
                   <div className="flex items-center justify-center min-h-[360px]">
-                    <p className="text-slate-400 text-lg">Não possui jogos ativos.</p>
+                    <p className="text-slate-400 text-lg">{t.games.noActiveGames}</p>
                   </div>
                 )}
               </div>
@@ -350,13 +353,13 @@ export default function AllGamesPage({ onGameSelect: _onGameSelect }: AllGamesPa
             {hasMoreGames && (
               <div className="flex flex-col items-center gap-4 mb-8">
                 <p className="text-slate-400 text-sm">
-                  Mostrando {currentGames.length} de {filteredGames.length} jogos
+                  {t.games.showingGames(currentGames.length, filteredGames.length)}
                 </p>
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                   className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
                 >
-                  Carregar mais
+                  {t.common.loadMore}
                 </button>
               </div>
             )}

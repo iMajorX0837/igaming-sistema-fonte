@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import SearchInput from './SearchInput';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 export interface FilterDropdownItem {
   id: string;
@@ -32,6 +33,7 @@ export default function FilterDropdown({
   className = '',
 }: FilterDropdownProps) {
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -93,7 +95,7 @@ export default function FilterDropdown({
           <div className="p-2 border-b border-slate-700">
             <SearchInput
               variant="compact"
-              placeholder="Buscar..."
+              placeholder={t.common.search}
               value={searchTerm}
               onChange={setSearchTerm}
             />

@@ -71,7 +71,6 @@ export default function TodosJogosPage() {
 
   const loadAll = async () => {
     try {
-      setLoading(true);
       const [configRes, providersRes, categoriesRes] = await Promise.all([
         supabase.from('all_games_page_config').select('titulo, jogos_por_pagina').eq('id', 1).maybeSingle(),
         supabase.from('all_games_providers').select('*').order('ordem', { ascending: true }),

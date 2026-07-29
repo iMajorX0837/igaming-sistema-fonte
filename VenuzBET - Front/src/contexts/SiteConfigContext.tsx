@@ -69,6 +69,12 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('venuz-site-theme-v7');
       localStorage.removeItem('venuz-site-theme-v8');
       localStorage.removeItem('venuz-site-theme-v9');
+      localStorage.removeItem('venuz-site-theme-v10');
+      localStorage.removeItem('venuz-home-banners-v1');
+      localStorage.removeItem('venuz-recommended-banners-v1');
+      localStorage.removeItem('venuz-home-quick-nav-v1');
+      localStorage.removeItem('venuz-top-banner-v1');
+      localStorage.removeItem('venuz-sidebar-menu-v1');
     } catch {
       // ignore
     }

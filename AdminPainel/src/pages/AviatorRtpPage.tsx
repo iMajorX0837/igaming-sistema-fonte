@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
+import Modal from '../components/ui/Modal';
 import PagePanel from '../components/ui/PagePanel';
 import StatCard from '../components/ui/StatCard';
 import { fetchAviatorRtpPreview, invalidateAviatorQueue, type AviatorScheduleEntry } from '../lib/aviatorEngineApi';
@@ -90,6 +91,43 @@ function parseDecimal(raw: string): number | null {
   const n = Number(raw.replace(',', '.').trim());
   if (!Number.isFinite(n)) return null;
   return n;
+}
+
+/** Mínimo técnico do jogo Aviator (cashout / crash). */
+const CRASH_ABSOLUTE_MIN = 1.01;
+
+function sanitizeCrashInput(raw: string): string {
+  const normalized = raw.replace(',', '.');
+  let cleaned = '';
+  let seenDot = false;
+  for (const ch of normalized) {
+    if (ch >= '0' && ch <= '9') {
+      cleaned += ch;
+      continue;
+    }
+    if (ch === '.' && !seenDot) {
+      cleaned += '.';
+      seenDot = true;
+    }
+  }
+  if (!cleaned.includes('.')) return cleaned;
+  const [intPart, decPart = ''] = cleaned.split('.');
+  return `${intPart}.${decPart.slice(0, 2)}`;
+}
+
+function toCrashFormString(value: unknown, fallback = CRASH_ABSOLUTE_MIN): string {
+  if (value == null || value === '') {
+    return CRASH_ABSOLUTE_MIN.toFixed(2);
+  }
+  const n = Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(n)) return fallback.toFixed(2);
+  return (Math.round(n * 100) / 100).toFixed(2);
+}
+
+function parseCrashField(raw: string): number | null {
+  const n = parseDecimal(raw);
+  if (n === null) return null;
+  return Math.round(n * 100) / 100;
 }
 
 function parsePctField(raw: string, { min = 0, max = 100 } = {}): number | null {
@@ -314,10 +352,10 @@ function validateFormForModo(
   const pctAzul = parsePctField(form.pct_vela_azul);
   const pctRoxa = parsePctField(form.pct_vela_roxa);
   const pctRosa = parsePctField(form.pct_vela_rosa);
-  const geracaoMin = parseDecimal(form.geracao_min_crash);
-  const geracaoMax = parseDecimal(form.geracao_max_crash);
-  const minCrash = parseDecimal(form.min_crash);
-  const maxCrash = parseDecimal(form.max_crash);
+  const geracaoMin = parseCrashField(form.geracao_min_crash);
+  const geracaoMax = parseCrashField(form.geracao_max_crash);
+  const minCrash = parseCrashField(form.min_crash);
+  const maxCrash = parseCrashField(form.max_crash);
   const queueSize = Number(form.queue_size);
 
   if (modo === 'rtp_geral') {
@@ -344,17 +382,23 @@ function validateFormForModo(
     if (
       geracaoMin === null ||
       geracaoMax === null ||
-      geracaoMin < 1 ||
+      geracaoMin < CRASH_ABSOLUTE_MIN ||
       geracaoMax > limits.crashMax ||
       geracaoMin > geracaoMax
     ) {
-      return `Limite mínimo ≥ 1,00x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
+      return `Limite mínimo ≥ ${CRASH_ABSOLUTE_MIN.toFixed(2)}x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
     }
   }
 
   if (modo === 'crash') {
-    if (minCrash === null || maxCrash === null || minCrash < 1 || maxCrash > limits.crashMax || minCrash > maxCrash) {
-      return `Crash mínimo ≥ 1,00x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
+    if (
+      minCrash === null ||
+      maxCrash === null ||
+      minCrash < CRASH_ABSOLUTE_MIN ||
+      maxCrash > limits.crashMax ||
+      minCrash > maxCrash
+    ) {
+      return `Crash mínimo ≥ ${CRASH_ABSOLUTE_MIN.toFixed(2)}x e máximo ≤ ${limits.crashMax.toFixed(2)}x.`;
     }
   }
 
@@ -372,10 +416,10 @@ function buildSavePayload(form: ConfigForm, modo: ModoGeracao) {
   const pctAzul = parsePctField(form.pct_vela_azul);
   const pctRoxa = parsePctField(form.pct_vela_roxa);
   const pctRosa = parsePctField(form.pct_vela_rosa);
-  const geracaoMin = parseDecimal(form.geracao_min_crash);
-  const geracaoMax = parseDecimal(form.geracao_max_crash);
-  const minCrash = parseDecimal(form.min_crash);
-  const maxCrash = parseDecimal(form.max_crash);
+  const geracaoMin = parseCrashField(form.geracao_min_crash);
+  const geracaoMax = parseCrashField(form.geracao_max_crash);
+  const minCrash = parseCrashField(form.min_crash);
+  const maxCrash = parseCrashField(form.max_crash);
   const queueSize = Number(form.queue_size);
 
   return {
@@ -384,10 +428,10 @@ function buildSavePayload(form: ConfigForm, modo: ModoGeracao) {
     p_pct_vela_azul: pctAzul ?? parsePctField(form.pct_vela_azul) ?? 52,
     p_pct_vela_roxa: pctRoxa ?? parsePctField(form.pct_vela_roxa) ?? 38,
     p_pct_vela_rosa: pctRosa ?? parsePctField(form.pct_vela_rosa) ?? 10,
-    p_geracao_min_crash: geracaoMin ?? parseDecimal(form.geracao_min_crash) ?? 1.01,
-    p_geracao_max_crash: geracaoMax ?? parseDecimal(form.geracao_max_crash) ?? 500,
-    p_min_crash: minCrash ?? parseDecimal(form.min_crash) ?? 1.01,
-    p_max_crash: maxCrash ?? parseDecimal(form.max_crash) ?? 500,
+    p_geracao_min_crash: geracaoMin ?? CRASH_ABSOLUTE_MIN,
+    p_geracao_max_crash: geracaoMax ?? 500,
+    p_min_crash: minCrash ?? CRASH_ABSOLUTE_MIN,
+    p_max_crash: maxCrash ?? 500,
     p_queue_size: queueSize,
   };
 }
@@ -405,6 +449,7 @@ export default function AviatorRtpPage() {
   const [liveRound, setLiveRound] = useState<AviatorScheduleEntry | null>(null);
   const [upcomingRounds, setUpcomingRounds] = useState<AviatorScheduleEntry[]>([]);
   const [pastRounds, setPastRounds] = useState<AviatorScheduleEntry[]>([]);
+  const [pastHistoryOpen, setPastHistoryOpen] = useState(false);
   const [clockOffset, setClockOffset] = useState(0);
   const [, setTick] = useState(0);
   const [engineMotor, setEngineMotor] = useState<{
@@ -420,16 +465,16 @@ export default function AviatorRtpPage() {
       pct_vela_azul: toFormNumberString(config.pct_vela_azul, Number(defaultForm.pct_vela_azul)),
       pct_vela_roxa: toFormNumberString(config.pct_vela_roxa, Number(defaultForm.pct_vela_roxa)),
       pct_vela_rosa: toFormNumberString(config.pct_vela_rosa, Number(defaultForm.pct_vela_rosa)),
-      geracao_min_crash: toFormNumberString(
-        config.geracao_min_crash ?? config.min_crash,
+      geracao_min_crash: toCrashFormString(
+        config.geracao_min_crash,
         Number(defaultForm.geracao_min_crash)
       ),
-      geracao_max_crash: toFormNumberString(
-        config.geracao_max_crash ?? config.max_crash,
+      geracao_max_crash: toCrashFormString(
+        config.geracao_max_crash,
         Number(defaultForm.geracao_max_crash)
       ),
-      min_crash: toFormNumberString(config.min_crash, Number(defaultForm.min_crash)),
-      max_crash: toFormNumberString(config.max_crash, Number(defaultForm.max_crash)),
+      min_crash: toCrashFormString(config.min_crash, Number(defaultForm.min_crash)),
+      max_crash: toCrashFormString(config.max_crash, Number(defaultForm.max_crash)),
       queue_size: toFormNumberString(config.queue_size, Number(defaultForm.queue_size)),
     });
     setLimits({
@@ -560,10 +605,8 @@ export default function AviatorRtpPage() {
         return false;
       }
 
-      const { data, error } = await supabase.rpc(
-        'atualizar_aviator_config_admin',
-        buildSavePayload(nextForm, nextForm.modo_geracao)
-      );
+      const payload = buildSavePayload(nextForm, nextForm.modo_geracao);
+      const { data, error } = await supabase.rpc('atualizar_aviator_config_admin', payload);
 
       if (error) {
         showToast('Erro ao salvar configurações.', 'error');
@@ -582,8 +625,23 @@ export default function AviatorRtpPage() {
             ...prev,
             modo_geracao: parseModo(result.config!.modo_geracao),
           }));
+        } else if (result.config.geracao_min_crash != null || result.config.modo_geracao != null) {
+          applyConfigToForm({
+            ...result.config,
+            geracao_min_crash: result.config.geracao_min_crash ?? payload.p_geracao_min_crash,
+            geracao_max_crash: result.config.geracao_max_crash ?? payload.p_geracao_max_crash,
+            min_crash: result.config.min_crash ?? payload.p_min_crash,
+            max_crash: result.config.max_crash ?? payload.p_max_crash,
+          });
         } else {
-          applyConfigToForm(result.config);
+          // Resposta incompleta (RPC antiga): mantém o que acabamos de salvar
+          setForm({
+            ...nextForm,
+            geracao_min_crash: toCrashFormString(payload.p_geracao_min_crash),
+            geracao_max_crash: toCrashFormString(payload.p_geracao_max_crash),
+            min_crash: toCrashFormString(payload.p_min_crash),
+            max_crash: toCrashFormString(payload.p_max_crash),
+          });
         }
       }
       if (!modeSwitchOnly && result.stats) setStats(normalizeAviatorStats(result.stats));
@@ -652,8 +710,8 @@ export default function AviatorRtpPage() {
   const engineModoMismatch = engineMotor?.modo_geracao && engineModo !== form.modo_geracao;
   const crashHint = useMemo(() => {
     if (form.modo_geracao !== 'crash') return null;
-    const min = parseDecimal(form.min_crash);
-    const max = parseDecimal(form.max_crash);
+    const min = parseCrashField(form.min_crash);
+    const max = parseCrashField(form.max_crash);
     if (min === null || max === null) return null;
     return crashUniformHint(min, max);
   }, [form.modo_geracao, form.min_crash, form.max_crash]);
@@ -962,41 +1020,65 @@ export default function AviatorRtpPage() {
             </section>
 
             <section className="rounded-xl border border-admin-border bg-black/20 overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25">
+              <button
+                type="button"
+                disabled={pastRounds.length === 0}
+                onClick={() => setPastHistoryOpen(true)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 border-b border-admin-border bg-black/25 text-left transition-colors disabled:cursor-default enabled:hover:bg-white/[0.04] enabled:cursor-pointer"
+              >
                 <div className="flex items-center gap-2">
                   <History className="w-3.5 h-3.5 text-gray-400" />
                   <h3 className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Velas recentes</h3>
                 </div>
                 {pastRounds.length > 0 && (
-                  <span className="text-[10px] text-gray-500 tabular-nums">{pastRounds.length} registradas</span>
+                  <span className="text-[10px] text-admin-accent tabular-nums">
+                    {pastRounds.length} registradas · ver todas
+                  </span>
                 )}
-              </div>
+              </button>
 
               {pastRounds.length === 0 ? (
                 <p className="text-gray-500 text-sm px-3 py-4 text-center">Nenhuma vela recente.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-gray-500 border-b border-admin-border/80">
-                        <th className="py-2 pl-3 pr-1 text-left font-medium w-8">#</th>
-                        <th className="py-2 px-1 text-left font-medium">Rodada</th>
-                        <th className="py-2 px-1 text-left font-medium min-w-[88px]">Resultado</th>
-                        <th className="py-2 pr-3 pl-1 text-right font-medium">Horário</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pastRounds.slice(0, 10).map((item, idx) => (
-                        <PastRow key={`past-${item.round_id}-${idx}`} item={item} index={idx + 1} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPastHistoryOpen(true)}
+                  className="w-full text-left hover:bg-white/[0.02] transition-colors"
+                >
+                  <div className="grid grid-cols-9 gap-1 px-2 py-2">
+                    {pastRounds.slice(0, 9).map((item, idx) => (
+                      <PastHistoryChip
+                        key={`past-preview-${item.round_id}-${idx}`}
+                        item={item}
+                        compact
+                      />
+                    ))}
+                  </div>
+                </button>
               )}
             </section>
           </div>
         </PagePanel>
       </div>
+
+      <Modal
+        open={pastHistoryOpen}
+        onClose={() => setPastHistoryOpen(false)}
+        title="Velas recentes"
+        description={`${pastRounds.length} rodada${pastRounds.length === 1 ? '' : 's'} finalizada${pastRounds.length === 1 ? '' : 's'}`}
+        icon={History}
+        size="xl"
+      >
+        {pastRounds.length === 0 ? (
+          <p className="text-admin-muted text-sm text-center py-6">Nenhuma vela recente.</p>
+        ) : (
+          <div className="grid grid-cols-9 gap-1">
+            {pastRounds.map((item, idx) => (
+              <PastHistoryChip key={`past-modal-${item.round_id}-${idx}`} item={item} />
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -1113,27 +1195,38 @@ function UpcomingRow({
   );
 }
 
-function PastRow({ item, index }: { item: AviatorScheduleEntry; index: number }) {
+function PastHistoryChip({
+  item,
+  compact = false,
+}: {
+  item: AviatorScheduleEntry;
+  compact?: boolean;
+}) {
   const x = Number(item.crash_x);
   const tier = crashTier(x);
   const styles = crashTierStyles(tier);
 
   return (
-    <tr className="border-b border-admin-border/40 last:border-0 hover:bg-white/[0.02]">
-      <td className="py-2.5 pl-3 pr-1 text-gray-500 tabular-nums">{index}</td>
-      <td className="py-2.5 px-1 text-gray-400 tabular-nums">#{formatRoundId(item.round_id)}</td>
-      <td className="py-2.5 px-1">
-        <span
-          className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono font-semibold tabular-nums"
-          style={styles.chipStyle}
-        >
-          {formatCrashX(x)}
+    <div
+      className={`w-full rounded border flex flex-col items-center justify-center text-center ${
+        compact ? 'px-0.5 py-1 gap-0' : 'px-1 py-1.5 gap-0.5'
+      }`}
+      style={styles.chipStyle}
+      title={`#${formatRoundId(item.round_id)} · ${formatLocalTime(item.crash_at)}`}
+    >
+      <span
+        className={`font-mono font-semibold tabular-nums leading-tight ${
+          compact ? 'text-[10px]' : 'text-[11px]'
+        }`}
+      >
+        {formatCrashX(x)}
+      </span>
+      {!compact && (
+        <span className="text-[8px] opacity-55 tabular-nums leading-none truncate max-w-full">
+          {formatLocalTime(item.crash_at)}
         </span>
-      </td>
-      <td className="py-2.5 pr-3 pl-1 text-right text-gray-500 tabular-nums">
-        {formatLocalTime(item.crash_at)}
-      </td>
-    </tr>
+      )}
+    </div>
   );
 }
 
@@ -1212,14 +1305,14 @@ function GenerationBoundsFields({
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-      <Field
+      <CrashField
         label="Limite mínimo do crash (x)"
-        hint="Nenhuma vela abaixo desse valor."
+        hint={`Nenhuma vela abaixo desse valor. Mínimo: ${CRASH_ABSOLUTE_MIN.toFixed(2)}x`}
         value={minCrash}
         disabled={disabled}
         onChange={onMinChange}
       />
-      <Field
+      <CrashField
         label="Limite máximo do crash (x)"
         hint={`Nenhuma vela acima desse valor. Máx. técnico: ${crashMax.toFixed(2)}x`}
         value={maxCrash}
@@ -1247,14 +1340,14 @@ function CrashBoundsFields({
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-      <Field
+      <CrashField
         label="Crash mínimo (x)"
-        hint="Início do intervalo uniforme."
+        hint={`Início do intervalo uniforme. Mínimo: ${CRASH_ABSOLUTE_MIN.toFixed(2)}x`}
         value={minCrash}
         disabled={disabled}
         onChange={onMinChange}
       />
-      <Field
+      <CrashField
         label="Crash máximo (x)"
         hint={`Fim do intervalo uniforme. Máx. técnico: ${crashMax.toFixed(2)}x`}
         value={maxCrash}
@@ -1262,6 +1355,45 @@ function CrashBoundsFields({
         onChange={onMaxChange}
       />
     </div>
+  );
+}
+
+function CrashField({
+  label,
+  hint,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm text-gray-200 font-medium">{label}</span>
+      {hint && <span className="block text-xs text-gray-500 mt-0.5">{hint}</span>}
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(sanitizeCrashInput(e.target.value))}
+        onBlur={() => {
+          const parsed = parseCrashField(value);
+          if (parsed === null) {
+            onChange(CRASH_ABSOLUTE_MIN.toFixed(2));
+            return;
+          }
+          const clamped = Math.max(CRASH_ABSOLUTE_MIN, parsed);
+          onChange(clamped.toFixed(2));
+        }}
+        placeholder="1.01"
+        className="mt-2 w-full rounded-lg bg-admin-panel border border-admin-border px-3 py-2.5 text-white text-sm tabular-nums focus:outline-none focus:border-admin-accent/30 disabled:opacity-60 disabled:cursor-not-allowed"
+      />
+    </label>
   );
 }
 

@@ -315,6 +315,10 @@ function redactUserCode(userCode) {
   return `${s.slice(0, 2)}***${s.slice(at)}`;
 }
 
+function logPlayFiverAposta(phase, payload) {
+  console.log(`[PLAYFIVER APOSTA] ${phase}:`, JSON.stringify(payload, null, 2));
+}
+
 function logGameCallback(level, title, details = {}) {
   const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : '🎯';
   const lines = [
@@ -1130,6 +1134,21 @@ async function handleGameCallback(req, res) {
       `Jogo ${gameCode || ''}`.trim() ||
       'Jogo';
 
+    const { usuario: usuarioAntes } = await findUsuarioByEmail(user_code);
+    logPlayFiverAposta('entrada', {
+      user_code: isProduction() ? redactUserCode(user_code) : user_code,
+      txn_id: txnId,
+      game_code: gameCode,
+      game_type: resolvedGameType,
+      bet,
+      win,
+      delta: roundMoney(win - bet),
+      carteira_ativa_db: usuarioAntes?.carteira_ativa ?? 'real',
+      saldo_real_antes: roundMoney(usuarioAntes?.saldo ?? 0),
+      saldo_bonus_antes: roundMoney(usuarioAntes?.saldo_bonus ?? 0),
+      saldo_jogavel_antes: usuarioAntes ? getPlayableBalance(usuarioAntes) : null,
+    });
+
     // C5: crédito + idempotência por txn_id na mesma transação SQL
     const { data: rpcResult, error: rpcError } = await supabase.rpc(
       'processar_callback_playfiver',
@@ -1143,6 +1162,12 @@ async function handleGameCallback(req, res) {
     );
 
     if (rpcError) {
+      logPlayFiverAposta('erro_rpc', {
+        txn_id: txnId,
+        bet,
+        win,
+        erro: rpcError.message || String(rpcError),
+      });
       return respondGameCallbackError(res, 500, 'ERROR_INTERNAL', {
         ...baseContext,
         txnId,
@@ -1154,6 +1179,33 @@ async function handleGameCallback(req, res) {
 
     const result = rpcResult && typeof rpcResult === 'object' ? rpcResult : {};
     const balance = await fetchPlayableBalanceForUser(user_code, result);
+
+    const { usuario: usuarioDepois } = await findUsuarioByEmail(user_code);
+    logPlayFiverAposta(result.ok ? (result.duplicate ? 'duplicada' : 'processada') : 'rejeitada', {
+      txn_id: txnId,
+      bet,
+      win,
+      ok: result.ok,
+      duplicate: Boolean(result.duplicate),
+      erro: result.error ?? null,
+      carteira_ativa: result.carteira_ativa ?? null,
+      carteira_aposta: result.carteira_aposta ?? null,
+      eh_giros_gratis: result.eh_giros_gratis ?? null,
+      bonus_credit: result.bonus_credit ?? null,
+      herdou_carteira_aposta: result.herdou_carteira_aposta ?? null,
+      saldo_real_antes: result.saldo_antes ?? roundMoney(usuarioAntes?.saldo ?? 0),
+      saldo_bonus_antes: result.saldo_bonus_antes ?? roundMoney(usuarioAntes?.saldo_bonus ?? 0),
+      saldo_real_depois: roundMoney(result.saldo ?? usuarioDepois?.saldo ?? 0),
+      saldo_bonus_depois: roundMoney(result.saldo_bonus ?? usuarioDepois?.saldo_bonus ?? 0),
+      saldo_jogavel_resposta: balance,
+      delta_saldo_real: roundMoney(
+        Number(result.saldo ?? usuarioDepois?.saldo ?? 0) - Number(usuarioAntes?.saldo ?? 0)
+      ),
+      delta_saldo_bonus: roundMoney(
+        Number(result.saldo_bonus ?? usuarioDepois?.saldo_bonus ?? 0) -
+          Number(usuarioAntes?.saldo_bonus ?? 0)
+      ),
+    });
 
     if (!result.ok) {
       const errCode = result.error || 'ERROR_INTERNAL';
@@ -1440,6 +1492,13 @@ app.post('/api/game_launch', gameLaunchRateLimit, async (req, res) => {
         2
       )
     );
+
+    console.log('[game_launch] enviando à PlayFivers:', {
+      user_code,
+      game_code,
+      carteira_ativa: carteiraAtivaLaunch ?? preferredCarteira ?? 'real',
+      user_balance,
+    });
 
     const playFiverResponse = await fetch(`${PLAYFIVERS_UPSTREAM}/api/v2/game_launch`, {
       method: 'POST',

@@ -11,6 +11,7 @@ import { GameInfo } from '../App';
 import { fetchGamesForProviderCached } from '../api/playfiversCache';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useSiteBrand } from '../hooks/useSiteBrand';
+import { useTranslation } from '../hooks/useTranslation';
 import { getOriginaisLabel } from '../lib/siteBrand';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
@@ -96,13 +97,7 @@ const getCategoryFromProvider = (providerName: string, gameName?: string): strin
   return 'slots';
 };
 
-const categories = [
-  { id: 'all', name: 'Todos' },
-  { id: 'slots', name: 'Slots' },
-  { id: 'live', name: 'Cassino Ao Vivo' },
-  { id: 'table', name: 'Jogos de Mesa' },
-  { id: 'crash', name: 'Crash Games' },
-];
+
 
 // Função para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
@@ -140,6 +135,17 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
   const navigate = useNavigate();
   const { config: homeConfig } = useHomeConfig();
   const { nomeBet } = useSiteBrand();
+  const { t } = useTranslation();
+  const categories = useMemo(
+    () => [
+      { id: 'all', name: t.games.categories.all },
+      { id: 'slots', name: t.games.categories.slots },
+      { id: 'live', name: t.games.categories.liveCasino },
+      { id: 'table', name: t.games.categories.tableGames },
+      { id: 'crash', name: t.games.categories.crash },
+    ],
+    [t.games.categories],
+  );
   const providers = useMemo(
     () =>
       baseProviders.map((provider) => {
@@ -193,7 +199,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
       setAllGames(allGamesData);
     } catch (err) {
       console.error('Erro ao buscar jogos:', err);
-      setError('Erro ao carregar jogos. Tente novamente.');
+      setError(t.games.loadGamesError);
       setAllGames([]);
     } finally {
       setIsLoading(false);
@@ -239,7 +245,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
   const hasMoreGames = currentGames.length < filteredGames.length;
 
   const selectedProviderName = providers.find(p => p.id === selectedProvider)?.name || 'Todos';
-  const selectedCategoryName = categories.find(c => c.id === selectedCategory)?.name || 'Todos';
+  const selectedCategoryName = categories.find(c => c.id === selectedCategory)?.name || t.games.categories.all;
 
   return (
     <AppPageScaffold>
@@ -254,7 +260,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                 <BackButton compact onClick={() => setSelectedProvider('all')} />
               </div>
               <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
-                <span className="whitespace-nowrap shrink-0">Jogos de slots</span>
+                <span className="whitespace-nowrap shrink-0">{t.games.categories.slots}</span>
                 <span
                   className={`text-brand-light whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
                     selectedProvider !== 'all' ? 'max-w-[500px] opacity-100' : 'max-w-0 opacity-0'
@@ -285,7 +291,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
             </div>
 
             {isLoading && allGames.length === 0 && (
-              <LoadingScreen title="Carregando jogos..." variant="page" />
+              <LoadingScreen title={t.games.loadingGames} variant="page" />
             )}
 
             {error && !isLoading && allGames.length === 0 && (
@@ -295,7 +301,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                   onClick={() => fetchAllGames()}
                   className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
                 >
-                  Tentar novamente
+                  {t.common.tryAgain}
                 </button>
               </div>
             )}
@@ -344,7 +350,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                                 <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                                   <path d="M8 5v14l11-7z"/>
                                 </svg>
-                                JOGAR
+                                {t.common.playUpper}
                               </button>
                             </div>
                           </div>
@@ -354,7 +360,7 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
                   </div>
                 ) : (
                   <div className="flex items-center justify-center min-h-[360px]">
-                    <p className="text-slate-400 text-lg">Não possui jogos ativos.</p>
+                    <p className="text-slate-400 text-lg">{t.games.noActiveGames}</p>
                   </div>
                 )}
               </div>
@@ -363,13 +369,13 @@ export default function SlotsPage({ onGameSelect: _onGameSelect }: SlotsPageProp
             {hasMoreGames && (
               <div className="flex flex-col items-center gap-4 mb-8">
                 <p className="text-slate-400 text-sm">
-                  Mostrando {currentGames.length} de {filteredGames.length} jogos
+                  {t.games.showingGames(currentGames.length, filteredGames.length)}
                 </p>
                 <button
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                   className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
                 >
-                  Carregar mais
+                  {t.common.loadMore}
                 </button>
               </div>
             )}

@@ -5,7 +5,6 @@ import {
   VIP_PROFILE_UPDATED_EVENT,
   type VipNivelRow,
   type VipProfile,
-  getVipImageUrl,
 } from '../lib/vip';
 
 const DEFAULT_PROFILE: VipProfile = {
@@ -13,7 +12,7 @@ const DEFAULT_PROFILE: VipProfile = {
   vip_nivel: 1,
   vip_nome: 'Bronze 1',
   vip_grupo: 'bronze',
-  vip_imagem: getVipImageUrl('bronze'),
+  vip_imagem: null,
   vip_cor: 'rgb(255, 146, 17)',
   cashback_pct: 0,
   total_depositado: 0,
@@ -60,7 +59,7 @@ export function useVipProfile() {
       if (row?.ok) {
         setProfile({
           ...row,
-          vip_imagem: row.vip_imagem || getVipImageUrl(row.vip_grupo || 'bronze'),
+          vip_imagem: row.vip_imagem || null,
         });
       }
     } catch (err) {

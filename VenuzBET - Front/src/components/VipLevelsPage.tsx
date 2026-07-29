@@ -6,9 +6,8 @@ import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useVipProfile } from '../hooks/useVipProfile';
 import { formatBRL } from '../lib/vip';
+import { useTranslation } from '../hooks/useTranslation';
 import { appPageContainerClass } from '../constants/homeLayout';
-
-const THRONE_IMAGE = 'https://royalbetsolutions.com/_ipx/_/assets/imgs/throne.webp';
 
 const SCROLL_STEP = 220;
 
@@ -16,6 +15,7 @@ export default function VipLevelsPage() {
   const { isAuthenticated } = useAuth();
   const { profile, niveis } = useVipProfile();
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
   const vipCardBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
   const boxesRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export default function VipLevelsPage() {
     ? niveis.map((n) => ({
         nivel: n.nivel,
         name: n.nome,
-        image: n.imagem_url || `https://cdn.royalbetsolutions.com/default/vip/${n.grupo}.webp`,
+        image: n.imagem_url || '',
         imageAlt: n.grupo,
         color: n.cor || 'rgb(255, 146, 17)',
         depositoMinimo: n.deposito_minimo,
@@ -55,28 +55,31 @@ export default function VipLevelsPage() {
             <div className="top-vip flex flex-col-reverse lg:flex-row items-center gap-6 md:gap-8 lg:gap-12">
               <div className="title flex-1 min-w-0 text-center lg:text-left">
                 <h1 className="text-white text-xl sm:text-3xl md:text-4xl font-bold leading-tight mb-3 md:mb-4">
-                  Assuma o trono que é seu por direito
+                  {t.vip.heroTitle}
                 </h1>
                 <p className="text-slate-300 text-sm sm:text-base leading-relaxed mb-5 md:mb-6 max-w-xl mx-auto lg:mx-0">
-                  Desperte seu potencial em um universo reservado para poucos, onde cada detalhe foi pensado
-                  para oferecer exclusividade, conforto e prestígio. Tenha acesso a benefícios únicos,
-                  atendimento personalizado e recompensas generosas, tudo isso sem compromissos, sem burocracia
-                  e com a liberdade que só os grandes merecem.
+                  {t.vip.heroSubtitle}
                 </p>
                 <Link
                   to="/games"
                   className="play-game btn-shadow inline-flex items-center justify-center h-11 px-6 md:px-8 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm tracking-wide transition-all duration-200 active:scale-[0.98] no-underline btn-brand-submit"
                 >
-                  JOGAR AGORA
+                  {t.vip.playNow}
                 </Link>
               </div>
 
-              <div className="img-banner flex shrink-0 items-center justify-center w-full max-w-xs sm:max-w-md lg:w-auto lg:max-w-[50%]">
-                <img
-                  src={THRONE_IMAGE}
-                  alt="VIP Levels"
-                  draggable={false}
-                  className="w-full h-auto object-contain select-none"
+              <div
+                className="img-banner flex shrink-0 items-center justify-center w-full max-w-xs sm:max-w-md lg:w-auto lg:max-w-[50%] aspect-[4/3] rounded-2xl border border-white/10"
+                style={{
+                  background:
+                    'radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--brand-primary) 45%, transparent), transparent 70%), linear-gradient(180deg, color-mix(in srgb, var(--brand-primary) 18%, #121319), #121319)',
+                }}
+                aria-hidden="true"
+              >
+                <span
+                  className="iconify i-solar:crown-bold-duotone text-white/90"
+                  data-icon="solar:crown-bold-duotone"
+                  style={{ fontSize: '96px' }}
                 />
               </div>
             </div>
@@ -87,21 +90,33 @@ export default function VipLevelsPage() {
                 style={{ backgroundColor: vipCardBg }}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-                  <img
-                    src={profile.vip_imagem || ''}
-                    alt={profile.vip_nome}
-                    className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover shrink-0 mx-auto sm:mx-0"
-                  />
+                  {profile.vip_imagem ? (
+                    <img
+                      src={profile.vip_imagem}
+                      alt={profile.vip_nome}
+                      className="w-14 h-14 md:w-16 md:h-16 rounded-full object-cover shrink-0 mx-auto sm:mx-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-14 h-14 md:w-16 md:h-16 rounded-full shrink-0 mx-auto sm:mx-0 flex items-center justify-center border border-white/10"
+                      style={{ backgroundColor: profile.vip_cor || 'var(--brand-primary)' }}
+                      aria-hidden="true"
+                    >
+                      <span className="text-white font-bold text-lg">
+                        {(profile.vip_nome || 'V').charAt(0)}
+                      </span>
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1 text-center sm:text-left">
-                    <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">Seu nível atual</p>
+                    <p className="text-slate-400 text-xs uppercase tracking-wide mb-1">{t.vip.currentLevel}</p>
                     <h2 className="text-white text-lg md:text-xl font-bold" style={{ color: profile.vip_cor || undefined }}>
                       {profile.vip_nome}
                     </h2>
                     <p className="text-slate-400 text-sm mt-1 leading-relaxed">
-                      Total depositado: <span className="text-white font-semibold">{formatBRL(profile.total_depositado)}</span>
+                      {t.vip.totalDeposited} <span className="text-white font-semibold">{formatBRL(profile.total_depositado)}</span>
                       {profile.cashback_pct > 0 && (
                         <span className="max-md:block md:ml-2">
-                          Cashback: <span className="text-brand-light">{profile.cashback_pct}%</span>
+                          {t.vip.cashback} <span className="text-brand-light">{profile.cashback_pct}%</span>
                         </span>
                       )}
                     </p>
@@ -111,8 +126,8 @@ export default function VipLevelsPage() {
                 {profile.proximo_nome ? (
                   <div>
                     <div className="flex flex-col gap-1 sm:flex-row sm:justify-between text-xs text-slate-400 mb-2">
-                      <span>Progresso para {profile.proximo_nome}</span>
-                      <span>Faltam {formatBRL(profile.falta_para_proximo)}</span>
+                      <span>{t.vip.progressTo(profile.proximo_nome)}</span>
+                      <span>{t.vip.remaining(formatBRL(profile.falta_para_proximo))}</span>
                     </div>
                     <div className="h-2.5 rounded-full bg-slate-700/80 overflow-hidden">
                       <div
@@ -122,7 +137,7 @@ export default function VipLevelsPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-brand-light text-sm font-semibold text-center sm:text-left">Você atingiu o nível máximo — Diamante 3!</p>
+                  <p className="text-brand-light text-sm font-semibold text-center sm:text-left">{t.vip.maxLevel}</p>
                 )}
               </div>
             )}
@@ -136,7 +151,7 @@ export default function VipLevelsPage() {
                     aria-hidden="true"
                     style={{ fontSize: '32px' }}
                   />
-                  <h2 className="text-white text-lg sm:text-2xl font-bold">Classificação VIP</h2>
+                  <h2 className="text-white text-lg sm:text-2xl font-bold">{t.vip.classification}</h2>
                 </div>
 
                 <div className="box-btn flex items-center gap-2 shrink-0 self-end sm:self-auto">
@@ -145,7 +160,7 @@ export default function VipLevelsPage() {
                     onClick={() => scrollBoxes('left')}
                     className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/20 transition-colors"
                     style={{ backgroundColor: vipCardBg }}
-                    aria-label="Níveis anteriores"
+                    aria-label={t.vip.previousLevels}
                   >
                     <span
                       className="iconify i-ic:round-arrow-back-ios"
@@ -159,7 +174,7 @@ export default function VipLevelsPage() {
                     onClick={() => scrollBoxes('right')}
                     className="next-btn flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/20 transition-colors"
                     style={{ backgroundColor: vipCardBg }}
-                    aria-label="Próximos níveis"
+                    aria-label={t.vip.nextLevels}
                   >
                     <span
                       className="iconify i-ic:round-arrow-forward-ios"
@@ -196,22 +211,31 @@ export default function VipLevelsPage() {
                           backgroundColor: `color-mix(in srgb, ${level.color} 15%, transparent)`,
                         }}
                       >
-                        <img
-                          src={level.image}
-                          alt={level.imageAlt}
-                          draggable={false}
-                          className="h-12 w-12 sm:h-14 sm:w-14 object-contain select-none"
-                        />
+                        {level.image ? (
+                          <img
+                            src={level.image}
+                            alt={level.imageAlt}
+                            draggable={false}
+                            className="h-12 w-12 sm:h-14 sm:w-14 object-contain select-none"
+                          />
+                        ) : (
+                          <span
+                            className="font-bold text-lg sm:text-xl"
+                            style={{ color: level.color }}
+                          >
+                            {level.nivel}
+                          </span>
+                        )}
                       </div>
                       <div className="info-vip text-center w-full">
                         <h2 className="text-white font-bold text-sm">{level.name}</h2>
                         <p className="text-slate-400 text-[10px] mt-1">{formatBRL(level.depositoMinimo)}</p>
                         {level.cashbackPct > 0 && (
-                          <p className="text-brand-light text-[10px]">{level.cashbackPct}% cashback</p>
+                          <p className="text-brand-light text-[10px]">{level.cashbackPct}% {t.vip.cashbackLabel}</p>
                         )}
                         {isCurrent && (
                           <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-brand text-white">
-                            ATUAL
+                            {t.vip.current}
                           </span>
                         )}
                       </div>

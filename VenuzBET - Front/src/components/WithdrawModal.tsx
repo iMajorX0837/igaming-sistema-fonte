@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useUserProfileData } from '../hooks/useUserProfileData';
+import { useTranslation } from '../hooks/useTranslation';
 import type { UserProfileData } from '../lib/userProfileCache';
 import SiteLogo from './SiteLogo';
 import Notification from './Notification';
@@ -14,24 +15,26 @@ interface WithdrawModalProps {
 }
 
 const pixOptions = [
-  { id: 'email', label: 'Email', icon: 'email' },
-  { id: 'cpf', label: 'CPF', icon: 'cpf' },
-  { id: 'phone', label: 'Telefone', icon: 'phone' },
-];
+  { id: 'email', icon: 'email' },
+  { id: 'cpf', icon: 'cpf' },
+  { id: 'phone', icon: 'phone' },
+] as const;
+
+type PixTypeId = (typeof pixOptions)[number]['id'];
 
 const MODAL_ANIM_MS = 320;
 
 function getPixKeyForType(
-  type: string,
+  type: PixTypeId,
   profile: UserProfileData,
   fallbackEmail?: string
 ): string {
   switch (type) {
-    case 'Email':
+    case 'email':
       return profile.email || fallbackEmail || '';
-    case 'CPF':
+    case 'cpf':
       return (profile.cpf || '').replace(/\D/g, '');
-    case 'Telefone':
+    case 'phone':
       return (profile.telefone || '').replace(/\D/g, '').replace(/^55/, '');
     default:
       return '';
@@ -42,10 +45,11 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { config } = usePlataformaConfig();
   const { userData } = useUserProfileData(isOpen);
+  const { t, locale } = useTranslation();
   const minWithdraw = config.saque_minimo;
   const maxWithdraw = config.saque_maximo;
   const [amount, setAmount] = useState('50');
-  const [pixType, setPixType] = useState('Email');
+  const [pixType, setPixType] = useState<PixTypeId>('email');
   const [pixKey, setPixKey] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [availableBalance, setAvailableBalance] = useState<number>(0);
@@ -132,7 +136,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         setError(null);
         setSuccess(false);
         setAmount(String(minWithdraw));
-        setPixType('Email');
+        setPixType('email');
       }
       prevIsOpenRef.current = true;
     } else {
@@ -245,46 +249,46 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
     setSuccess(false);
 
     if (!isAuthenticated || !user) {
-      notify('Você precisa estar autenticado para realizar um saque');
+      notify(t.depositWithdraw.authRequired);
       return;
     }
 
     if (availableBalance < minWithdraw) {
-      notify('Saldo insuficiente para realizar um saque.');
+      notify(t.depositWithdraw.insufficientBalance);
       return;
     }
 
     const valorSaque = parseFloat(String(amount).trim().replace(',', '.'));
 
     if (!Number.isFinite(valorSaque) || valorSaque <= 0) {
-      notify('Por favor, insira um valor válido');
+      notify(t.depositWithdraw.invalidAmount);
       return;
     }
 
     if (valorSaque < minWithdraw) {
-      notify(`O valor mínimo para saque é R$ ${minWithdraw},00.`);
+      notify(t.depositWithdraw.minWithdraw(minWithdraw));
       return;
     }
 
     if (valorSaque > maxWithdraw) {
-      notify(`O valor máximo para saque é R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+      notify(t.depositWithdraw.maxWithdraw(maxWithdraw.toLocaleString(locale)));
       return;
     }
 
     if (valorSaque > availableBalance) {
-      notify('Saldo insuficiente para realizar este saque');
+      notify(t.depositWithdraw.insufficientForWithdraw);
       return;
     }
 
     if (rolloverPendente > 0) {
       notify(
-        `Rollover pendente: aposte mais R$ ${rolloverPendente.toFixed(2).replace('.', ',')} antes de sacar.`
+        t.depositWithdraw.rolloverPending(rolloverPendente.toFixed(2).replace('.', ','))
       );
       return;
     }
 
     if (!pixKey || pixKey.trim() === '') {
-      notify('Por favor, informe a chave PIX');
+      notify(t.depositWithdraw.pixKeyRequired);
       return;
     }
 
@@ -299,36 +303,29 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         .maybeSingle();
 
       if (usuarioError) {
-        throw new Error(usuarioError.message || 'Erro ao buscar saldo atual');
+        throw new Error(usuarioError.message || t.depositWithdraw.balanceFetchError);
       }
 
       if (!usuarioData) {
-        throw new Error('Usuário não encontrado');
+        throw new Error(t.depositWithdraw.userNotFound);
       }
 
       const saldoAtual = parseFloat(usuarioData.saldo) || 0;
 
       if (valorSaque < minWithdraw) {
-        throw new Error(`O valor mínimo para saque é R$ ${minWithdraw},00.`);
+        throw new Error(t.depositWithdraw.minWithdraw(minWithdraw));
       }
 
       if (valorSaque > maxWithdraw) {
-        throw new Error(`O valor máximo para saque é R$ ${maxWithdraw.toLocaleString('pt-BR')},00.`);
+        throw new Error(t.depositWithdraw.maxWithdraw(maxWithdraw.toLocaleString(locale)));
       }
 
       // Validar saldo novamente com o valor atual do banco
       if (valorSaque > saldoAtual) {
-        throw new Error('Saldo insuficiente para realizar este saque');
+        throw new Error(t.depositWithdraw.insufficientForWithdraw);
       }
 
-      const mapPixTypeToKey = (type: string): string => {
-        const typeMap: { [key: string]: string } = {
-          Email: 'email',
-          CPF: 'cpf',
-          Telefone: 'telefone',
-        };
-        return typeMap[type] || 'email';
-      };
+      const mapPixTypeToKey = (type: PixTypeId): string => (type === 'phone' ? 'telefone' : type);
 
       // Débito + insert pendente na mesma transação (RPC atômica)
       const { data: rpcResult, error: rpcError } = await supabase.rpc('solicitar_saque', {
@@ -339,11 +336,11 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
       });
 
       if (rpcError) {
-        throw new Error(rpcError.message || 'Erro ao processar saque');
+        throw new Error(rpcError.message || t.depositWithdraw.withdrawProcessError);
       }
 
       if (!rpcResult || !rpcResult.success) {
-        throw new Error(rpcResult?.error || 'Erro ao processar saque');
+        throw new Error(rpcResult?.error || t.depositWithdraw.withdrawProcessError);
       }
 
       const saldoAtualizado =
@@ -354,7 +351,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
 
     } catch (err: any) {
       console.error('Erro ao processar saque:', err);
-      setError(err.message || 'Erro ao processar saque. Tente novamente.');
+      setError(err.message || t.depositWithdraw.withdrawProcessError);
     } finally {
       setIsSubmitting(false);
     }
@@ -383,12 +380,12 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <h2 className="text-white font-bold text-lg mb-0.5">Saques</h2>
-              <p className="text-slate-400 text-xs">Escolha o valor que deseja sacar da sua conta</p>
+              <h2 className="text-white font-bold text-lg mb-0.5">{t.depositWithdraw.withdrawTitle}</h2>
+              <p className="text-slate-400 text-xs">{t.depositWithdraw.withdrawSubtitle}</p>
             </div>
 
             <div>
-              <label className="text-white text-xs font-medium mb-1.5 block">Valor a sacar</label>
+              <label className="text-white text-xs font-medium mb-1.5 block">{t.depositWithdraw.withdrawAmount}</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm font-medium">$</span>
                 <input
@@ -429,18 +426,14 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                 <path d="M12 16v-4M12 8h.01" />
               </svg>
               <span className="text-slate-300">
-                Disponível para saque: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
+                {t.depositWithdraw.availableForWithdraw}: <span className="text-white font-bold">R$ {availableBalance.toFixed(2)}</span>
               </span>
             </div>
 
             {rolloverPendente > 0 ? (
               <div className="p-3 rounded-lg bg-amber-500/15 border border-amber-500/40">
                 <p className="text-amber-300 text-xs font-medium">
-                  Rollover pendente: aposte mais{' '}
-                  <span className="text-white font-bold">
-                    R$ {rolloverPendente.toFixed(2).replace('.', ',')}
-                  </span>{' '}
-                  em jogos para liberar saques.
+                  {t.depositWithdraw.rolloverPending(rolloverPendente.toFixed(2).replace('.', ','))}
                 </p>
               </div>
             ) : null}
@@ -455,7 +448,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             {success && (
               <div className="p-3 rounded-lg bg-brand/20 border border-brand/50">
                 <p className="text-brand-light text-xs font-medium">
-                  Saque solicitado com sucesso! O valor será processado em breve.
+                  {t.depositWithdraw.withdrawSuccess}
                 </p>
               </div>
             )}
@@ -463,7 +456,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             <div className="border-t border-slate-700/50 pt-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-400 text-xs mb-1.5 block">Tipo de Chave</label>
+                  <label className="text-slate-400 text-xs mb-1.5 block">{t.depositWithdraw.pixKeyType}</label>
                   <div className="relative" ref={dropdownRef}>
                     <button
                       type="button"
@@ -471,7 +464,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                       disabled={isSubmitting}
                       className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all text-left disabled:opacity-50"
                     >
-                      <span>{pixType}</span>
+                      <span>{t.depositWithdraw.pixTypes[pixType]}</span>
                       <svg className="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
@@ -491,7 +484,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                               key={option.id}
                               type="button"
                               onClick={() => {
-                                setPixType(option.label);
+                                setPixType(option.id);
                                 setIsDropdownOpen(false);
                               }}
                               className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-brand/10 text-white text-xs transition-colors"
@@ -499,7 +492,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                               <div className="text-brand-light">
                                 {getIcon(option.icon)}
                               </div>
-                              <span>{option.label}</span>
+                              <span>{t.depositWithdraw.pixTypes[option.id]}</span>
                             </button>
                           ))}
                         </div>
@@ -509,14 +502,14 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
                 </div>
 
                 <div>
-                  <label className="text-slate-400 text-xs mb-1.5 block">Chave PIX</label>
+                  <label className="text-slate-400 text-xs mb-1.5 block">{t.depositWithdraw.pixKey}</label>
                   <div className="relative">
                     <input
                       type="text"
                       value={pixKey}
                       readOnly
                       disabled={isSubmitting}
-                      placeholder="Não cadastrado na conta"
+                      placeholder={t.depositWithdraw.notRegistered}
                       className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#181923] border-2 border-brand text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50 cursor-default"
                     />
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none">
@@ -531,7 +524,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
             </div>
 
             <div className="text-yellow-400 text-[10px] leading-tight">
-              O PIX cadastrado deve ser próprio (CPF). Não serão pagos prêmios em PIX de outras titularidades.
+              {t.depositWithdraw.pixOwnership}
             </div>
 
             <button
@@ -539,7 +532,7 @@ export default function WithdrawModal({ isOpen, onClose }: WithdrawModalProps) {
               disabled={isSubmitting}
               className="w-full h-10 rounded-lg bg-brand hover:bg-brand-hover disabled:bg-brand disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98] btn-brand-submit"
             >
-              {isSubmitting ? 'Processando...' : 'Sacar'}
+              {isSubmitting ? t.depositWithdraw.processing : t.depositWithdraw.withdraw}
             </button>
           </form>
         </div>

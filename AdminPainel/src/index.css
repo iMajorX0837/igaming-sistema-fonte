@@ -59,6 +59,18 @@ body {
   min-height: 100vh;
 }
 
+/* Remove setas (stepper/spinner) de inputs numéricos em todo o admin */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 html,
 body,
 * {

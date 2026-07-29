@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import SiteLogo from './SiteLogo';
+import { useTranslation } from '../hooks/useTranslation';
 
 type LoadingScreenVariant = 'fullscreen' | 'page' | 'inline' | 'compact';
 
@@ -43,21 +44,23 @@ const variantStyles: Record<
 };
 
 export default function LoadingScreen({
-  title = 'Carregando...',
+  title,
   subtitle,
   showText = true,
   variant = 'page',
   className = '',
   style,
 }: LoadingScreenProps) {
+  const { t } = useTranslation();
   const styles = variantStyles[variant];
+  const displayTitle = title ?? t.common.loading;
 
   return (
     <div className={`${styles.wrapper} ${className}`.trim()} style={style}>
       <SiteLogo className={`object-contain ${styles.logo}`} />
       {showText ? (
         <div className="text-center space-y-1 md:space-y-2">
-          <p className={styles.title}>{title}</p>
+          <p className={styles.title}>{displayTitle}</p>
           {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
         </div>
       ) : null}

@@ -4,7 +4,7 @@ import { useAdminSiteBrand } from '../contexts/AdminSiteBrandContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 
-export default function LoginPage() {
+export default function LoginPage({ redirectTo = '/dashboard' }: { redirectTo?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
@@ -34,7 +34,7 @@ export default function LoginPage() {
         setTotpCode('');
         return;
       }
-      navigate('/dashboard');
+      navigate(redirectTo);
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
     } finally {
@@ -49,7 +49,7 @@ export default function LoginPage() {
 
     try {
       await verify2FA(challengeToken, totpCode.trim());
-      navigate('/dashboard');
+      navigate(redirectTo);
     } catch (err: any) {
       setError(err.message || 'Código inválido');
     } finally {

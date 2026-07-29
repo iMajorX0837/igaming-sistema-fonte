@@ -72,7 +72,6 @@ export default function WebhooksPage() {
 
   const loadData = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await listWebhooks();
       setWebhooks(data);
     } catch (err) {

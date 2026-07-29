@@ -44,7 +44,7 @@ export interface SidebarMenuItem {
   ativo: boolean;
 }
 
-const STORAGE_KEY = 'venuz-sidebar-menu-v1';
+const STORAGE_KEY = 'venuz-sidebar-menu-v2';
 
 export const DEFAULT_SIDEBAR_CATEGORIES: SidebarMenuCategory[] = [
   {
@@ -183,8 +183,8 @@ export const DEFAULT_SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
     href: null,
     game_name: 'Fortune Dragon',
     action_value: null,
-    icon_type: 'image',
-    icon_value: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/fortune-dragon.svg',
+    icon_type: 'iconify',
+    icon_value: 'mdi:dragon',
     destaque: true,
     ordem: 5,
     ativo: true,
@@ -203,8 +203,8 @@ export const DEFAULT_SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
     href: null,
     game_name: 'Fortune Tiger',
     action_value: null,
-    icon_type: 'image',
-    icon_value: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/fortune-tiger.svg',
+    icon_type: 'iconify',
+    icon_value: 'mdi:cat',
     destaque: true,
     ordem: 6,
     ativo: true,
@@ -223,8 +223,8 @@ export const DEFAULT_SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
     href: null,
     game_name: 'Aviator',
     action_value: null,
-    icon_type: 'image',
-    icon_value: 'https://royal-images.s3.us-east-1.amazonaws.com/default/menu/aviator.svg',
+    icon_type: 'iconify',
+    icon_value: 'mdi:airplane',
     destaque: true,
     ordem: 7,
     ativo: true,

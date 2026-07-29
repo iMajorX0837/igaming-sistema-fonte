@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { HOME_SECTION_GAMES_MAX } from '../lib/homeSectionGames';
 
 interface Game {
@@ -19,17 +20,17 @@ interface GameSliderProps {
   useGreenButton?: boolean;
 }
 
-// Fun˜˜o para criar slug de URL (normalizar para URL-friendly)
+// Funï¿½ï¿½o para criar slug de URL (normalizar para URL-friendly)
 const createSlug = (text: string): string => {
   return text
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres n˜o alfanum˜ricos por h˜fen
-    .replace(/^-+|-+$/g, ''); // Remove h˜fens do in˜cio e fim
+    .replace(/[^a-z0-9]+/g, '-') // Substitui caracteres nï¿½o alfanumï¿½ricos por hï¿½fen
+    .replace(/^-+|-+$/g, ''); // Remove hï¿½fens do inï¿½cio e fim
 };
 
-// Fun˜˜o para obter o slug do provider baseado no nome
+// Funï¿½ï¿½o para obter o slug do provider baseado no nome
 const getProviderSlug = (providerName: string): string => {
   // Mapear nomes conhecidos para slugs
   const providerMap: { [key: string]: string } = {
@@ -61,8 +62,9 @@ function isMobileViewport(): boolean {
   return window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches;
 }
 
-export default function GameSlider({ title, viewAllLink, games, useGreenButton = false }: GameSliderProps) {
+export default function GameSlider({ title, viewAllLink, games }: GameSliderProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const visibleGames = useMemo(() => games.slice(0, HOME_SECTION_GAMES_MAX), [games]);
   const { config: homeConfig } = useHomeConfig();
   const surfaceBg = `color-mix(in srgb, ${homeConfig.fundo} 88%, black)`;
@@ -158,7 +160,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
     // Salvar a rota atual antes de navegar
     sessionStorage.setItem('previousPath', window.location.pathname);
     
-    // Criar URL din˜mica
+    // Criar URL dinï¿½mica
     const providerSlug = getProviderSlug(game.provider);
     const gameSlug = createSlug(game.name);
     const gameUrl = `/${providerSlug}/${gameSlug}`;
@@ -190,7 +192,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
             style={{ backgroundColor: surfaceBg }}
             {...surfaceHoverHandlers}
           >
-            Ver Tudo
+            {t.common.seeAll}
           </a>
           <div className="flex items-center gap-2">
             <button
@@ -254,7 +256,7 @@ export default function GameSlider({ title, viewAllLink, games, useGreenButton =
                   <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                     <path d="M8 5v14l11-7z"/>
                   </svg>
-                  JOGAR
+                  {t.common.playUpper}
                 </button>
               </div>
             </div>

@@ -63,10 +63,16 @@ def utc_now():
 
 
 def _sync_rtp_config(force=False):
-    """Atualiza parâmetros do motor e invalida fila se RTP/GGR mudou."""
+    """Atualiza parâmetros do motor e invalida fila se config/RTP mudou."""
     global _rtp_queue_version
     cfg = refresh_runtime(force=force)
-    version = str(cfg.get("engine_version") or cfg.get("version_key") or cfg.get("config_version") or "")
+    # Preferir version_key (inclui updated_at/pct); engine_version sozinho ignora mudança de velas
+    version = str(
+        cfg.get("version_key")
+        or cfg.get("engine_version")
+        or cfg.get("config_version")
+        or ""
+    )
     if version and version != _rtp_queue_version:
         _rtp_queue_version = version
         _rtp_upcoming.clear()
@@ -291,12 +297,16 @@ def get_rtp_state():
             "engine": {
                 "modo_geracao": runtime.get("modo_geracao"),
                 "rtp_geral": runtime.get("rtp_geral"),
+                "pct_vela_azul": runtime.get("pct_vela_azul"),
+                "pct_vela_roxa": runtime.get("pct_vela_roxa"),
+                "pct_vela_rosa": runtime.get("pct_vela_rosa"),
                 "min_crash": runtime.get("min_crash"),
                 "max_crash": runtime.get("max_crash"),
                 "min_crash_mul": runtime.get("min_crash_mul"),
                 "max_crash_mul": runtime.get("max_crash_mul"),
                 "config_version": runtime.get("config_version"),
                 "engine_version": runtime.get("engine_version"),
+                "version_key": runtime.get("version_key"),
             },
         }
     payload["timeline"] = build_rtp_schedule(upcoming)
@@ -660,22 +670,6 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(raw)
         path = parsed.path.rstrip("/")
 
-        if path == "/rtp":
-            rtp_path = os.path.join(os.getcwd(), "rtp.html")
-            try:
-                with open(rtp_path, "rb") as f:
-                    body = f.read()
-            except OSError:
-                self.send_error(404, "rtp.html não encontrado")
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
-            return
-
         if path == "/api/rtp":
             if not _is_internal_rtp_request(self):
                 send_json(self, 403, {"ok": False, "error": "Acesso negado"})
@@ -977,7 +971,7 @@ if __name__ == "__main__":
     live_game.start()
     server = ThreadingHTTPServer(("", PORT), Handler)
     print(f"Aviator local em http://localhost:{PORT}")
-    print(f"RTP das próximas velas em http://localhost:{PORT}/rtp")
+    print("RTP preview via GET /api/rtp (interno) — use o AdminPainel /aviator-rtp")
     print("Webhook Discord ativo via POST /api/discord-notify")
     print("Histórico de velas via Supabase (GET/POST /api/history)")
     print("Chat em memória via GET/POST /api/chat e POST /api/chat/like")

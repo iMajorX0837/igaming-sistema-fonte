@@ -11,7 +11,7 @@ export interface TopBannerConfig {
 }
 
 export const DEFAULT_TOP_BANNER_CONFIG: TopBannerConfig = {
-  ativo: true,
+  ativo: false,
   background_color: 'var(--brand-primary)',
   emoji: '📲',
   mensagem: 'Faça o download do nosso aplicativo para uma experiência ainda melhor!',
@@ -22,7 +22,7 @@ export const DEFAULT_TOP_BANNER_CONFIG: TopBannerConfig = {
   permitir_fechar: true,
 };
 
-const STORAGE_KEY = 'venuz-top-banner-v1';
+const STORAGE_KEY = 'venuz-top-banner-v2';
 
 function readCache(): TopBannerConfig | null {
   if (typeof window === 'undefined') return null;

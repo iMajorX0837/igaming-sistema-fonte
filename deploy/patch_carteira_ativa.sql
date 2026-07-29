@@ -164,6 +164,62 @@ AS $$
   SELECT COALESCE(p_carteira, 'real') = 'bonus';
 $$;
 
+CREATE OR REPLACE FUNCTION public._aviator_bet_txn_id(p_txn_id TEXT)
+RETURNS TEXT
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN COALESCE(p_txn_id, '') ~ '_(win|refund|crash)$'
+      THEN regexp_replace(p_txn_id, '_(win|refund|crash)$', '_bet')
+    ELSE NULL
+  END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._aviator_com_bonus_eh_sim(p_com_bonus TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT lower(trim(COALESCE(p_com_bonus, ''))) IN ('sim', 's', 'true', '1', 'yes');
+$$;
+
+CREATE OR REPLACE FUNCTION public._aviator_usa_bonus_aposta(
+  p_usuario_id UUID,
+  p_txn_id TEXT,
+  p_usa_bonus_forcado BOOLEAN DEFAULT NULL
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_bet_txn TEXT;
+  v_com_bonus TEXT;
+BEGIN
+  IF p_usa_bonus_forcado IS NOT NULL THEN
+    RETURN p_usa_bonus_forcado;
+  END IF;
+
+  v_bet_txn := public._aviator_bet_txn_id(p_txn_id);
+
+  IF v_bet_txn IS NOT NULL THEN
+    SELECT t.com_bonus
+    INTO v_com_bonus
+    FROM public.transacoes_jogos t
+    WHERE t.txn_id = v_bet_txn
+    LIMIT 1;
+
+    IF v_com_bonus IS NOT NULL THEN
+      RETURN public._aviator_com_bonus_eh_sim(v_com_bonus);
+    END IF;
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.definir_carteira_ativa(p_carteira TEXT)
 RETURNS JSON
 LANGUAGE plpgsql
@@ -699,7 +755,8 @@ BEGIN
     RETURN json_build_object('ok', false, 'error', 'INVALID_USER', 'balance', 0);
   END IF;
 
-  v_usa_bonus := public._carteira_usa_bonus(v_carteira);
+  -- Mesma carteira usada no débito da aposta (_bet), não carteira_ativa atual
+  v_usa_bonus := public._aviator_usa_bonus_aposta(v_usuario_id, v_txn, NULL);
   v_com_bonus := CASE WHEN v_usa_bonus THEN 'Sim' ELSE 'Não' END;
 
   INSERT INTO public.transacoes_jogos (
@@ -760,6 +817,7 @@ BEGIN
     'ok', true, 'duplicate', false,
     'balance', v_jogavel,
     'saldo_anterior', ROUND(v_jogavel - v_valor, 2),
+    'carteira_aposta', CASE WHEN v_usa_bonus THEN 'bonus' ELSE 'real' END,
     'carteira_ativa', v_carteira,
     'usuario_id', v_usuario_id,
     'transacao_id', v_inserted

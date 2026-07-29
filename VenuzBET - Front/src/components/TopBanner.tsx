@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTopBannerConfig } from '../hooks/useTopBannerConfig';
 import { normalizeCmsLink, openCmsLink } from '../lib/cmsLink';
+import { useTranslation } from '../hooks/useTranslation';
 
 const DISMISS_KEY = 'venuz-top-banner-dismissed-v1';
 
@@ -25,6 +26,7 @@ function persistDismissed() {
 
 export default function TopBanner() {
   const { config } = useTopBannerConfig();
+  const { t } = useTranslation();
   const [isDismissed, setIsDismissed] = useState(readDismissed);
   const navigate = useNavigate();
   const buttonLink = config.botao_href ? normalizeCmsLink(config.botao_href) : null;
@@ -63,7 +65,7 @@ export default function TopBanner() {
             setIsDismissed(true);
           }}
           className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-          aria-label="Fechar banner"
+          aria-label={t.common.closeBanner}
         >
           <X className="w-4 h-4" />
         </button>

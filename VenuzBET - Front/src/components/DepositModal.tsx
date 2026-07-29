@@ -11,6 +11,7 @@ import { generatePixQrDataUrl, resolvePixQrImageSrc } from '../lib/pixQrImage';
 import { dispatchVipProfileUpdated, formatBRL, type DepositVipResult } from '../lib/vip';
 import { usePlataformaConfig } from '../hooks/usePlataformaConfig';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 import { useAuthModalsConfig } from '../contexts/SiteConfigContext';
 import SiteLogo from './SiteLogo';
 import {
@@ -56,6 +57,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { config } = usePlataformaConfig();
   const { config: homeConfig } = useHomeConfig();
+  const { t, language, locale } = useTranslation();
   const { config: authModalsConfig } = useAuthModalsConfig();
   const depositImageUrl = authModalsConfig.deposit_imagem_url.trim();
   const minDeposit = config.deposito_minimo;
@@ -226,24 +228,24 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
       const result = await validarCupom(couponCode, valor ?? undefined);
 
       if (!result.ok) {
-        setCouponPopupMessage(getCupomErrorMessage(result.error, result.deposito_minimo));
+        setCouponPopupMessage(getCupomErrorMessage(result.error, result.deposito_minimo, language));
         setShowInvalidCouponPopup(true);
         return;
       }
 
       if (result.requer_deposito && (valor == null || valor <= 0)) {
-        setCouponPopupMessage('Informe o valor do depósito para validar este cupom.');
+        setCouponPopupMessage(t.depositWithdraw.depositValueForCoupon);
         setShowInvalidCouponPopup(true);
         return;
       }
 
       setValidatedCoupon(result);
       setCouponPopupMessage(
-        `Cupom válido! Bônus de ${formatCupomBonus(result.bonus_calculado ?? 0)} será creditado após o pagamento.`
+        t.depositWithdraw.couponValidBonus(formatCupomBonus(result.bonus_calculado ?? 0))
       );
       setShowInvalidCouponPopup(true);
     } catch {
-      setCouponPopupMessage('Erro ao validar cupom. Tente novamente.');
+      setCouponPopupMessage(t.depositWithdraw.couponValidateError);
       setShowInvalidCouponPopup(true);
     } finally {
       setValidatingCoupon(false);
@@ -293,7 +295,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError('Não foi possível copiar. Copie manualmente o código abaixo.');
+      setError(t.depositWithdraw.copyFailed);
     }
   };
 
@@ -302,21 +304,21 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
     setError(null);
 
     if (!isAuthenticated || !user) {
-      setError('Faça login para depositar.');
+      setError(t.depositWithdraw.loginToDeposit);
       return;
     }
 
     const valor = parseReaisInt(amount);
     if (valor === null) {
-      setLimitNotification(`Informe um valor inteiro em reais (mínimo R$ ${minDeposit},00).`);
+      setLimitNotification(t.depositWithdraw.integerAmountRequired(minDeposit));
       return;
     }
     if (valor < minDeposit) {
-      setLimitNotification(`Informe um valor mínimo de R$ ${minDeposit},00.`);
+      setLimitNotification(t.depositWithdraw.minDeposit(minDeposit));
       return;
     }
     if (valor > maxDeposit) {
-      setLimitNotification(`O valor máximo para depósito é R$ ${maxDeposit.toLocaleString('pt-BR')},00.`);
+      setLimitNotification(t.depositWithdraw.maxDeposit(maxDeposit.toLocaleString(locale)));
       return;
     }
 
@@ -337,7 +339,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
         expiresAt: Date.now() + PIX_PAYMENT_TIMEOUT_MS,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao gerar o PIX. Tente novamente.');
+      setError(err instanceof Error ? err.message : t.depositWithdraw.pixGenerateError);
     } finally {
       setIsSubmitting(false);
     }
@@ -362,7 +364,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
       <Notification
         isOpen={showInvalidCouponPopup}
         onClose={() => setShowInvalidCouponPopup(false)}
-        message={couponPopupMessage || 'Cupom inválido ou expirado!'}
+        message={couponPopupMessage || t.depositWithdraw.invalidCoupon}
       />
       <Notification
         isOpen={limitNotification !== null}
@@ -391,7 +393,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
           {depositImageUrl ? (
             <img
               src={depositImageUrl}
-              alt="Depósito"
+              alt={t.depositWithdraw.depositAlt}
               className="w-full h-auto object-contain"
             />
           ) : (
@@ -408,11 +410,11 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 ✓
               </p>
               <div>
-                <h2 className="text-white font-bold text-lg mb-0.5">Pagamento confirmado</h2>
+                <h2 className="text-white font-bold text-lg mb-0.5">{t.depositWithdraw.paymentConfirmed}</h2>
                 <p className="text-slate-400 text-xs">
                   {pixCheckError
                     ? pixCheckError
-                    : 'Seu depósito foi aprovado e o saldo foi atualizado.'}
+                    : t.depositWithdraw.depositApproved}
                 </p>
                 {couponBonusInfo && (
                   <div className="mt-3 rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-left">
@@ -450,13 +452,13 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
           ) : pixResult ? (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white font-bold text-lg mb-0.5">Realizar pagamento</h2>
-                <p className="text-slate-400 text-xs">Aponte a câmera do seu celular para o QRCode</p>
+                <h2 className="text-white font-bold text-lg mb-0.5">{t.depositWithdraw.makePayment}</h2>
+                <p className="text-slate-400 text-xs">{t.depositWithdraw.scanQrCode}</p>
               </div>
               {qrSrc ? (
                 <div className="flex justify-center">
                   <div className="bg-white inline-block">
-                    <img src={qrSrc} alt="QR Code PIX" className="max-h-52 w-auto object-contain block" />
+                    <img src={qrSrc} alt={t.depositWithdraw.qrCodeAlt} className="max-h-52 w-auto object-contain block" />
                   </div>
                 </div>
               ) : null}
@@ -475,12 +477,12 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                       onClick={handleCopyPix}
                       className="w-full h-10 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-sm transition-all"
                     >
-                      {copied ? 'Copiado!' : 'Copiar copia e cola'}
+                      {copied ? t.depositWithdraw.copied : t.depositWithdraw.copyPix}
                     </button>
                   </>
                 ) : null}
                 <p className="text-slate-400 text-xs">
-                  O tempo para pagar acaba em:{' '}
+                  {t.depositWithdraw.paymentTimeRemaining}{' '}
                   <span className="text-white font-semibold tabular-nums">
                     {formatPixCountdown(pixTimeLeftMs)}
                   </span>
@@ -492,22 +494,12 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   />
                 </div>
               </div>
-              <div className="owner-alert">
-                <span
-                  className="iconify i-material-symbols:brightness-alert-outline"
-                  aria-hidden="true"
-                  style={{ fontSize: '48px' }}
-                />
-                <span>
-                  Apenas depósitos de contas bancárias cujo CPF corresponda ao do titular serão aceitos.
-                </span>
-              </div>
             </div>
           ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <h2 className="text-white font-bold text-lg mb-0.5">Depósito</h2>
-              <p className="text-white text-xs font-bold">Adicione saldo à sua conta</p>
+              <h2 className="text-white font-bold text-lg mb-0.5">{t.depositWithdraw.depositTitle}</h2>
+              <p className="text-white text-xs font-bold">{t.depositWithdraw.addBalanceSubtitle}</p>
             </div>
 
             {error ? (
@@ -517,7 +509,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
             ) : null}
 
             <div>
-              <label className="text-white text-xs font-medium mb-1.5 block">Valor a ser depositado</label>
+              <label className="text-white text-xs font-medium mb-1.5 block">{t.depositWithdraw.depositAmount}</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm font-medium">R$</span>
@@ -583,7 +575,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   aria-hidden="true"
                   style={{ fontSize: '24px' }}
                 />
-                <p className="text-sm font-medium">Adicionar cupom</p>
+                <p className="text-sm font-medium">{t.depositWithdraw.addCoupon}</p>
               </button>
             ) : (
             <div className="relative">
@@ -602,7 +594,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                   setCouponCode(e.target.value.toUpperCase());
                   setValidatedCoupon(null);
                 }}
-                placeholder="Cupom de desconto (opcional)"
+                placeholder={t.depositWithdraw.couponPlaceholder}
                 disabled={isSubmitting}
                 autoFocus
                 className="w-full h-9 pl-9 pr-20 rounded-lg border-2 border-brand text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all disabled:opacity-50"
@@ -614,13 +606,13 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 disabled={!couponCode || validatingCoupon || isSubmitting}
                 className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 h-7 rounded-md bg-brand hover:bg-brand-hover disabled:bg-brand/50 disabled:cursor-not-allowed text-white font-bold text-xs transition-all duration-200"
               >
-                {validatingCoupon ? 'Validando...' : 'Validar'}
+                {validatingCoupon ? t.depositWithdraw.validating : t.depositWithdraw.validate}
               </button>
             </div>
             )}
             {validatedCoupon?.ok && (
               <p className="text-xs text-green-400 font-medium">
-                Cupom validado — bônus de {formatCupomBonus(validatedCoupon.bonus_calculado ?? 0)} após pagamento.
+                {t.depositWithdraw.couponValidBonus(formatCupomBonus(validatedCoupon.bonus_calculado ?? 0))}
               </p>
             )}
 
@@ -631,7 +623,7 @@ export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
               disabled={isSubmitting}
               className="h-[52px] w-full rounded-lg bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 active:scale-[0.98] btn-brand-submit"
             >
-              {isSubmitting ? 'Gerando PIX...' : 'Depositar'}
+              {isSubmitting ? t.depositWithdraw.generatingPix : t.depositWithdraw.deposit}
             </button>
           </form>
           )}

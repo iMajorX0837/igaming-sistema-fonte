@@ -63,7 +63,6 @@ export default function AdministracaoPage() {
 
   const loadMembros = async () => {
     try {
-      setLoading(true);
       setError(null);
 
       const { data, error: fetchError } = await supabase.rpc('listar_membros_equipe');

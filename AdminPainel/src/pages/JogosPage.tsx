@@ -10,6 +10,7 @@ import StatCard from '../components/ui/StatCard';
 import {
   ApiGame,
   ApiProvider,
+  clearPlayFiversCatalogCache,
   fetchGamesForProvider,
   fetchProviders,
   getProviderSlug,
@@ -63,13 +64,103 @@ export default function JogosPage() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [gamesPreloading, setGamesPreloading] = useState(false);
+
+  const loadGamesForProvider = useCallback(
+    async (providerId: number, force = false) => {
+      setProviders((prev) =>
+        prev.map((p) => (p.id === providerId ? { ...p, loadingGames: true } : p))
+      );
+
+      try {
+        const db = await loadPlatformDbOverrides();
+
+        if (isProprietaryProviderId(providerId)) {
+          const gameMap = new Map(
+            db.games
+              .filter((g) => g.api_provider_id === providerId)
+              .map((g) => [g.game_code, g.ativo])
+          );
+
+          const games: GameItem[] = PROPRIETARY_GAMES.map((game) => ({
+            game_code: game.game_code,
+            nome: game.nome,
+            image_url: game.image_url,
+            api_status: game.api_status,
+            ativo: gameMap.get(game.game_code) ?? false,
+          }));
+
+          setProviders((prev) =>
+            prev.map((p) => (p.id === providerId ? { ...p, games, loadingGames: false } : p))
+          );
+          return;
+        }
+
+        const gamesRes = await fetchGamesForProvider(providerId, force ? { force: true } : undefined);
+
+        if (gamesRes.status !== 1 || !gamesRes.data) {
+          throw new Error(gamesRes.msg || 'Resposta inválida da API de jogos.');
+        }
+
+        const gameMap = new Map(
+          db.games.filter((g) => g.api_provider_id === providerId).map((g) => [g.game_code, g.ativo])
+        );
+
+        const games: GameItem[] = gamesRes.data
+          .map((game: ApiGame) => ({
+            game_code: game.game_code,
+            nome: game.name,
+            image_url: game.image_url,
+            api_status: Boolean(game.status),
+            ativo: gameMap.get(game.game_code) ?? getOfficialSpribeGameDefaultActive(game.game_code),
+          }))
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+        setProviders((prev) =>
+          prev.map((p) => (p.id === providerId ? { ...p, games, loadingGames: false } : p))
+        );
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Erro ao carregar jogos.', 'error');
+        setProviders((prev) =>
+          prev.map((p) => (p.id === providerId ? { ...p, loadingGames: false } : p))
+        );
+      }
+    },
+    [showToast]
+  );
+
+  const preloadAllGames = useCallback(
+    async (providerList: ProviderGroup[], force = false) => {
+      const pending = providerList.filter(
+        (provider) => force || provider.games.length === 0
+      );
+      if (pending.length === 0) return;
+
+      setGamesPreloading(true);
+      try {
+        for (const provider of pending) {
+          await loadGamesForProvider(provider.id, force);
+        }
+      } finally {
+        setGamesPreloading(false);
+      }
+    },
+    [loadGamesForProvider]
+  );
 
   const loadProviders = useCallback(
-    async (showLoader = true) => {
+    async (showLoader = true, forceRefresh = false) => {
       try {
         if (showLoader) setLoading(true);
 
-        const [apiRes, db] = await Promise.all([fetchProviders(), loadPlatformDbOverrides()]);
+        if (forceRefresh) {
+          clearPlayFiversCatalogCache();
+        }
+
+        const [apiRes, db] = await Promise.all([
+          fetchProviders(forceRefresh ? { force: true } : undefined),
+          loadPlatformDbOverrides(),
+        ]);
 
         if (apiRes.status !== 1 || !apiRes.data) {
           throw new Error(apiRes.msg || 'Resposta inválida da API de provedores.');
@@ -106,81 +197,23 @@ export default function JogosPage() {
           expanded: false,
         };
 
-        setProviders([proprietaryProvider, ...apiProviders]);
+        const allProviders = [proprietaryProvider, ...apiProviders];
+        setProviders(allProviders);
+        void preloadAllGames(allProviders, forceRefresh);
+        return allProviders;
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Erro ao carregar catálogo.', 'error');
+        return [];
       } finally {
         if (showLoader) setLoading(false);
       }
     },
-    [showToast]
+    [showToast, preloadAllGames]
   );
 
   useEffect(() => {
     void loadProviders();
   }, [loadProviders]);
-
-  const loadGamesForProvider = async (providerId: number) => {
-    setProviders((prev) =>
-      prev.map((p) => (p.id === providerId ? { ...p, loadingGames: true } : p))
-    );
-
-    try {
-      const db = await loadPlatformDbOverrides();
-
-      if (isProprietaryProviderId(providerId)) {
-        const gameMap = new Map(
-          db.games
-            .filter((g) => g.api_provider_id === providerId)
-            .map((g) => [g.game_code, g.ativo])
-        );
-
-        const games: GameItem[] = PROPRIETARY_GAMES.map((game) => ({
-          game_code: game.game_code,
-          nome: game.nome,
-          image_url: game.image_url,
-          api_status: game.api_status,
-          ativo: gameMap.get(game.game_code) ?? false,
-        }));
-
-        setProviders((prev) =>
-          prev.map((p) => (p.id === providerId ? { ...p, games, loadingGames: false } : p))
-        );
-        return;
-      }
-
-      const [gamesRes] = await Promise.all([
-        fetchGamesForProvider(providerId),
-      ]);
-
-      if (gamesRes.status !== 1 || !gamesRes.data) {
-        throw new Error(gamesRes.msg || 'Resposta inválida da API de jogos.');
-      }
-
-      const gameMap = new Map(
-        db.games.filter((g) => g.api_provider_id === providerId).map((g) => [g.game_code, g.ativo])
-      );
-
-      const games: GameItem[] = gamesRes.data
-        .map((game: ApiGame) => ({
-          game_code: game.game_code,
-          nome: game.name,
-          image_url: game.image_url,
-          api_status: game.status === true,
-          ativo: gameMap.get(game.game_code) ?? getOfficialSpribeGameDefaultActive(game.game_code),
-        }))
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-
-      setProviders((prev) =>
-        prev.map((p) => (p.id === providerId ? { ...p, games, loadingGames: false } : p))
-      );
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erro ao carregar jogos.', 'error');
-      setProviders((prev) =>
-        prev.map((p) => (p.id === providerId ? { ...p, loadingGames: false } : p))
-      );
-    }
-  };
 
   const toggleProviderExpanded = async (providerId: number) => {
     const provider = providers.find((p) => p.id === providerId);
@@ -348,10 +381,10 @@ export default function JogosPage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     const expandedIds = providers.filter((p) => p.expanded).map((p) => p.id);
-    await loadProviders(false);
-    for (const id of expandedIds) {
-      await loadGamesForProvider(id);
-    }
+    await loadProviders(false, true);
+    setProviders((prev) =>
+      prev.map((p) => ({ ...p, expanded: expandedIds.includes(p.id) }))
+    );
     setRefreshing(false);
     showToast('Catálogo atualizado da API.', 'success');
   };
@@ -467,8 +500,8 @@ export default function JogosPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <StatCard title="Provedores" value={String(stats.providers)} icon={Layers} color="text-admin-accent" small />
           <StatCard title="Provedores inativos" value={String(stats.inactiveProviders)} icon={Ban} color="text-admin-danger" small />
-          <StatCard title="Jogos carregados" value={String(stats.totalGames)} icon={Gamepad2} color="text-admin-info" small />
-          <StatCard title="Jogos ativos" value={String(stats.activeGames)} icon={CheckCircle2} color="text-admin-success" small />
+          <StatCard title="Jogos carregados" value={gamesPreloading ? '…' : String(stats.totalGames)} icon={Gamepad2} color="text-admin-info" small />
+          <StatCard title="Jogos ativos" value={gamesPreloading ? '…' : String(stats.activeGames)} icon={CheckCircle2} color="text-admin-success" small />
         </div>
 
         <div className="mb-4">

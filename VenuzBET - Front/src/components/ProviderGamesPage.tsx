@@ -18,6 +18,8 @@ import {
   isPlatformGameEnabled,
   isPlatformProviderEnabled,
 } from '../lib/platformGames';
+import { useTranslation } from '../hooks/useTranslation';
+import { GAME_IMAGE_FALLBACK_LG } from '../lib/gameImageFallback';
 
 interface ApiGame {
   name: string;
@@ -89,6 +91,7 @@ const getProviderSlug = (providerName: string): string => {
 
 export default function ProviderGamesPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { providerSlug } = useParams<{ providerSlug: string }>();
   const { config: homeConfig } = useHomeConfig();
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,7 +115,7 @@ export default function ProviderGamesPage() {
         const settings = await ensurePlatformGameSettingsLoaded();
 
         if (!isPlatformProviderEnabled(PROPRIETARY_PROVIDER_ID, settings)) {
-          throw new Error('Provedor não encontrado');
+          throw new Error(t.games.providerNotFound);
         }
 
         setProvider({
@@ -139,7 +142,7 @@ export default function ProviderGamesPage() {
       const providersData: ApiProvidersResponse = await fetchProvidersCached();
 
       if (providersData.status !== 1 || !providersData.data) {
-        throw new Error('Provedor não encontrado');
+        throw new Error(t.games.providerNotFound);
       }
 
       const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
@@ -157,7 +160,7 @@ export default function ProviderGamesPage() {
       }
 
       if (!foundProvider) {
-        throw new Error('Provedor não encontrado');
+        throw new Error(t.games.providerNotFound);
       }
 
       setProvider(foundProvider);
@@ -180,12 +183,12 @@ export default function ProviderGamesPage() {
       }
     } catch (err: unknown) {
       console.error('Erro ao buscar jogos do provedor:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar jogos. Tente novamente.');
+      setError(err instanceof Error ? err.message : t.games.loadGamesError);
       setGames([]);
     } finally {
       setIsLoading(false);
     }
-  }, [providerSlug]);
+  }, [providerSlug, t.games]);
 
   useEffect(() => {
     void fetchProviderAndGames();
@@ -218,23 +221,23 @@ export default function ProviderGamesPage() {
           <div className="flex items-center gap-4 mb-6 min-h-[40px] min-w-0">
             <BackButton compact onClick={handleBack} />
             <h1 className="flex items-center flex-nowrap min-w-0 text-white text-2xl font-bold">
-              <span className="whitespace-nowrap shrink-0">Jogos de</span>
+              <span className="whitespace-nowrap shrink-0">{t.games.gamesFrom}</span>
               <span className="text-brand-light whitespace-nowrap overflow-hidden ml-1">
-                {provider ? provider.name : 'Carregando...'}
+                {provider ? provider.name : t.common.loading}
               </span>
             </h1>
           </div>
 
           <div className="mb-6 w-full">
             <SearchInput
-              placeholder="Pesquisar jogos"
+              placeholder={t.games.searchGames}
               value={searchTerm}
               onChange={setSearchTerm}
             />
           </div>
 
           {isLoading && games.length === 0 && (
-            <LoadingScreen title="Carregando jogos..." variant="page" />
+            <LoadingScreen title={t.games.loadingGames} variant="page" />
           )}
 
           {error && !isLoading && games.length === 0 && (
@@ -244,7 +247,7 @@ export default function ProviderGamesPage() {
                 onClick={() => fetchProviderAndGames()}
                 className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200"
               >
-                Tentar novamente
+                {t.common.tryAgain}
               </button>
             </div>
           )}
@@ -286,7 +289,7 @@ export default function ProviderGamesPage() {
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
-                                'https://via.placeholder.com/300x400/1e293b/64748b?text=Game';
+                                GAME_IMAGE_FALLBACK_LG;
                             }}
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
@@ -302,7 +305,7 @@ export default function ProviderGamesPage() {
                               <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor">
                                 <path d="M8 5v14l11-7z" />
                               </svg>
-                              JOGAR
+                              {t.common.playUpper}
                             </button>
                           </div>
                         </div>
@@ -312,7 +315,7 @@ export default function ProviderGamesPage() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center min-h-[360px]">
-                  <p className="text-slate-400 text-lg">Não possui jogos ativos.</p>
+                  <p className="text-slate-400 text-lg">{t.games.noActiveGames}</p>
                 </div>
               )}
             </div>
@@ -321,13 +324,13 @@ export default function ProviderGamesPage() {
           {hasMoreGames && (
             <div className="flex flex-col items-center gap-4 mb-8">
               <p className="text-slate-400 text-sm">
-                Mostrando {currentGames.length} de {filteredGames.length} jogos
+                {t.games.showingGames(currentGames.length, filteredGames.length)}
               </p>
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                 className="px-6 py-3 rounded-lg bg-gradient-to-r from-brand to-brand-hover hover:from-brand-hover hover:to-brand-hover text-white font-bold text-sm transition-all duration-200 shadow-lg"
               >
-                Carregar mais
+                {t.common.loadMore}
               </button>
             </div>
           )}

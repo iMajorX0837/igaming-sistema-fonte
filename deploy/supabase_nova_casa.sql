@@ -8654,7 +8654,7 @@ BEGIN
 END;
 $$;
 
--- 4) obter admin — expõe campos novos
+-- 4) obter admin — modo/velas/geracao + campos de recovery (NÃO sobrescrever sem geracao_*)
 CREATE OR REPLACE FUNCTION public.obter_aviator_config_admin()
 RETURNS JSON
 LANGUAGE plpgsql
@@ -8675,14 +8675,27 @@ BEGIN
     SELECT * INTO v_config FROM public.aviator_config WHERE id = 1;
   END IF;
 
-  v_stats := public.calcular_aviator_ggr(v_config.recovery_window_hours);
+  v_stats := public.calcular_aviator_ggr(COALESCE(v_config.recovery_window_hours, 24));
 
   RETURN json_build_object(
     'ok', true,
     'config', json_build_object(
+      'modo_geracao', v_config.modo_geracao,
+      'rtp_geral', v_config.rtp_base,
       'rtp_base', v_config.rtp_base,
       'rtp_min', v_config.rtp_min,
       'rtp_max', v_config.rtp_max,
+      'pct_vela_azul', v_config.pct_vela_azul,
+      'pct_vela_roxa', v_config.pct_vela_roxa,
+      'pct_vela_rosa', v_config.pct_vela_rosa,
+      'geracao_min_crash', v_config.geracao_min_crash,
+      'geracao_max_crash', v_config.geracao_max_crash,
+      'min_crash', v_config.min_crash,
+      'max_crash', v_config.max_crash,
+      'queue_size', v_config.queue_size,
+      'rtp_limit_min_pct', v_config.rtp_limit_min_pct,
+      'rtp_limit_max_pct', v_config.rtp_limit_max_pct,
+      'crash_technical_max', v_config.crash_technical_max,
       'recovery_enabled', v_config.recovery_enabled,
       'recovery_window_hours', v_config.recovery_window_hours,
       'ggr_target_pct', v_config.ggr_target_pct,
@@ -8691,9 +8704,6 @@ BEGIN
       'min_wagered_for_recovery', v_config.min_wagered_for_recovery,
       'recovery_loss_trigger_brl', COALESCE(v_config.recovery_loss_trigger_brl, 10000),
       'recovery_profit_trigger_brl', COALESCE(v_config.recovery_profit_trigger_brl, 10000),
-      'min_crash', v_config.min_crash,
-      'max_crash', v_config.max_crash,
-      'queue_size', v_config.queue_size,
       'updated_at', v_config.updated_at
     ),
     'stats', v_stats
@@ -8727,6 +8737,8 @@ DECLARE
   v_rtp_bucket INT;
   v_engine_version TEXT;
   v_hours INT;
+  v_eff_min NUMERIC;
+  v_eff_max NUMERIC;
 BEGIN
   SELECT * INTO v_config FROM public.aviator_config WHERE id = 1;
   IF NOT FOUND THEN
@@ -8734,7 +8746,7 @@ BEGIN
     SELECT * INTO v_config FROM public.aviator_config WHERE id = 1;
   END IF;
 
-  v_hours := GREATEST(v_config.recovery_window_hours, 1);
+  v_hours := GREATEST(COALESCE(v_config.recovery_window_hours, 24), 1);
   v_stats := public.calcular_aviator_ggr(v_hours);
 
   v_wagered := COALESCE((v_stats->>'total_wagered')::NUMERIC, 0);
@@ -8792,22 +8804,43 @@ BEGIN
     END IF;
   END IF;
 
+  IF COALESCE(v_config.modo_geracao, 'velas') = 'crash' THEN
+    v_eff_min := v_config.min_crash;
+    v_eff_max := v_config.max_crash;
+  ELSE
+    v_eff_min := COALESCE(v_config.geracao_min_crash, v_config.min_crash, 1.01);
+    v_eff_max := COALESCE(v_config.geracao_max_crash, v_config.max_crash, 500);
+  END IF;
+
   v_ggr_bucket := FLOOR(v_ggr / 500);
   v_rtp_bucket := ROUND(v_effective_rtp * 1000);
-  v_engine_version := v_rtp_bucket::TEXT || ':' || v_ggr_bucket::TEXT;
+  v_engine_version := COALESCE(v_config.modo_geracao, 'velas') || ':' || v_rtp_bucket::TEXT || ':' || v_ggr_bucket::TEXT;
 
   RETURN json_build_object(
     'ok', true,
+    'modo_geracao', COALESCE(v_config.modo_geracao, 'velas'),
+    'rtp_geral', v_effective_rtp,
     'rtp_factor', v_effective_rtp,
     'rtp_base', v_config.rtp_base,
     'rtp_min', v_config.rtp_min,
     'rtp_max', v_config.rtp_max,
     'effective_rtp', v_effective_rtp,
+    'pct_vela_azul', v_config.pct_vela_azul,
+    'pct_vela_roxa', v_config.pct_vela_roxa,
+    'pct_vela_rosa', v_config.pct_vela_rosa,
+    'geracao_min_crash', v_config.geracao_min_crash,
+    'geracao_max_crash', v_config.geracao_max_crash,
+    'min_crash', v_eff_min,
+    'max_crash', v_eff_max,
+    'min_crash_mul', GREATEST(101, FLOOR(v_eff_min * 100)::INT),
+    'max_crash_mul', LEAST(
+      FLOOR(COALESCE(v_config.crash_technical_max, 1000) * 100)::INT,
+      FLOOR(v_eff_max * 100)::INT
+    ),
+    'crash_technical_max', v_config.crash_technical_max,
     'recovery_enabled', v_config.recovery_enabled,
     'recovery_adjustment', v_config.rtp_base - v_effective_rtp,
     'recovery_mode', v_recovery_mode,
-    'min_crash_mul', GREATEST(101, FLOOR(v_config.min_crash * 100)::INT),
-    'max_crash_mul', LEAST(1000000, FLOOR(v_config.max_crash * 100)::INT),
     'queue_size', v_config.queue_size,
     'config_version', v_config.updated_at,
     'engine_version', v_engine_version,
@@ -8822,8 +8855,11 @@ BEGIN
 END;
 $$;
 
--- 6) GRANT — assinatura correta (14 parâmetros)
+-- 6) GRANT — manter as duas assinaturas (modo/velas + recovery legado)
 GRANT EXECUTE ON FUNCTION public.obter_aviator_config_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.atualizar_aviator_config_admin(
+  TEXT, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, INT
+) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.atualizar_aviator_config_admin(
   NUMERIC, NUMERIC, NUMERIC, BOOLEAN, INT, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, INT
 ) TO authenticated;

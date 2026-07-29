@@ -5,12 +5,14 @@ import BackButton from './BackButton';
 import LoadingScreen from './LoadingScreen';
 import { usePromotionDetail } from '../hooks/usePromotionBanners';
 import { useHomeConfig } from '../hooks/useHomeConfig';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function PromotionDetailPage() {
   const navigate = useNavigate();
   const { promotionId } = useParams<{ promotionId: string }>();
   const { promotion, loading, error } = usePromotionDetail(promotionId);
   const { config: homeConfig } = useHomeConfig();
+  const { t } = useTranslation();
 
   return (
     <AppPageScaffold>
@@ -20,7 +22,7 @@ export default function PromotionDetailPage() {
 
           {loading ? (
             <LoadingScreen
-              title="Carregando promoção..."
+              title={t.promotions.loadingDetail}
               variant="page"
               className="min-h-[40vh] rounded-xl border border-brand bg-[#181923]"
             />
@@ -33,7 +35,7 @@ export default function PromotionDetailPage() {
                 className="text-center text-lg font-semibold text-slate-300"
                 style={{ fontFamily: 'Montserrat, sans-serif' }}
               >
-                {error || 'Promoção não encontrada'}
+                {error || t.promotions.notFound}
               </p>
               <button
                 type="button"
@@ -55,7 +57,7 @@ export default function PromotionDetailPage() {
                   />
                 ) : (
                   <div className="flex min-h-[240px] w-full items-center justify-center text-sm text-slate-500">
-                    Sem imagem
+                    {t.common.noImage}
                   </div>
                 )}
               </div>
