@@ -13,6 +13,8 @@
   let onPush = null;
   let eventSource = null;
   let identity = null;
+  /** roundId → { roundId, crashMul, crashX } — velas já vistas no cliente (hisMuls / fim de rodada) */
+  const roundMulCache = new Map();
 
   function randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -137,6 +139,51 @@
     return Number.isNaN(ms) ? Date.now() : ms;
   }
 
+  function resolveCrashMultiplier(round) {
+    if (!round) return 0;
+    const mul = Number(round.crashMul);
+    if (Number.isFinite(mul) && mul > 0) return mul / GOLD_MULTIPLE;
+    const cx = Number(round.crashX);
+    if (Number.isFinite(cx) && cx > 0) return cx;
+    return 0;
+  }
+
+  function rememberRoundFromGold(roundId, mulGold) {
+    const id = Number(roundId) || 0;
+    const mul = Math.round(Number(mulGold) || 0);
+    if (!id || mul <= 0) return;
+    roundMulCache.set(id, {
+      roundId: id,
+      crashMul: mul,
+      crashX: +(mul / GOLD_MULTIPLE).toFixed(2),
+    });
+  }
+
+  function rememberRoundFromDecimal(roundId, multiplier) {
+    const id = Number(roundId) || 0;
+    const dec = Number(multiplier) || 0;
+    if (!id || dec <= 0) return;
+    roundMulCache.set(id, {
+      roundId: id,
+      crashMul: Math.round(dec * GOLD_MULTIPLE),
+      crashX: +dec.toFixed(2),
+    });
+  }
+
+  function rememberRounds(roundsInfo) {
+    if (!Array.isArray(roundsInfo)) return;
+    roundsInfo.forEach(function (entry) {
+      if (!entry) return;
+      rememberRoundFromDecimal(entry.roundId, entry.maxMultiplier);
+    });
+  }
+
+  function getCachedRound(roundId) {
+    const id = Number(roundId) || 0;
+    if (!id) return null;
+    return roundMulCache.get(id) || null;
+  }
+
   function normalizeRoundRecord(raw) {
     if (!raw) return null;
     if (raw.vela) {
@@ -176,7 +223,13 @@
 
   async function fetchRoundFromDb(roundId) {
     try {
-      const res = await fetch("/api/history/" + roundId);
+      const cfg = window.enterGameConfig || {};
+      const account = String(cfg.account || "").trim();
+      const params = new URLSearchParams();
+      if (account) params.set("account", account);
+      const qs = params.toString();
+      const url = "/api/history/" + roundId + (qs ? "?" + qs : "");
+      const res = await fetch(url, { credentials: "same-origin" });
       if (!res.ok) return null;
       return normalizeRoundRecord(await res.json());
     } catch (err) {
@@ -212,12 +265,13 @@
     const seedSHA256 = await shaHex("SHA-512", combinedInput);
     const partSeedHexNumber = seedSHA256.substring(0, 13);
     const partSeedDecimalNumber = String(parseInt(partSeedHexNumber, 16) || 0);
+    const crashMultiplier = resolveCrashMultiplier(round);
 
     return {
       roundId: round.roundId,
       code: 200,
       fairness: {
-        result: Number(round.crashX) || Number((round.crashMul || 0) / 100),
+        result: crashMultiplier,
         roundStartDate: parseIsoMs(round.startedAt),
         roundEndDate: parseIsoMs(round.crashedAt),
         serverSeed: serverSeed,
@@ -228,7 +282,7 @@
         playerSeeds: playerSeeds,
       },
       roundInfo: {
-        multiplier: Number(round.crashX) || Number((round.crashMul || 0) / 100),
+        multiplier: crashMultiplier,
         roundStartDate: parseIsoMs(round.startedAt),
         roundEndDate: parseIsoMs(round.crashedAt),
         roundId: round.roundId,
@@ -342,10 +396,29 @@
       return { code: 200 };
     },
 
+    rememberRoundFromGold,
+    rememberRoundFromDecimal,
+    rememberRounds,
+
     async getRoundFairness(roundId) {
       const id = Number(roundId) || 0;
       let round = await fetchRoundFromDb(id);
-      if (!round) {
+      if (!round || resolveCrashMultiplier(round) <= 0) {
+        const cached = getCachedRound(id);
+        if (cached) {
+          round = {
+            roundId: id,
+            crashMul: cached.crashMul,
+            crashX: cached.crashX,
+            serverSeed: (round && round.serverSeed) || "",
+            startedAt: (round && round.startedAt) || null,
+            crashedAt: (round && round.crashedAt) || null,
+            bets: (round && round.bets) || [],
+          };
+        }
+      }
+      if (!round || resolveCrashMultiplier(round) <= 0) {
+        console.warn("[DB] Rodada", id, "sem multiplicador — usando cache vazio");
         round = {
           roundId: id,
           crashMul: 100,

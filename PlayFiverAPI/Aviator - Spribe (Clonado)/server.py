@@ -593,6 +593,15 @@ def get_vela(round_id):
     except Exception as exc:
         print(f"[HIST] Falha ao buscar rodada no Supabase: {exc}")
 
+    # Fallback: buscar na lista recente (mesma fonte do histórico exibido no jogo)
+    try:
+        hist = list_velas(limit=MAX_VELAS, offset=0)
+        for vela in hist.get("velas") or []:
+            if int(vela.get("round_id") or 0) == round_id:
+                return {"ok": True, "vela": vela, "bets": []}
+    except Exception as exc:
+        print(f"[HIST] Falha no fallback de listagem: {exc}")
+
     return None
 
 

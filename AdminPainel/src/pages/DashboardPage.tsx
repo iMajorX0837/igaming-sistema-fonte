@@ -27,15 +27,19 @@ import {
 } from 'lucide-react';
 import {
   buildFilterKey,
+  buildCurrentMonthCacheKey,
+  currentMonthRangeSP,
   defaultCustomRange,
-  getEvolutionChartPoints,
+  formatCurrentMonthLabel,
+  getMonthChartPoints,
   spDayEndExclusive,
+  spDayStart,
   ymdFromDateSP,
   type CustomDateRange,
 } from '../lib/dashboardDateRange';
 
 const dashStatsCacheKey = (filterKey: string) => `admin:dashboard:stats:${filterKey}`;
-const dashChartsCacheKey = (filterKey: string) => `admin:dashboard:charts:${filterKey}`;
+const dashChartsCacheKey = (monthKey: string) => `admin:dashboard:charts:v3:month:${monthKey}`;
 const DASH_TRANSACTIONS_CACHE = 'admin:dashboard:transactions:recent';
 const DASH_SAQUES_PENDENTES_CACHE = 'admin:dashboard:saques-pendentes';
 const RECENT_TRANSACTIONS_LIMIT = 10;
@@ -149,41 +153,45 @@ const formatPercent = (value: number) =>
   }).format(value) + '%';
 
 function buildCadastrosChartPoints(
-  chartPoints: ReturnType<typeof getEvolutionChartPoints>,
-  timestamps: Array<{ date: Date; ymd: string }>
+  chartPoints: ReturnType<typeof getMonthChartPoints>,
+  usuariosTimestamps: Array<{ date: Date; ymd: string }>,
+  depositosTimestamps: Array<{ date: Date; ymd: string; valor: number }>
 ): CadastrosChartPoint[] {
-  const countsByYmd = new Map<string, number>();
-  chartPoints.forEach((point) => countsByYmd.set(point.ymd, 0));
+  const cadastrosByYmd = new Map<string, number>();
+  const depositosByYmd = new Map<string, number>();
+  chartPoints.forEach((point) => {
+    cadastrosByYmd.set(point.ymd, 0);
+    depositosByYmd.set(point.ymd, 0);
+  });
 
-  timestamps.forEach(({ ymd }) => {
-    if (countsByYmd.has(ymd)) {
-      countsByYmd.set(ymd, (countsByYmd.get(ymd) || 0) + 1);
+  usuariosTimestamps.forEach(({ ymd }) => {
+    if (cadastrosByYmd.has(ymd)) {
+      cadastrosByYmd.set(ymd, (cadastrosByYmd.get(ymd) || 0) + 1);
     }
   });
 
-  const raw = chartPoints.map((point) => {
+  depositosTimestamps.forEach(({ ymd, valor }) => {
+    if (depositosByYmd.has(ymd)) {
+      depositosByYmd.set(ymd, (depositosByYmd.get(ymd) || 0) + valor);
+    }
+  });
+
+  return chartPoints.map((point) => {
     const dayEnd = spDayEndExclusive(point.ymd);
-    const totalAcumulado = timestamps.filter(({ date }) => date < dayEnd).length;
+    const totalCadastros = usuariosTimestamps.filter(({ date }) => date < dayEnd).length;
+    const totalDepositos = depositosTimestamps
+      .filter(({ date }) => date < dayEnd)
+      .reduce((sum, item) => sum + item.valor, 0);
 
     return {
       label: point.label,
       ymd: point.ymd,
-      cadastros: countsByYmd.get(point.ymd) || 0,
-      totalAcumulado,
+      cadastros: cadastrosByYmd.get(point.ymd) || 0,
+      depositos: depositosByYmd.get(point.ymd) || 0,
+      totalCadastros,
+      totalDepositos,
     };
   });
-
-  const maxCadastros = Math.max(...raw.map((day) => day.cadastros), 0);
-  const maxTotal = Math.max(...raw.map((day) => day.totalAcumulado), 0);
-
-  return raw.map((day) => ({
-    ...day,
-    barHeight:
-      day.cadastros > 0 && maxCadastros > 0
-        ? Math.max(8, (day.cadastros / maxCadastros) * 100)
-        : 0,
-    lineY: maxTotal > 0 ? (day.totalAcumulado / maxTotal) * 100 : 0,
-  }));
 }
 
 export default function DashboardPage() {
@@ -200,6 +208,7 @@ export default function DashboardPage() {
   const [loadingSaquesPendentes, setLoadingSaquesPendentes] = useState(true);
 
   const filterKey = buildFilterKey(customRange);
+  const monthCacheKey = buildCurrentMonthCacheKey();
 
   useEffect(() => {
     const statsKey = dashStatsCacheKey(filterKey);
@@ -210,8 +219,10 @@ export default function DashboardPage() {
     } else {
       void loadStats();
     }
+  }, [filterKey, customRange]);
 
-    const chartsKey = dashChartsCacheKey(filterKey);
+  useEffect(() => {
+    const chartsKey = dashChartsCacheKey(monthCacheKey);
     const chartsCached = adminPageCache.get<CadastrosChartPoint[]>(chartsKey);
     if (chartsCached !== undefined) {
       setChartPoints(chartsCached);
@@ -219,7 +230,7 @@ export default function DashboardPage() {
     } else {
       void loadChartData();
     }
-  }, [filterKey, customRange]);
+  }, [monthCacheKey]);
 
   useEffect(() => {
     const cached = adminPageCache.get<RecentTransaction[]>(DASH_TRANSACTIONS_CACHE);
@@ -287,23 +298,35 @@ export default function DashboardPage() {
   const loadChartData = async () => {
     try {
       setLoadingCharts(true);
-      const evolutionPoints = getEvolutionChartPoints(customRange);
-      const lastPoint = evolutionPoints[evolutionPoints.length - 1];
-      const queryEnd = spDayEndExclusive(lastPoint.ymd);
+      const monthRange = currentMonthRangeSP();
+      const evolutionPoints = getMonthChartPoints(monthRange);
+      const monthStart = spDayStart(monthRange.start);
+      const queryEnd = spDayEndExclusive(monthRange.end);
 
-      const { data: usuariosData, error: usuariosError } = await supabase
-        .from('usuarios')
-        .select('created_at')
-        .lt('created_at', queryEnd.toISOString())
-        .order('created_at', { ascending: true });
+      const [{ data: usuariosData, error: usuariosError }, { data: depositosData, error: depositosError }] =
+        await Promise.all([
+          supabase
+            .from('usuarios')
+            .select('created_at')
+            .gte('created_at', monthStart.toISOString())
+            .lt('created_at', queryEnd.toISOString())
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('depositos')
+            .select('valor, data_hora')
+            .eq('status', 'aprovado')
+            .gte('data_hora', monthStart.toISOString())
+            .lt('data_hora', queryEnd.toISOString())
+            .order('data_hora', { ascending: true }),
+        ]);
 
-      if (usuariosError) {
-        console.error('[DashboardPage] Erro ao carregar evolução de cadastros:', usuariosError);
+      if (usuariosError || depositosError) {
+        console.error('[DashboardPage] Erro ao carregar evolução do gráfico:', usuariosError || depositosError);
         setChartPoints([]);
         return;
       }
 
-      const timestamps = (usuariosData || [])
+      const usuariosTimestamps = (usuariosData || [])
         .map((usuario) => {
           if (!usuario.created_at) return null;
           const date = new Date(usuario.created_at);
@@ -312,9 +335,22 @@ export default function DashboardPage() {
         })
         .filter((item): item is { date: Date; ymd: string } => item !== null);
 
-      const points = buildCadastrosChartPoints(evolutionPoints, timestamps);
+      const depositosTimestamps = (depositosData || [])
+        .map((deposito) => {
+          if (!deposito.data_hora) return null;
+          const date = new Date(deposito.data_hora);
+          if (Number.isNaN(date.getTime())) return null;
+          return {
+            date,
+            ymd: ymdFromDateSP(date),
+            valor: Number(deposito.valor) || 0,
+          };
+        })
+        .filter((item): item is { date: Date; ymd: string; valor: number } => item !== null);
+
+      const points = buildCadastrosChartPoints(evolutionPoints, usuariosTimestamps, depositosTimestamps);
       setChartPoints(points);
-      adminPageCache.set(dashChartsCacheKey(filterKey), points);
+      adminPageCache.set(dashChartsCacheKey(monthCacheKey), points);
     } catch (error) {
       console.error('[DashboardPage] Erro ao carregar evolução de cadastros:', error);
       setChartPoints([]);
@@ -457,7 +493,7 @@ export default function DashboardPage() {
       <PageHeader
         icon={LayoutDashboard}
         title="Dashboard"
-        description="Acompanhe métricas e a evolução de cadastros da plataforma."
+        description="Acompanhe métricas, cadastros e depósitos da plataforma."
       />
       <DashboardDateFilter
         customRange={customRange}
@@ -488,9 +524,9 @@ export default function DashboardPage() {
       <PagePanel padding={false} className="mb-6 overflow-hidden">
         <div className="min-h-[64px] px-[18px] flex items-center justify-between gap-3 border-b border-admin-border">
           <div>
-            <h3 className="text-sm font-semibold text-admin-foreground">Evolução de Cadastros</h3>
+            <h3 className="text-sm font-semibold text-admin-foreground">Cadastros e Depósitos</h3>
             <p className="mt-1 text-[11px] text-admin-muted">
-              Cadastros diários e total acumulado no período selecionado
+              Evolução diária de {formatCurrentMonthLabel()} — total acumulado do mês atual
             </p>
           </div>
         </div>
@@ -499,6 +535,7 @@ export default function DashboardPage() {
           points={chartPoints}
           loading={loadingCharts}
           formatNumber={formatNumber}
+          formatCurrency={formatCurrency}
         />
       </PagePanel>
 

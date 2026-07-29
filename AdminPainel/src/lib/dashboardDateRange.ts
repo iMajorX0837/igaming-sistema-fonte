@@ -127,6 +127,44 @@ export interface EvolutionChartPoint {
 const EVOLUTION_LOOKBACK_DAYS = 90;
 const EVOLUTION_MAX_LABELS = 10;
 
+export function currentMonthRangeSP(): CustomDateRange {
+  const today = todayYmdSP();
+  const { year, month } = parseYmd(today);
+  return {
+    start: ymdFromParts(year, month, 1),
+    end: today,
+  };
+}
+
+export function buildCurrentMonthCacheKey(): string {
+  const { year, month } = parseYmd(todayYmdSP());
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+export function formatCurrentMonthLabel(): string {
+  const { year, month } = parseYmd(todayYmdSP());
+  return new Date(year, month - 1, 15).toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+export function getMonthChartPoints(range: CustomDateRange): EvolutionChartPoint[] {
+  const totalDays = daysBetweenYmd(range.start, range.end) + 1;
+  const points: EvolutionChartPoint[] = [];
+
+  for (let i = 0; i < totalDays; i += 1) {
+    const ymd = addDaysYmd(range.start, i);
+    const { day } = parseYmd(ymd);
+    points.push({
+      label: String(day).padStart(2, '0'),
+      ymd,
+    });
+  }
+
+  return points;
+}
+
 export function getEvolutionChartPoints(customRange: CustomDateRange): EvolutionChartPoint[] {
   const endYmd = customRange.end;
   const startYmd = isSingleDayRange(customRange)

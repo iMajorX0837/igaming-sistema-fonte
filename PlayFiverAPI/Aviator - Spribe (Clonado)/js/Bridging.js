@@ -1347,9 +1347,10 @@ const ServerMethod_PING = 29;
     }
   };
   async function roundFairnessHandler(roundId) {
+    const rid = Number(roundId) || 0;
     let data;
     if (isLocalMode() && window.LocalAviatorServer) {
-      data = await window.LocalAviatorServer.getRoundFairness(roundId);
+      data = await window.LocalAviatorServer.getRoundFairness(rid);
     } else {
       const url = window["enterGameConfig"]["domain2ip"] + "/history/?" + "roundId=" + roundId;
       const response = await fetch(url);
@@ -1701,6 +1702,9 @@ const ServerMethod_PING = 29;
         });
       });
     console.log("showRoundList:", showRoundList);
+    if (window.LocalAviatorServer && window.LocalAviatorServer.rememberRounds) {
+      window.LocalAviatorServer.rememberRounds(roundsInfo);
+    }
     var headIcon = transformHeadIcon(data.data.headIcon);
     saveProfileImage(headIcon);
     // 创建用户信息
@@ -2014,6 +2018,9 @@ const ServerMethod_PING = 29;
   }
   //回合结束
   function onRoundEnd(data) {
+    if (window.LocalAviatorServer && window.LocalAviatorServer.rememberRoundFromGold) {
+      window.LocalAviatorServer.rememberRoundFromGold(data.roundId, data.maxMul);
+    }
     //记录上回合数据
     transformLastBetInfo(data.LastBetInfo, data.maxMul, {
       roundId: data.roundId,

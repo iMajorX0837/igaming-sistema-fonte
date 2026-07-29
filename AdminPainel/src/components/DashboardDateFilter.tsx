@@ -30,6 +30,15 @@ const MONTHS = [
   'Dezembro',
 ];
 
+function normalizeRange(start: string, end: string): CustomDateRange {
+  if (compareYmd(start, end) <= 0) {
+    return { start, end };
+  }
+  return { start: end, end: start };
+}
+
+type DayRole = 'none' | 'single' | 'start' | 'middle' | 'end';
+
 export default function DashboardDateFilter({
   customRange,
   onCustomRangeApply,
@@ -43,11 +52,13 @@ export default function DashboardDateFilter({
   const [viewMonth, setViewMonth] = useState(initial.month);
   const [draftStart, setDraftStart] = useState<string | null>(customRange.start);
   const [draftEnd, setDraftEnd] = useState<string | null>(customRange.end);
+  const [hoverYmd, setHoverYmd] = useState<string | null>(null);
 
   useEffect(() => {
     if (!calendarOpen) return;
     setDraftStart(customRange.start);
     setDraftEnd(customRange.end);
+    setHoverYmd(null);
     const parsed = parseYmd(customRange.start);
     setViewYear(parsed.year);
     setViewMonth(parsed.month);
@@ -82,38 +93,96 @@ export default function DashboardDateFilter({
     setViewYear(year);
   };
 
+  const applyRange = (start: string, end: string) => {
+    const range = normalizeRange(start, end);
+    onCustomRangeApply(range);
+    setDraftStart(range.start);
+    setDraftEnd(range.end);
+    setHoverYmd(null);
+    setCalendarOpen(false);
+  };
+
   const handleDayClick = (ymd: string) => {
     if (!draftStart || (draftStart && draftEnd)) {
       setDraftStart(ymd);
       setDraftEnd(null);
+      setHoverYmd(null);
       return;
     }
 
-    if (compareYmd(ymd, draftStart) < 0) {
-      setDraftEnd(draftStart);
-      setDraftStart(ymd);
-      return;
+    applyRange(draftStart, ymd);
+  };
+
+  const getSelectionBounds = (): { start: string; end: string } | null => {
+    if (!draftStart) return null;
+
+    if (draftEnd) {
+      return normalizeRange(draftStart, draftEnd);
     }
 
-    setDraftEnd(ymd);
+    if (hoverYmd) {
+      return normalizeRange(draftStart, hoverYmd);
+    }
+
+    return { start: draftStart, end: draftStart };
   };
 
   const isInRange = (ymd: string) => {
-    if (!draftStart) return false;
-    const end = draftEnd ?? draftStart;
-    const start = compareYmd(draftStart, end) <= 0 ? draftStart : end;
-    const finish = compareYmd(draftStart, end) <= 0 ? end : draftStart;
-    return compareYmd(ymd, start) >= 0 && compareYmd(ymd, finish) <= 0;
+    const bounds = getSelectionBounds();
+    if (!bounds) return false;
+    return compareYmd(ymd, bounds.start) >= 0 && compareYmd(ymd, bounds.end) <= 0;
   };
 
-  const isRangeStart = (ymd: string) => draftStart === ymd && (!draftEnd || draftEnd === draftStart);
-  const isRangeEnd = (ymd: string) => draftEnd === ymd && draftStart !== draftEnd;
+  const getDayRole = (ymd: string): DayRole => {
+    const bounds = getSelectionBounds();
+    if (!bounds || !isInRange(ymd)) return 'none';
+    if (bounds.start === bounds.end) return 'single';
+    if (ymd === bounds.start) return 'start';
+    if (ymd === bounds.end) return 'end';
+    return 'middle';
+  };
+
+  const getDayClassName = (ymd: string, isFuture: boolean, isToday: boolean) => {
+    if (isFuture) {
+      return 'cursor-not-allowed text-gray-600';
+    }
+
+    const role = getDayRole(ymd);
+    const base = 'h-9 w-full text-sm transition-colors';
+
+    switch (role) {
+      case 'single':
+        return `${base} rounded-lg bg-admin-accent font-semibold text-[#0d0e10]`;
+      case 'start':
+        return `${base} rounded-l-lg bg-admin-accent font-semibold text-[#0d0e10]`;
+      case 'end':
+        return `${base} rounded-r-lg bg-admin-accent font-semibold text-[#0d0e10]`;
+      case 'middle':
+        return `${base} bg-admin-accent/14 text-admin-foreground`;
+      default:
+        return `${base} rounded-lg text-gray-300 hover:bg-white/5 hover:text-white ${
+          isToday ? 'ring-1 ring-admin-accent/30' : ''
+        }`;
+    }
+  };
+
+  const selectionHint = () => {
+    if (!draftStart) {
+      return 'Clique no dia inicial';
+    }
+    if (!draftEnd) {
+      return `Início: ${formatRangeLabel({ start: draftStart, end: draftStart })} — clique no dia final`;
+    }
+    return formatRangeLabel({ start: draftStart, end: draftEnd });
+  };
 
   const applyCustomRange = () => {
     if (!draftStart) return;
-    const end = draftEnd ?? draftStart;
-    onCustomRangeApply({ start: draftStart, end });
-    setCalendarOpen(false);
+    applyRange(draftStart, draftEnd ?? draftStart);
+  };
+
+  const resetToToday = () => {
+    applyRange(today, today);
   };
 
   return (
@@ -129,10 +198,8 @@ export default function DashboardDateFilter({
         </button>
 
         {calendarOpen ? (
-          <div
-            className="absolute left-0 top-full z-30 mt-2 w-[320px] rounded-xl border border-admin-border bg-admin-panel p-4 shadow-admin"
-          >
-            <div className="mb-4 flex items-center justify-between">
+          <div className="absolute left-0 top-full z-30 mt-2 w-[320px] rounded-xl border border-admin-border bg-admin-panel p-4 shadow-admin">
+            <div className="mb-3 flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
@@ -152,6 +219,10 @@ export default function DashboardDateFilter({
               </button>
             </div>
 
+            <p className="mb-3 text-[11px] text-admin-muted">
+              Selecione um intervalo: 1º clique no dia inicial, 2º clique no dia final
+            </p>
+
             <div className="mb-2 grid grid-cols-7 gap-1">
               {WEEKDAYS.map((day) => (
                 <div key={day} className="py-1 text-center text-[11px] font-medium text-gray-500">
@@ -168,11 +239,8 @@ export default function DashboardDateFilter({
                       return <div key={`empty-${weekIndex}-${dayIndex}`} className="h-9" />;
                     }
 
-                    const inRange = isInRange(ymd);
                     const isToday = ymd === today;
                     const isFuture = compareYmd(ymd, today) > 0;
-                    const isStart = isRangeStart(ymd) || (draftStart === ymd && !draftEnd);
-                    const isEnd = isRangeEnd(ymd);
 
                     return (
                       <button
@@ -180,15 +248,13 @@ export default function DashboardDateFilter({
                         type="button"
                         disabled={isFuture}
                         onClick={() => handleDayClick(ymd)}
-                        className={`h-9 rounded-lg text-sm transition-colors ${
-                          isFuture
-                            ? 'cursor-not-allowed text-gray-600'
-                            : inRange
-                              ? 'bg-admin-accent/12 text-admin-foreground'
-                              : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                        } ${isStart || isEnd ? 'bg-admin-accent text-[#0d0e10] font-semibold' : ''} ${
-                          isToday && !inRange ? 'ring-1 ring-admin-accent/30' : ''
-                        }`}
+                        onMouseEnter={() => {
+                          if (!isFuture && draftStart && !draftEnd) {
+                            setHoverYmd(ymd);
+                          }
+                        }}
+                        onMouseLeave={() => setHoverYmd(null)}
+                        className={getDayClassName(ymd, isFuture, isToday)}
                       >
                         {parseYmd(ymd).day}
                       </button>
@@ -199,19 +265,24 @@ export default function DashboardDateFilter({
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
-              <p className="text-xs text-gray-400">
-                {draftStart
-                  ? formatRangeLabel({ start: draftStart, end: draftEnd ?? draftStart })
-                  : 'Selecione a data inicial'}
-              </p>
-              <button
-                type="button"
-                onClick={applyCustomRange}
-                disabled={!draftStart}
-                className="rounded-lg bg-admin-accent px-3 py-1.5 text-sm font-semibold text-[#0d0e10] transition-colors hover:bg-admin-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Aplicar
-              </button>
+              <p className="min-w-0 text-xs text-gray-400">{selectionHint()}</p>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetToToday}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-admin-muted transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  Hoje
+                </button>
+                <button
+                  type="button"
+                  onClick={applyCustomRange}
+                  disabled={!draftStart}
+                  className="rounded-lg bg-admin-accent px-3 py-1.5 text-sm font-semibold text-[#0d0e10] transition-colors hover:bg-admin-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Aplicar
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
