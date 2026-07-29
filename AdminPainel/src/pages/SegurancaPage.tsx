@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../contexts/ToastContext';
-import { Copy, KeyRound, Loader2, Shield, ShieldCheck, ShieldOff } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Copy, KeyRound, Loader2, Shield, ShieldAlert, ShieldCheck } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import LoadingState from '../components/ui/LoadingState';
 import PagePanel from '../components/ui/PagePanel';
@@ -15,13 +17,14 @@ type SetupData = {
 
 export default function SegurancaPage() {
   const { showToast } = useToast();
+  const { requires2FASetup, refreshTwoFactorStatus } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [setupData, setSetupData] = useState<SetupData | null>(null);
   const [confirmCode, setConfirmCode] = useState('');
-  const [disablePassword, setDisablePassword] = useState('');
-  const [disableCode, setDisableCode] = useState('');
   const [saving, setSaving] = useState(false);
+  const mandatory = requires2FASetup;
 
   const loadStatus = async () => {
     try {
@@ -40,6 +43,13 @@ export default function SegurancaPage() {
   useEffect(() => {
     void loadStatus();
   }, []);
+
+  useEffect(() => {
+    if (!loading && mandatory && !enabled && !setupData && !saving) {
+      void handleStartSetup();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, mandatory, enabled, setupData]);
 
   const handleStartSetup = async () => {
     setSaving(true);
@@ -73,29 +83,11 @@ export default function SegurancaPage() {
       setEnabled(true);
       setSetupData(null);
       setConfirmCode('');
+      await refreshTwoFactorStatus();
       showToast('2FA ativado com sucesso!', 'success');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDisable = async () => {
-    if (!disablePassword || disableCode.length !== 6) {
-      showToast('Informe sua senha e o código 2FA', 'error');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const { error } = await supabase.auth.twoFactor.disable(disablePassword, disableCode);
-      if (error) {
-        showToast(error.message || 'Erro ao desativar 2FA', 'error');
-        return;
+      if (mandatory) {
+        navigate('/dashboard', { replace: true });
       }
-      setEnabled(false);
-      setDisablePassword('');
-      setDisableCode('');
-      showToast('2FA desativado', 'success');
     } finally {
       setSaving(false);
     }
@@ -119,9 +111,28 @@ export default function SegurancaPage() {
     <div className="space-y-6">
       <PageHeader
         title="Segurança"
-        description="Proteja sua conta de administrador com autenticação em duas etapas"
+        description={
+          mandatory
+            ? 'Configure o 2FA para concluir seu primeiro acesso como administrador'
+            : 'Proteja sua conta de administrador com autenticação em duas etapas'
+        }
         icon={Shield}
       />
+
+      {mandatory && (
+        <PagePanel className="border-admin-warning/30 bg-admin-warning/5">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-admin-warning shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-white font-semibold">Configuração obrigatória</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Todo administrador precisa ativar o 2FA antes de acessar o painel. Escaneie o QR Code
+                abaixo e confirme com um código do Google Authenticator.
+              </p>
+            </div>
+          </div>
+        </PagePanel>
+      )}
 
       <PagePanel>
         <div className="flex items-start gap-4">
@@ -137,7 +148,9 @@ export default function SegurancaPage() {
             <p className="text-sm text-gray-400 mt-1">
               {enabled
                 ? 'Sua conta exige um código do app autenticador a cada login no painel admin.'
-                : 'Adicione uma camada extra de segurança. Após ativar, será necessário um código do Google Authenticator para entrar.'}
+                : mandatory
+                  ? 'Ative o Google Authenticator para liberar o acesso completo ao painel.'
+                  : 'Adicione uma camada extra de segurança. Após ativar, será necessário um código do Google Authenticator para entrar.'}
             </p>
 
             <div className="mt-4">
@@ -154,12 +167,19 @@ export default function SegurancaPage() {
           </div>
         </div>
 
-        {!enabled && !setupData && (
+        {!enabled && !setupData && !mandatory && (
           <div className="mt-6 pt-6 border-t border-admin-border">
             <Button onClick={handleStartSetup} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
               Configurar 2FA
             </Button>
+          </div>
+        )}
+
+        {!enabled && !setupData && mandatory && saving && (
+          <div className="mt-6 pt-6 border-t border-admin-border flex items-center gap-2 text-gray-400 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Preparando configuração do 2FA...
           </div>
         )}
 
@@ -219,6 +239,7 @@ export default function SegurancaPage() {
                       setSetupData(null);
                       setConfirmCode('');
                     }}
+                    disabled={mandatory}
                   >
                     Cancelar
                   </Button>
@@ -229,30 +250,10 @@ export default function SegurancaPage() {
         )}
 
         {enabled && (
-          <div className="mt-6 pt-6 border-t border-admin-border space-y-4 max-w-md">
+          <div className="mt-6 pt-6 border-t border-admin-border">
             <p className="text-sm text-gray-400">
-              Para desativar, confirme sua senha e um código atual do Google Authenticator.
+              O 2FA está ativo e é obrigatório para administradores. A desativação não está disponível.
             </p>
-            <input
-              type="password"
-              value={disablePassword}
-              onChange={(e) => setDisablePassword(e.target.value)}
-              placeholder="Sua senha"
-              className="w-full px-4 py-2.5 text-white rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
-            />
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={disableCode}
-              onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="Código 2FA"
-              className="w-full px-4 py-2.5 text-white text-center tracking-[0.4em] rounded-lg border border-admin-border bg-admin-panel focus:outline-none focus:ring-2 focus:ring-admin-accent/30 font-mono"
-            />
-            <Button variant="danger" onClick={handleDisable} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldOff className="w-4 h-4" />}
-              Desativar 2FA
-            </Button>
           </div>
         )}
       </PagePanel>

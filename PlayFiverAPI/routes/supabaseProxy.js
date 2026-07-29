@@ -210,7 +210,12 @@ export function createSupabaseProxyRouter({
     };
   }
 
-  async function requireAdminUser(req, res) {
+  function adminRequires2FASetup(record) {
+    return record?.cargo === 'admin' && (!record.two_factor_enabled || !record.totp_secret);
+  }
+
+  /** Admin autenticado — permite endpoints de configuração do 2FA antes da ativação. */
+  async function requireAdminUserForSetup(req, res) {
     const auth = await getAuthUser(req);
     if (!auth) {
       res.status(401).json({ data: null, error: { message: 'Não autenticado' } });
@@ -223,8 +228,27 @@ export function createSupabaseProxyRouter({
       return null;
     }
 
-    // Com 2FA ativo, só sessão elevada (login no painel + TOTP) acessa APIs admin.
-    if (record.two_factor_enabled && record.totp_secret && !isAdminSessionElevated(auth.token, req, auth.user.id)) {
+    return { auth, record };
+  }
+
+  async function requireAdminUser(req, res) {
+    const setup = await requireAdminUserForSetup(req, res);
+    if (!setup) return null;
+
+    const { auth, record } = setup;
+
+    if (adminRequires2FASetup(record)) {
+      res.status(403).json({
+        data: null,
+        error: {
+          message: 'Configure o 2FA antes de continuar.',
+          code: 'REQUIRES_2FA_SETUP',
+        },
+      });
+      return null;
+    }
+
+    if (!isAdminSessionElevated(auth.token, req, auth.user.id)) {
       res.status(403).json({
         data: null,
         error: { message: '2FA necessário. Entre pelo painel administrativo.' },
@@ -285,9 +309,17 @@ export function createSupabaseProxyRouter({
             });
           }
 
-          // Admin sem 2FA no painel: eleva a sessão para APIs admin.
+          // Admin sem 2FA: login permitido, mas exige configuração antes de acessar o painel.
           if (data.session?.access_token) {
-            markAdminSessionElevated(data.session.access_token, undefined, res, data.user.id);
+            setAuthCookies(res, req, data.session);
+            return res.json({
+              data: {
+                user: data.user,
+                session: sanitizeSessionForClient(data.session),
+                requires2FASetup: true,
+              },
+              error: null,
+            });
           }
         }
         // Front (ou qualquer cliente sem header admin-panel):
@@ -372,12 +404,15 @@ export function createSupabaseProxyRouter({
   /** GET /api/supabase/auth/2fa/status */
   router.get('/auth/2fa/status', async (req, res) => {
     try {
-      const auth = await requireAdminUser(req, res);
-      if (!auth) return;
+      const setup = await requireAdminUserForSetup(req, res);
+      if (!setup) return;
 
-      const record = await getAdmin2FARecord(auth.user.id);
+      const { record } = setup;
       res.json({
-        data: { enabled: !!record?.two_factor_enabled },
+        data: {
+          enabled: !!record?.two_factor_enabled,
+          requiresSetup: adminRequires2FASetup(record),
+        },
         error: null,
       });
     } catch (err) {
@@ -389,10 +424,10 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/2fa/setup */
   router.post('/auth/2fa/setup', async (req, res) => {
     try {
-      const auth = await requireAdminUser(req, res);
-      if (!auth) return;
+      const setup = await requireAdminUserForSetup(req, res);
+      if (!setup) return;
 
-      const record = await getAdmin2FARecord(auth.user.id);
+      const { auth, record } = setup;
       if (record?.two_factor_enabled) {
         return res.status(400).json({
           data: null,
@@ -430,8 +465,10 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/2fa/confirm */
   router.post('/auth/2fa/confirm', async (req, res) => {
     try {
-      const auth = await requireAdminUser(req, res);
-      if (!auth) return;
+      const setup = await requireAdminUserForSetup(req, res);
+      if (!setup) return;
+
+      const { auth, record } = setup;
 
       const { code } = req.body ?? {};
       if (!code) {
@@ -440,8 +477,6 @@ export function createSupabaseProxyRouter({
           error: { message: 'Código de verificação obrigatório' },
         });
       }
-
-      const record = await getAdmin2FARecord(auth.user.id);
       if (!record?.totp_pending_secret) {
         return res.status(400).json({
           data: null,
@@ -473,7 +508,11 @@ export function createSupabaseProxyRouter({
         });
       }
 
-      res.json({ data: { enabled: true }, error: null });
+      if (auth.token) {
+        markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
+      }
+
+      res.json({ data: { enabled: true, requiresSetup: false }, error: null });
     } catch (err) {
       console.error('[supabase-proxy] 2fa confirm:', err);
       res.status(500).json({ data: null, error: { message: 'Erro ao confirmar 2FA' } });
@@ -483,62 +522,13 @@ export function createSupabaseProxyRouter({
   /** POST /api/supabase/auth/2fa/disable */
   router.post('/auth/2fa/disable', async (req, res) => {
     try {
-      const auth = await requireAdminUser(req, res);
-      if (!auth) return;
+      const setup = await requireAdminUserForSetup(req, res);
+      if (!setup) return;
 
-      const { password, code } = req.body ?? {};
-      if (!password || !code) {
-        return res.status(400).json({
-          data: null,
-          error: { message: 'Senha e código 2FA são obrigatórios' },
-        });
-      }
-
-      const record = await getAdmin2FARecord(auth.user.id);
-      if (!record?.two_factor_enabled || !record?.totp_secret) {
-        return res.status(400).json({
-          data: null,
-          error: { message: '2FA não está ativo' },
-        });
-      }
-
-      const { error: signInError } = await authClient.auth.signInWithPassword({
-        email: auth.user.email,
-        password,
+      return res.status(403).json({
+        data: null,
+        error: { message: '2FA é obrigatório para administradores e não pode ser desativado.' },
       });
-
-      if (signInError) {
-        return res.status(401).json({
-          data: null,
-          error: { message: 'Senha incorreta' },
-        });
-      }
-
-      if (!(await verifyTotpCode(record.totp_secret, code))) {
-        return res.status(401).json({
-          data: null,
-          error: { message: 'Código 2FA inválido' },
-        });
-      }
-
-      const serviceClient = createServiceClient();
-      const { error: updateError } = await serviceClient
-        .from('usuarios')
-        .update({
-          totp_secret: null,
-          totp_pending_secret: null,
-          two_factor_enabled: false,
-        })
-        .eq('id', auth.user.id);
-
-      if (updateError) {
-        return res.status(500).json({
-          data: null,
-          error: { message: 'Erro ao desativar 2FA' },
-        });
-      }
-
-      res.json({ data: { enabled: false }, error: null });
     } catch (err) {
       console.error('[supabase-proxy] 2fa disable:', err);
       res.status(500).json({ data: null, error: { message: 'Erro ao desativar 2FA' } });
@@ -863,18 +853,25 @@ export function createSupabaseProxyRouter({
 
     const record = await getAdmin2FARecord(auth.user.id, auth.token);
     const isAdmin = record?.cargo === 'admin';
+    const needsSetup = adminRequires2FASetup(record);
     const needsElevation = !!(isAdmin && record.two_factor_enabled && record.totp_secret);
     const fromAdminPanel = isAdminClient(req);
-    let elevated = isAdminSessionElevated(auth.token, req, auth.user.id);
+    const elevated = isAdminSessionElevated(auth.token, req, auth.user.id);
 
-    // Admin sem 2FA no painel: eleva sessão sob demanda (cookie perdido / sessão antiga).
-    if (fromAdminPanel && isAdmin && !needsElevation && !elevated) {
-      markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
-      elevated = true;
+    if (fromAdminPanel && isAdmin && needsSetup) {
+      res.status(403).json({
+        data: null,
+        error: {
+          message: 'Configure o 2FA antes de continuar.',
+          code: 'REQUIRES_2FA_SETUP',
+        },
+        count: null,
+      });
+      return false;
     }
 
-    // Admin elevado (ou sem 2FA): bypass deny-list de RPCs.
-    if (isAdmin && (!needsElevation || elevated)) {
+    // Admin com 2FA configurado e sessão elevada: bypass deny-list de RPCs.
+    if (isAdmin && needsElevation && elevated) {
       return true;
     }
 

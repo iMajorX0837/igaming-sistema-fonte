@@ -42,15 +42,26 @@ function resolvePostLoginPath(from: unknown): string {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { isAuthenticated, isAdmin, authReady, loading, loadingCargo, cargoVerified, user } = useAuth();
+  const { isAuthenticated, isAdmin, authReady, loading, loadingCargo, cargoVerified, user, requires2FASetup, twoFactorReady } =
+    useAuth();
 
-  if (!authReady || loading || loadingCargo || (user !== null && !cargoVerified)) {
+  if (
+    !authReady ||
+    loading ||
+    loadingCargo ||
+    (user !== null && !cargoVerified) ||
+    (isAdmin && !twoFactorReady)
+  ) {
     return <LoadingSpinner />;
   }
 
   if (!isAuthenticated || !isAdmin) {
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
     return <Navigate to="/login" replace state={{ from: returnTo }} />;
+  }
+
+  if (requires2FASetup && location.pathname !== '/seguranca') {
+    return <Navigate to="/seguranca" replace />;
   }
 
   return <>{children}</>;
@@ -67,7 +78,7 @@ function ProtectedLayout() {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, isAdmin, authReady, loading, loadingCargo, cargoVerified } = useAuth();
+  const { isAuthenticated, isAdmin, authReady, loading, loadingCargo, cargoVerified, requires2FASetup } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectAttempted = useRef(false);
@@ -79,11 +90,20 @@ function LoginRoute() {
     if (isAuthenticated && isAdmin && !redirectAttempted.current) {
       redirectAttempted.current = true;
       requestAnimationFrame(() => {
-        navigate(postLoginPath, { replace: true });
+        navigate(requires2FASetup ? '/seguranca' : postLoginPath, { replace: true });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isAdmin, authReady, loading, loadingCargo, cargoVerified, postLoginPath]);
+  }, [
+    isAuthenticated,
+    isAdmin,
+    authReady,
+    loading,
+    loadingCargo,
+    cargoVerified,
+    requires2FASetup,
+    postLoginPath,
+  ]);
 
   if (!authReady || loading || loadingCargo || (isAuthenticated && !cargoVerified)) {
     return <LoadingSpinner />;

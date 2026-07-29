@@ -205,7 +205,7 @@ export function consume2FAChallenge(challengeToken) {
 }
 
 /**
- * Marca sessão admin como elevada (2FA ok ou admin sem 2FA no painel).
+ * Marca sessão admin como elevada (2FA confirmado no painel).
  * @param {string | null | undefined} accessToken
  * @param {number} [ttlMs]
  * @param {import('express').Response | null} [res]

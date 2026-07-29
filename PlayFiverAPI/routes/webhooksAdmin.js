@@ -68,11 +68,14 @@ export function createWebhooksAdminRouter({ supabase, supabaseUrl, supabaseAnonK
       .eq('id', userData.user.id)
       .maybeSingle();
 
-    if (
-      adminRow?.two_factor_enabled &&
-      adminRow?.totp_secret &&
-      !isAdminSessionElevated(token, req, userData.user.id)
-    ) {
+    if (!adminRow?.two_factor_enabled || !adminRow?.totp_secret) {
+      return res.status(403).json({
+        ok: false,
+        message: 'Configure o 2FA no painel administrativo antes de continuar.',
+      });
+    }
+
+    if (!isAdminSessionElevated(token, req, userData.user.id)) {
       return res.status(403).json({
         ok: false,
         message: '2FA necessário. Entre pelo painel administrativo.',

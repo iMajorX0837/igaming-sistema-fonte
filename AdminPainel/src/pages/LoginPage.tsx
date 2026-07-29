@@ -34,7 +34,7 @@ export default function LoginPage({ redirectTo = '/dashboard' }: { redirectTo?: 
         setTotpCode('');
         return;
       }
-      navigate(redirectTo);
+      navigate(result.requires2FASetup ? '/seguranca' : redirectTo);
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
     } finally {

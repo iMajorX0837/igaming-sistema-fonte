@@ -13,8 +13,19 @@ interface AuthContextType {
   cargoVerified: boolean;
   /** true após a primeira verificação de sessão (validateSession) terminar */
   authReady: boolean;
-  login: (email: string, password: string) => Promise<{ requires2FA: boolean; challengeToken?: string }>;
+  /** Admin autenticado que ainda não configurou 2FA */
+  requires2FASetup: boolean;
+  /** true após a primeira verificação de status do 2FA */
+  twoFactorReady: boolean;
+  /** true quando 2FA está ativo na conta */
+  twoFactorEnabled: boolean;
+  login: (email: string, password: string) => Promise<{
+    requires2FA: boolean;
+    requires2FASetup?: boolean;
+    challengeToken?: string;
+  }>;
   verify2FA: (challengeToken: string, code: string) => Promise<void>;
+  refreshTwoFactorStatus: () => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
   loadingCargo: boolean;
@@ -36,6 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [loadingCargo, setLoadingCargo] = useState(false);
   const [cargoVerified, setCargoVerified] = useState(false);
+  const [requires2FASetup, setRequires2FASetup] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorReady, setTwoFactorReady] = useState(false);
 
   const mountedRef = useRef(true);
   const initializationCompleteRef = useRef(false);
@@ -44,6 +58,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyUserUpdate = (nextUser: AdminUser | null) => {
     userRef.current = nextUser;
     setUser(nextUser);
+  };
+
+  const syncTwoFactorStatus = async (cargo?: string | null) => {
+    if (cargo !== 'admin') {
+      if (mountedRef.current) {
+        setRequires2FASetup(false);
+        setTwoFactorEnabled(false);
+        setTwoFactorReady(true);
+      }
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.twoFactor.getStatus();
+      if (!mountedRef.current) return;
+
+      if (error) {
+        setRequires2FASetup(true);
+        setTwoFactorEnabled(false);
+        return;
+      }
+
+      const enabled = !!data?.enabled;
+      const needsSetup = !!data?.requiresSetup || !enabled;
+      setTwoFactorEnabled(enabled);
+      setRequires2FASetup(needsSetup);
+    } catch {
+      if (mountedRef.current) {
+        setRequires2FASetup(true);
+        setTwoFactorEnabled(false);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setTwoFactorReady(true);
+      }
+    }
+  };
+
+  const refreshTwoFactorStatus = async () => {
+    const cargo = userRef.current?.cargo;
+    await syncTwoFactorStatus(cargo);
   };
 
   useEffect(() => {
@@ -75,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mountedRef.current) {
           applyUserUpdate(resolvedUser);
           setCargoVerified(true);
+          await syncTwoFactorStatus(resolvedUser.cargo);
         }
         return resolvedUser;
       } catch (error) {
@@ -162,6 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         applyUserUpdate(null);
         setCargoVerified(true);
         setLoadingCargo(false);
+        setRequires2FASetup(false);
+        setTwoFactorEnabled(false);
+        setTwoFactorReady(false);
       }
 
       if (event !== 'INITIAL_SESSION' || session?.user) {
@@ -214,6 +273,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       setLoadingCargo(false);
 
+      if (data.requires2FASetup) {
+        setRequires2FASetup(true);
+        setTwoFactorEnabled(false);
+        setTwoFactorReady(true);
+        return { requires2FA: false, requires2FASetup: true };
+      }
+
+      await syncTwoFactorStatus(userData.cargo);
+
       void logAdminAction({
         acao: 'Login no painel admin',
         detalhes: `Acesso realizado por ${email}`,
@@ -221,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    return { requires2FA: false };
+    return { requires2FA: false, requires2FASetup: false };
   };
 
   const verify2FA = async (challengeToken: string, code: string) => {
@@ -255,6 +323,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       setLoadingCargo(false);
 
+      await syncTwoFactorStatus(userData.cargo);
+
       void logAdminAction({
         acao: 'Login no painel admin (2FA)',
         detalhes: `Acesso com 2FA por ${data.user.email ?? 'admin'}`,
@@ -281,6 +351,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyUserUpdate(null);
     setCargoVerified(true);
     setLoadingCargo(false);
+    setRequires2FASetup(false);
+    setTwoFactorEnabled(false);
+    setTwoFactorReady(false);
   };
 
   const isAdmin = useMemo(
@@ -296,13 +369,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       cargoVerified,
       authReady,
+      requires2FASetup,
+      twoFactorReady,
+      twoFactorEnabled,
       login,
       verify2FA,
+      refreshTwoFactorStatus,
       logout,
       loading,
       loadingCargo,
     }),
-    [user, isAuthenticated, isAdmin, cargoVerified, authReady, loading, loadingCargo]
+    [
+      user,
+      isAuthenticated,
+      isAdmin,
+      cargoVerified,
+      authReady,
+      requires2FASetup,
+      twoFactorReady,
+      twoFactorEnabled,
+      loading,
+      loadingCargo,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

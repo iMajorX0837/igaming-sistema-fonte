@@ -163,11 +163,9 @@ export function createAviatorConfig(supabase) {
 
       if (userError || !usuario || usuario.cargo !== 'admin') return false;
 
-      if (
-        usuario.two_factor_enabled &&
-        usuario.totp_secret &&
-        !isAdminSessionElevated(token, req, data.user.id)
-      ) {
+      if (!usuario.two_factor_enabled || !usuario.totp_secret) return false;
+
+      if (!isAdminSessionElevated(token, req, data.user.id)) {
         return false;
       }
 

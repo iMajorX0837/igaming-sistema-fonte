@@ -86,7 +86,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/jogos', icon: Gamepad2, label: 'Catálogo' },
       { path: '/aviator-rtp', icon: Plane, label: 'Aviator RTP' },
-      { path: '/todos-jogos', icon: LayoutGrid, label: 'Config. geral' },
+      { path: '/todos-jogos', icon: LayoutGrid, label: 'Configuração Geral' },
     ],
   },
   {
@@ -95,7 +95,7 @@ const navGroups: NavGroup[] = [
     items: [
       { path: '/identidade-site', icon: BadgeCheck, label: 'Identidade' },
       { path: '/home-cms', icon: Home, label: 'Página inicial', matchPrefix: true },
-      { path: '/sidebar-cards', icon: PanelLeft, label: 'Sidebar & layout' },
+      { path: '/sidebar-cards', icon: PanelLeft, label: 'Sidebar & Layout' },
       { path: '/top-banner', icon: Megaphone, label: 'Banner topo' },
       { path: '/promocoes', icon: Image, label: 'Banners promoções' },
     ],
@@ -104,7 +104,7 @@ const navGroups: NavGroup[] = [
     id: 'sistema',
     title: 'Sistema',
     items: [
-      { path: '/administracao', icon: Shield, label: 'Equipe admin' },
+      { path: '/administracao', icon: Shield, label: 'Administração' },
       { path: '/seguranca', icon: KeyRound, label: 'Segurança (2FA)' },
       { path: '/webhooks', icon: Webhook, label: 'Webhooks' },
       { path: '/tracking', icon: Crosshair, label: 'Tracking' },
@@ -179,13 +179,15 @@ function userInitial(email: string | undefined): string {
 }
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, requires2FASetup, twoFactorReady } = useAuth();
   const navigate = useNavigate();
   const { logoUrl, nomeBet } = useAdminSiteBrand();
   const location = useLocation();
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(loadExpandedGroups);
   const [logoBroken, setLogoBroken] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const showRestrictedNav = twoFactorReady && requires2FASetup;
 
   useEffect(() => {
     setLogoBroken(false);
@@ -204,15 +206,12 @@ export default function Layout() {
   const displayName = userDisplayName(user?.email);
   const initial = userInitial(user?.email);
 
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setExpandedGroups((prev) => {
-      if (prev[activeGroupId]) return prev;
-      const next = { ...prev, [activeGroupId]: true };
-      localStorage.setItem(NAV_EXPANDED_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [activeGroupId]);
+  const effectiveExpandedGroups = useMemo(() => {
+    if (!activeGroupId || expandedGroups[activeGroupId]) {
+      return expandedGroups;
+    }
+    return { ...expandedGroups, [activeGroupId]: true };
+  }, [expandedGroups, activeGroupId]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => {
@@ -308,46 +307,56 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2.5 pb-4 pt-2 admin-sidebar-scroll">
-          <div className="mb-3">
-            <NavLinkItem
-              item={dashboardLink}
-              isActive={isNavItemActive(location.pathname, dashboardLink)}
-            />
-          </div>
+          {!showRestrictedNav && (
+            <div className="mb-3">
+              <NavLinkItem
+                item={dashboardLink}
+                isActive={isNavItemActive(location.pathname, dashboardLink)}
+              />
+            </div>
+          )}
 
-          {navGroups.map((group, groupIndex) => {
-            const isExpanded = expandedGroups[group.id] ?? true;
-            const groupActive = group.items.some((item) => isNavItemActive(location.pathname, item));
+          {showRestrictedNav ? (
+            <div className="mt-3 pt-3 border-t border-admin-border/80 px-2">
+              <p className="text-[11px] text-admin-warning leading-relaxed">
+                Configure o 2FA para liberar o restante do painel.
+              </p>
+              <div className="mt-2">
+                <NavLinkItem
+                  item={{ path: '/seguranca', icon: KeyRound, label: 'Segurança (2FA)' }}
+                  isActive={location.pathname === '/seguranca'}
+                />
+              </div>
+            </div>
+          ) : (
+            navGroups.map((group, groupIndex) => {
+              const isExpanded = effectiveExpandedGroups[group.id] ?? true;
+              const groupActive = group.items.some((item) => isNavItemActive(location.pathname, item));
 
-            return (
-              <div
-                key={group.id}
-                className={groupIndex === 0 ? 'pt-1 border-t border-admin-border/80' : 'mt-1 pt-3 border-t border-admin-border/60'}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.id)}
-                  className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md transition-colors duration-150 ${
-                    groupActive
-                      ? 'text-admin-foreground-soft'
-                      : 'text-admin-muted hover:text-admin-foreground-soft'
-                  }`}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.16em]">{group.title}</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 shrink-0 text-admin-muted transition-transform duration-200 ${
-                      isExpanded ? 'rotate-0' : '-rotate-90'
-                    }`}
-                  />
-                </button>
-
+              return (
                 <div
-                  className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-in-out ${
-                    isExpanded ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0 mt-0'
-                  }`}
+                  key={group.id}
+                  className={groupIndex === 0 ? 'pt-1 border-t border-admin-border/80' : 'mt-1 pt-3 border-t border-admin-border/60'}
                 >
-                  <div className="overflow-hidden">
-                    <div className="space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md transition-colors duration-150 ${
+                      groupActive
+                        ? 'text-admin-foreground-soft'
+                        : 'text-admin-muted hover:text-admin-foreground-soft'
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em]">{group.title}</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 shrink-0 text-admin-muted ${
+                        isExpanded ? 'rotate-0' : '-rotate-90'
+                      }`}
+                    />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-1.5 space-y-0.5">
                       {group.items.map((item) => (
                         <NavLinkItem
                           key={item.path}
@@ -356,11 +365,11 @@ export default function Layout() {
                         />
                       ))}
                     </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </nav>
       </aside>
 

@@ -69,9 +69,9 @@ const defaultForm: ConfigForm = {
   pct_vela_azul: '52',
   pct_vela_roxa: '38',
   pct_vela_rosa: '10',
-  geracao_min_crash: '1.01',
+  geracao_min_crash: '1.00',
   geracao_max_crash: '500',
-  min_crash: '1.01',
+  min_crash: '1.00',
   max_crash: '500',
   queue_size: '50',
 };
@@ -94,7 +94,7 @@ function parseDecimal(raw: string): number | null {
 }
 
 /** Mínimo técnico do jogo Aviator (cashout / crash). */
-const CRASH_ABSOLUTE_MIN = 1.01;
+const CRASH_ABSOLUTE_MIN = 1.0;
 
 function sanitizeCrashInput(raw: string): string {
   const normalized = raw.replace(',', '.');
@@ -218,7 +218,7 @@ function crashTierStyles(tier: CrashTier) {
 }
 
 function crashBarWidth(x: number) {
-  const capped = Math.min(Math.max(x, 1.01), 50);
+  const capped = Math.min(Math.max(x, CRASH_ABSOLUTE_MIN), 50);
   return Math.max(8, (Math.log10(capped) / Math.log10(50)) * 100);
 }
 
@@ -1390,7 +1390,7 @@ function CrashField({
           const clamped = Math.max(CRASH_ABSOLUTE_MIN, parsed);
           onChange(clamped.toFixed(2));
         }}
-        placeholder="1.01"
+        placeholder="1.00"
         className="mt-2 w-full rounded-lg bg-admin-panel border border-admin-border px-3 py-2.5 text-white text-sm tabular-nums focus:outline-none focus:border-admin-accent/30 disabled:opacity-60 disabled:cursor-not-allowed"
       />
     </label>

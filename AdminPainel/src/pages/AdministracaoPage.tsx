@@ -425,6 +425,7 @@ export default function AdministracaoPage() {
       >
         <p className="text-gray-400 text-sm mb-4">
           O usuário precisa já ter uma conta cadastrada no sistema. Informe o e-mail para promovê-lo à equipe.
+          No primeiro login, será obrigatório configurar o 2FA antes de acessar o painel.
         </p>
 
         <div className="space-y-4">
