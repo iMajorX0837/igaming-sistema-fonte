@@ -13,6 +13,9 @@ export const BLOCKED_USER_RPCS = new Set([
 /** RPCs permitidas sem JWT (allowlist anon). */
 export const PUBLIC_ANON_RPCS = new Set(['obter_config_plataforma', 'obter_roleta_config']);
 
+/** RPCs permitidas enquanto admin configura 2FA obrigatório (cargo/sessão). */
+export const ADMIN_2FA_SETUP_ALLOWED_RPCS = new Set(['get_user_cargo']);
+
 /**
  * SELECT público sem JWT — espelha GRANT SELECT TO anon + RLS USING (true|ativo).
  * Catálogo/CMS da home; não inclui usuarios, financeiro nem secrets.

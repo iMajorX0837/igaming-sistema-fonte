@@ -34,9 +34,14 @@ export default function LoginPage({ redirectTo = '/dashboard' }: { redirectTo?: 
         setTotpCode('');
         return;
       }
-      navigate(result.requires2FASetup ? '/seguranca' : redirectTo);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login');
+      navigate(result.requires2FASetup ? '/seguranca' : redirectTo, { replace: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao fazer login';
+      if (message.includes('Configure o 2FA')) {
+        navigate('/seguranca', { replace: true });
+        return;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -49,9 +54,9 @@ export default function LoginPage({ redirectTo = '/dashboard' }: { redirectTo?: 
 
     try {
       await verify2FA(challengeToken, totpCode.trim());
-      navigate(redirectTo);
-    } catch (err: any) {
-      setError(err.message || 'Código inválido');
+      navigate(redirectTo, { replace: true });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Código inválido');
     } finally {
       setLoading(false);
     }

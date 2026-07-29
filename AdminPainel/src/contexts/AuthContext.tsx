@@ -254,6 +254,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.user) {
+      if (data.requires2FASetup) {
+        applyUserUpdate({
+          id: data.user.id,
+          email: data.user.email || '',
+          name: data.user.email?.split('@')[0] || '',
+          cargo: 'admin',
+        });
+        setCargoVerified(true);
+        setRequires2FASetup(true);
+        setTwoFactorEnabled(false);
+        setTwoFactorReady(true);
+        initializationCompleteRef.current = true;
+        setAuthReady(true);
+        setLoading(false);
+        setLoadingCargo(false);
+        return { requires2FA: false, requires2FASetup: true };
+      }
+
       setLoadingCargo(true);
       setCargoVerified(false);
 
@@ -272,13 +290,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthReady(true);
       setLoading(false);
       setLoadingCargo(false);
-
-      if (data.requires2FASetup) {
-        setRequires2FASetup(true);
-        setTwoFactorEnabled(false);
-        setTwoFactorReady(true);
-        return { requires2FA: false, requires2FASetup: true };
-      }
 
       await syncTwoFactorStatus(userData.cargo);
 

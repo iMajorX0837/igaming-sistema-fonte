@@ -7,6 +7,7 @@ import {
   getQueryTableAndOperation,
   isAdminOnlyRpcName,
   isBlockedUserTableWrite,
+  ADMIN_2FA_SETUP_ALLOWED_RPCS,
   PUBLIC_ANON_RPCS,
   PUBLIC_ANON_SELECT_TABLES,
   sanitizeAdminUpdateUserAttributes,
@@ -859,6 +860,13 @@ export function createSupabaseProxyRouter({
     const elevated = isAdminSessionElevated(auth.token, req, auth.user.id);
 
     if (fromAdminPanel && isAdmin && needsSetup) {
+      if (effectiveRpc && ADMIN_2FA_SETUP_ALLOWED_RPCS.has(effectiveRpc)) {
+        return true;
+      }
+      if (table && operation === 'select' && PUBLIC_ANON_SELECT_TABLES.has(table.toLowerCase())) {
+        return true;
+      }
+
       res.status(403).json({
         data: null,
         error: {
