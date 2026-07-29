@@ -31,6 +31,34 @@
     return (mul / GOLD_MULTIPLE).toFixed(2);
   }
 
+  const FICTITIOUS_PLAYER_NAMES = [
+    "Player***",
+    "Lucky***",
+    "Win***",
+    "Ace***",
+    "Pro***",
+    "Star***",
+    "King***",
+    "Max***",
+    "Top***",
+    "Bet***",
+  ];
+
+  function pickFictitiousPlayer(roundId, slot) {
+    const rid = Number(roundId) || 0;
+    const names = FICTITIOUS_PLAYER_NAMES;
+    const nameIdx = Math.abs(rid * 3 + slot) % names.length;
+    const icon = (Math.abs(rid + slot * 7) % 72) + 1;
+    return {
+      username: names[nameIdx],
+      profileImage: "av-" + icon + ".png",
+    };
+  }
+
+  function normalizeProfileImage(icon) {
+    return "av-" + String(icon || "1").replace(/^av-/, "").replace(/\.png$/i, "") + ".png";
+  }
+
   function getIdentity() {
     if (identity) return identity;
     const cfg = window.enterGameConfig || {};
@@ -248,20 +276,25 @@
     ];
     const bets = round.bets || [];
     const playerSeeds = [];
-    for (let i = 0; i < Math.min(3, bets.length); i++) {
+    for (let i = 0; i < 3; i++) {
       const bet = bets[i];
-      playerSeeds.push({
-        username: bet.name || "Player",
-        profileImage:
-          "av-" + String(bet.iocn || "1").replace(/^av-/, "").replace(/\.png$/i, "") + ".png",
-        seed: clientSeeds[i],
-      });
+      const seed = clientSeeds[i];
+      if (bet && (bet.name || bet.userid)) {
+        playerSeeds.push({
+          username: bet.name || "Player",
+          profileImage: normalizeProfileImage(bet.iocn || bet.icon),
+          seed: seed,
+        });
+      } else {
+        const fake = pickFictitiousPlayer(round.roundId, i);
+        playerSeeds.push({
+          username: fake.username,
+          profileImage: fake.profileImage,
+          seed: seed,
+        });
+      }
     }
-    const combinedInput = [serverSeed]
-      .concat(playerSeeds.map(function (p) {
-        return p.seed;
-      }))
-      .join(":");
+    const combinedInput = [serverSeed].concat(clientSeeds).join(":");
     const seedSHA256 = await shaHex("SHA-512", combinedInput);
     const partSeedHexNumber = seedSHA256.substring(0, 13);
     const partSeedDecimalNumber = String(parseInt(partSeedHexNumber, 16) || 0);
@@ -295,8 +328,7 @@
           payout: (b.coRate || 0) / GOLD_MULTIPLE,
           isFreeBet: false,
           currency: "BRL",
-          profileImage:
-            "av-" + String(b.iocn || "1").replace(/^av-/, "").replace(/\.png$/i, "") + ".png",
+          profileImage: normalizeProfileImage(b.iocn || b.icon),
           win: (b.coUsd || 0) > 0,
           username: b.name || "Player",
         };
