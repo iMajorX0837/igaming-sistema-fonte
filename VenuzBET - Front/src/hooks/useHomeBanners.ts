@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import {
   getInitialHomeBannersCache,
   persistHomeBannersCache,
   type HomeBanner,
 } from '../lib/cmsBannersCache';
+import { fetchAllCmsItemsCached } from '../lib/cmsItemsLoader';
 
 export type { HomeBanner };
 
@@ -22,19 +22,18 @@ export function useHomeBanners() {
 
   const fetchBanners = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('cms_items')
-        .select('id, titulo, imagem_url, href, link_tipo, ordem, ativo')
-        .eq('secao', 'home_banner')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao buscar banners:', error);
-        return;
-      }
-
-      const next = (data ?? []) as HomeBanner[];
+      const data = await fetchAllCmsItemsCached();
+      const next = data
+        .filter((row) => row.secao === 'home_banner')
+        .map((row) => ({
+          id: String(row.id),
+          titulo: row.titulo ? String(row.titulo) : null,
+          imagem_url: String(row.imagem_url ?? ''),
+          href: row.href ? String(row.href) : null,
+          link_tipo: (row.link_tipo === 'external' ? 'external' : 'href') as HomeBanner['link_tipo'],
+          ordem: Number(row.ordem) || 0,
+          ativo: Boolean(row.ativo),
+        })) as HomeBanner[];
       setBanners((prev) => (bannersEqual(prev, next) ? prev : next));
       persistHomeBannersCache(next);
     } catch (err) {

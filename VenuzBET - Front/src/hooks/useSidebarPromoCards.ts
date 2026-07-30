@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import { normalizeInternalHref } from '../lib/cmsLink';
 import type { SidebarLanguage } from '../i18n/sidebar';
+import { fetchAllCmsItemsCached } from '../lib/cmsItemsLoader';
 
 export type SidebarCardIconType = 'emoji' | 'image' | 'iconify' | 'none';
 export type SidebarCardLayout = 'single' | 'double';
@@ -181,25 +181,16 @@ export function useSidebarPromoCards() {
   const fetchCards = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('cms_items')
-        .select('*')
-        .eq('secao', 'sidebar_card')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
+      const data = await fetchAllCmsItemsCached();
+      const sidebarCards = data.filter((row) => row.secao === 'sidebar_card');
 
-      if (error) {
-        console.error('Erro ao buscar cards da sidebar:', error);
-        return;
-      }
-
-      if (!data || data.length === 0) {
+      if (sidebarCards.length === 0) {
         setCards(DEFAULT_SIDEBAR_PROMO_CARDS);
         persistPromoCards(DEFAULT_SIDEBAR_PROMO_CARDS);
         return;
       }
 
-      const normalized = data.map((row) => normalizeCard(row as Record<string, unknown>));
+      const normalized = sidebarCards.map((row) => normalizeCard(row as Record<string, unknown>));
       setCards(normalized);
       persistPromoCards(normalized);
     } catch (err) {

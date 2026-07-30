@@ -2,44 +2,26 @@ import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 import { GameInfo } from '../App';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { useTranslation } from '../hooks/useTranslation';
-import { fetchProvidersCached, fetchGamesForProviderCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
+import {
+  fetchProvidersCached,
+  fetchGamesForProviderCached,
+  isPlayFiverEnabledProvider,
+} from '../api/playfiversCache';
 import IconifyIcon from './IconifyIcon';
 import LoadingScreen from './LoadingScreen';
 import { GAME_IMAGE_FALLBACK_SM } from '../lib/gameImageFallback';
 
+export interface WinnerPoolGame {
+  name: string;
+  provider: string;
+  image: string;
+  game_code: string;
+}
+
 interface WinnerSliderProps {
   onGameSelect: (game: GameInfo) => void;
-}
-
-interface ApiGame {
-  name: string;
-  image_url: string;
-  status: boolean;
-  game_code: string;
-  provider: {
-    name: string;
-  };
-}
-
-interface ApiResponse {
-  status: number;
-  data: ApiGame[];
-  msg: string;
-}
-
-interface ApiProvider {
-  id: number;
-  name: string;
-  wallet: {
-    name: string;
-  };
-  status: number;
-}
-
-interface ApiProvidersResponse {
-  status: number;
-  data: ApiProvider[];
-  msg: string;
+  /** Jogos já carregados das seções da home — evita buscar todos os provedores na API. */
+  poolGames?: WinnerPoolGame[];
 }
 
 interface Winner {
@@ -51,6 +33,9 @@ interface Winner {
   game_code: string;
   provider: string;
 }
+
+const FALLBACK_PROVIDER_LIMIT = 3;
+const WINNER_COUNT = 8;
 
 function WinnerSectionTitle() {
   const { t } = useTranslation();
@@ -75,15 +60,12 @@ function WinnerBarShell({ children, backgroundColor }: { children: ReactNode; ba
   );
 }
 
-// Função para gerar nomes aleatórios
 const generateRandomName = (): string => {
   const prefixes = ['aev', 'Edu', 'Lar', 'Nat', 'Otá', 'Pat', 'iam', 'Man', 'Joã', 'Mar', 'Ped', 'Ana', 'Luc', 'Car', 'Ric'];
   const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const stars = '***';
-  return `${prefix}${stars}`;
+  return `${prefix}***`;
 };
 
-// Função para gerar valores aleatórios
 const generateRandomAmount = (): string => {
   const min = 500;
   const max = 15000;
@@ -97,10 +79,62 @@ const generateRandomAmount = (): string => {
   return `+${formatted}`;
 };
 
-// Função para gerar tempos aleatórios
 const generateRandomMinutes = (): number => Math.floor(Math.random() * 30) + 1;
 
-export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
+function pickRandomGames(games: WinnerPoolGame[], count: number): WinnerPoolGame[] {
+  if (games.length === 0) return [];
+  const shuffled = [...games].sort(() => 0.5 - Math.random());
+  if (shuffled.length >= count) return shuffled.slice(0, count);
+  const picked: WinnerPoolGame[] = [];
+  while (picked.length < count) {
+    picked.push(shuffled[picked.length % shuffled.length]);
+  }
+  return picked;
+}
+
+async function fetchFallbackPoolGames(): Promise<WinnerPoolGame[]> {
+  const providersData = await fetchProvidersCached();
+  if (providersData.status !== 1 || !providersData.data) return [];
+
+  const providers = providersData.data
+    .filter(isPlayFiverEnabledProvider)
+    .slice(0, FALLBACK_PROVIDER_LIMIT);
+
+  const gamesResults = await Promise.all(
+    providers.map(async (prov) => {
+      try {
+        const apiData = await fetchGamesForProviderCached(prov.id);
+        if (apiData.status !== 1 || !apiData.data) return [];
+        return apiData.data
+          .filter((game) => game.status === true)
+          .map((game) => ({
+            name: game.name,
+            provider: game.provider.name,
+            image: game.image_url,
+            game_code: game.game_code,
+          }));
+      } catch {
+        return [];
+      }
+    }),
+  );
+
+  return gamesResults.flat();
+}
+
+function buildWinners(games: WinnerPoolGame[], minutesAgo: (n: number) => string): Winner[] {
+  return pickRandomGames(games, WINNER_COUNT).map((game) => ({
+    name: generateRandomName(),
+    amount: generateRandomAmount(),
+    time: minutesAgo(generateRandomMinutes()),
+    game: game.name,
+    image: game.image,
+    game_code: game.game_code,
+    provider: game.provider,
+  }));
+}
+
+export default function WinnerSlider({ onGameSelect, poolGames = [] }: WinnerSliderProps) {
   const { config: homeConfig } = useHomeConfig();
   const { t } = useTranslation();
   const [winners, setWinners] = useState<Winner[]>([]);
@@ -108,72 +142,27 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
   const sliderRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
 
-  const fetchGames = useCallback(async () => {
+  const loadWinners = useCallback(async () => {
     setIsLoading(true);
-    
+
     try {
-      const providersData: ApiProvidersResponse = await fetchProvidersCached();
-      
-      if (providersData.status !== 1 || !providersData.data) {
-        setWinners([]);
-        setIsLoading(false);
-        return;
+      let sourceGames = poolGames;
+      if (sourceGames.length === 0) {
+        sourceGames = await fetchFallbackPoolGames();
       }
-      
-      const filteredProviders = providersData.data.filter(isPlayFiverEnabledProvider);
-      
-      // Buscar jogos de todos os provedores em paralelo
-      const gamesPromises = filteredProviders.map(async (prov) => {
-        try {
-          const apiData: ApiResponse = await fetchGamesForProviderCached(prov.id);
-          
-          if (apiData.status === 1 && apiData.data) {
-            return apiData.data
-              .filter(game => game.status === true) // Apenas jogos ativos
-              .map(game => ({
-                name: game.name,
-                provider: game.provider.name,
-                image: game.image_url,
-                game_code: game.game_code,
-              }));
-          }
-          return [];
-        } catch (err) {
-          console.error(`Erro ao buscar jogos do provider ${prov.name}:`, err);
-          return [];
-        }
-      });
-      
-      const gamesResults = await Promise.all(gamesPromises);
-      const allGames = gamesResults.flat();
-      
-      // Selecionar aleatoriamente 8 jogos
-      const shuffled = allGames.sort(() => 0.5 - Math.random());
-      const selectedGames = shuffled.slice(0, 8);
-      
-      // Criar ganhadores com dados aleatórios
-      const generatedWinners: Winner[] = selectedGames.map(game => ({
-        name: generateRandomName(),
-        amount: generateRandomAmount(),
-        time: t.home.minutesAgo(generateRandomMinutes()),
-        game: game.name,
-        image: game.image,
-        game_code: game.game_code,
-        provider: game.provider,
-      }));
-      
-      setWinners(generatedWinners);
-    } catch (err: any) {
-      console.error('Erro ao buscar jogos:', err);
+
+      setWinners(buildWinners(sourceGames, t.home.minutesAgo));
+    } catch (err) {
+      console.error('Erro ao montar ganhadores:', err);
       setWinners([]);
     } finally {
       setIsLoading(false);
     }
-  }, [t.home]);
+  }, [poolGames, t.home]);
 
   useEffect(() => {
-    fetchGames();
-  }, [fetchGames]);
+    void loadWinners();
+  }, [loadWinners]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -237,37 +226,37 @@ export default function WinnerSlider({ onGameSelect }: WinnerSliderProps) {
     <div>
       <WinnerSectionTitle />
       <WinnerBarShell backgroundColor={homeConfig.fundo}>
-      <div
-        ref={sliderRef}
-        className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 will-change-transform"
-        style={{ scrollBehavior: 'auto' }}
-      >
-        {[...winners, ...winners].map((winner, index) => (
-          <div
-            key={`${winner.game_code}-${index}`}
-            onClick={() => handleWinnerClick(winner)}
-            className="flex w-[230px] shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-white/15 px-3 py-2 shadow-lg transition-all duration-200 hover:brightness-110 hover:border-brand/45"
-            style={{ backgroundColor: homeConfig.fundo }}
-          >
-            <img
-              src={winner.image}
-              alt={winner.game}
-              className="h-16 w-16 shrink-0 rounded-lg object-cover shadow-md"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = GAME_IMAGE_FALLBACK_SM;
-              }}
-            />
-            <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-              <span className="truncate text-sm font-bold text-white">{winner.name}</span>
-              <span className="truncate text-sm font-bold" style={{ color: '#00FFAE' }}>
-                {winner.amount}
-              </span>
-              <span className="truncate text-xs text-slate-400">{winner.time}</span>
+        <div
+          ref={sliderRef}
+          className="flex gap-3 overflow-x-auto scrollbar-hide pb-1 will-change-transform"
+          style={{ scrollBehavior: 'auto' }}
+        >
+          {[...winners, ...winners].map((winner, index) => (
+            <div
+              key={`${winner.game_code}-${index}`}
+              onClick={() => handleWinnerClick(winner)}
+              className="flex w-[230px] shrink-0 cursor-pointer items-center gap-3 rounded-xl border border-white/15 px-3 py-2 shadow-lg transition-all duration-200 hover:brightness-110 hover:border-brand/45"
+              style={{ backgroundColor: homeConfig.fundo }}
+            >
+              <img
+                src={winner.image}
+                alt={winner.game}
+                className="h-16 w-16 shrink-0 rounded-lg object-cover shadow-md"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = GAME_IMAGE_FALLBACK_SM;
+                }}
+              />
+              <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                <span className="truncate text-sm font-bold text-white">{winner.name}</span>
+                <span className="truncate text-sm font-bold" style={{ color: '#00FFAE' }}>
+                  {winner.amount}
+                </span>
+                <span className="truncate text-xs text-slate-400">{winner.time}</span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </WinnerBarShell>
+          ))}
+        </div>
+      </WinnerBarShell>
     </div>
   );
 }

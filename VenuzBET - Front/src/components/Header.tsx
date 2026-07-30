@@ -12,6 +12,7 @@ import SiteLogo from './SiteLogo';
 import IconifyIcon from './IconifyIcon';
 import { SIDEBAR_WIDTH_COLLAPSED_PX, SIDEBAR_WIDTH_EXPANDED_PX } from './Sidebar';
 import { supabase } from '../lib/supabase';
+import { fetchUserBalanceCached, invalidateUserBalanceCache } from '../lib/userBalanceCache';
 import { appPageContainerClass } from '../constants/homeLayout';
 import { useAuthModalsConfig, useFooterConfig } from '../contexts/SiteConfigContext';
 import { preloadRegisterModalImage } from '../lib/authModalImages';
@@ -130,63 +131,57 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     }
   }, [isAuthenticated, isRegisterOpen]);
 
+  const userId = user?.id;
+
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       setBalanceView('real');
       setToggleCooldownUntil(null);
       return;
     }
 
-    void syncWalletPreference(user.id).then(setBalanceView);
-    setToggleCooldownUntil(getStoredCooldownUntil(user.id));
-  }, [user?.id]);
+    void syncWalletPreference(userId).then(setBalanceView);
+    setToggleCooldownUntil(getStoredCooldownUntil(userId));
+  }, [userId]);
 
-  // Função para buscar saldo do usuário
-  const fetchSaldo = useCallback(async () => {
-    if (isAuthenticated && user) {
-      try {
-        const { data, error } = await supabase
-          .from('usuarios')
-          .select('saldo, saldo_bonus')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Erro ao buscar saldo:', error);
-          return;
-        }
-
-        if (data) {
-          setSaldo(data.saldo || 0);
-          setSaldoBonus(Number(data.saldo_bonus) || 0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar saldo:', error);
-      }
-    } else {
+  const fetchSaldo = useCallback(async (forceRefresh = false) => {
+    if (!isAuthenticated || !userId) {
       setSaldo(0);
       setSaldoBonus(0);
+      return;
     }
-  }, [isAuthenticated, user]);
 
-  // Buscar saldo quando o usuário está autenticado
-  useEffect(() => {
-    fetchSaldo();
-  }, [fetchSaldo]);
+    if (forceRefresh) {
+      invalidateUserBalanceCache(userId);
+    }
 
-  // Listener para mudanças no saldo em tempo real
+    try {
+      const data = await fetchUserBalanceCached(userId);
+      if (!data) return;
+      setSaldo(data.saldo);
+      setSaldoBonus(data.saldo_bonus);
+    } catch (error) {
+      console.error('Erro ao buscar saldo:', error);
+    }
+  }, [isAuthenticated, userId]);
+
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
+    if (authLoading) return;
+    void fetchSaldo();
+  }, [authLoading, fetchSaldo]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId) return;
 
     const channel = supabase
-      .channel('saldo-changes')
+      .channel(`saldo-changes-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'usuarios',
-          filter: `id=eq.${user.id}`,
+          filter: `id=eq.${userId}`,
         },
         (payload) => {
           if (payload.new && 'saldo' in payload.new) {
@@ -195,6 +190,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
           if (payload.new && 'saldo_bonus' in payload.new) {
             setSaldoBonus(Number(payload.new.saldo_bonus) || 0);
           }
+          invalidateUserBalanceCache(userId);
         }
       )
       .subscribe();
@@ -202,7 +198,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, userId]);
 
   // Formatar saldo para exibição
   const formatSaldo = useCallback((valor: number): string => {
@@ -646,8 +642,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen = true, isCoupon
         isOpen={isDepositOpen} 
         onClose={() => {
           setIsDepositOpen(false);
-          // Recarregar saldo após fechar o modal de depósito
-          fetchSaldo();
+          void fetchSaldo(true);
         }} 
       />
     </>

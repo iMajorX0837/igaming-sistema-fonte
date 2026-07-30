@@ -73,9 +73,9 @@ export function invalidatePlataformaConfigCache() {
   cachedConfig = null;
 }
 
-export function usePlataformaConfig() {
+export function usePlataformaConfig(enabled = true) {
   const [config, setConfig] = useState<PlataformaConfig>(DEFAULT_PLATAFORMA_CONFIG);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
 
   const refresh = useCallback(async () => {
     invalidatePlataformaConfigCache();
@@ -86,7 +86,13 @@ export function usePlataformaConfig() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
+    setLoading(true);
     fetchPlataformaConfig().then((c) => {
       if (mounted) {
         setConfig(c);
@@ -96,7 +102,7 @@ export function usePlataformaConfig() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   return { config, loading, refresh };
 }

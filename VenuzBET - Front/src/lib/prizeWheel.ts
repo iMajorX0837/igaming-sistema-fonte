@@ -92,12 +92,18 @@ function isRpcMissing(error: { code?: string } | null): boolean {
   return error?.code === 'PGRST202';
 }
 
-export async function obterRoletaConfig(): Promise<{
+type RoletaConfigResult = {
   ok: boolean;
   config?: PrizeWheelConfig;
   segments?: PrizeWheelSegment[];
   error?: string;
-}> {
+};
+
+let roletaConfigCache: RoletaConfigResult | null = null;
+let roletaConfigInflight: Promise<RoletaConfigResult> | null = null;
+let roletaStatusInflight: Promise<PrizeWheelStatus | null> | null = null;
+
+async function fetchRoletaConfigFromNetwork(): Promise<RoletaConfigResult> {
   const { data, error } = await supabase.rpc('obter_roleta_config');
 
   if (error) {
@@ -125,6 +131,26 @@ export async function obterRoletaConfig(): Promise<{
   };
 }
 
+export async function obterRoletaConfig(): Promise<RoletaConfigResult> {
+  if (roletaConfigCache) return roletaConfigCache;
+  if (roletaConfigInflight) return roletaConfigInflight;
+
+  roletaConfigInflight = fetchRoletaConfigFromNetwork()
+    .then((result) => {
+      roletaConfigCache = result;
+      return result;
+    })
+    .finally(() => {
+      roletaConfigInflight = null;
+    });
+
+  return roletaConfigInflight;
+}
+
+export function invalidateRoletaConfigCache(): void {
+  roletaConfigCache = null;
+}
+
 function parseRpcBoolean(value: unknown): boolean {
   if (value === true || value === 1) return true;
   if (value === false || value === 0 || value === null || value === undefined) return false;
@@ -132,7 +158,7 @@ function parseRpcBoolean(value: unknown): boolean {
   return Boolean(value);
 }
 
-export async function obterStatusRoleta(): Promise<PrizeWheelStatus | null> {
+async function fetchStatusRoletaFromNetwork(): Promise<PrizeWheelStatus | null> {
   const { data, error } = await supabase.rpc('obter_status_roleta');
 
   if (error) {
@@ -151,6 +177,16 @@ export async function obterStatusRoleta(): Promise<PrizeWheelStatus | null> {
     cooldown_horas: Number(result.cooldown_horas) || 24,
     proximo_giro_em: result.proximo_giro_em ?? null,
   };
+}
+
+export async function obterStatusRoleta(): Promise<PrizeWheelStatus | null> {
+  if (roletaStatusInflight) return roletaStatusInflight;
+
+  roletaStatusInflight = fetchStatusRoletaFromNetwork().finally(() => {
+    roletaStatusInflight = null;
+  });
+
+  return roletaStatusInflight;
 }
 
 export async function girarRoleta(): Promise<GirarRoletaResult> {

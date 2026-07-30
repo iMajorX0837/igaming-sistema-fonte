@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import type { SidebarLanguage } from '../i18n/sidebar';
+import { fetchAllCmsItemsCached } from '../lib/cmsItemsLoader';
 
 export type SidebarCategoryTipo = 'menu' | 'language';
 export type SidebarMenuLinkTipo = 'href' | 'game' | 'external' | 'event';
@@ -432,17 +432,7 @@ export function useSidebarMenu() {
   const fetchMenu = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('cms_items')
-        .select('*')
-        .in('secao', ['sidebar_category', 'sidebar_menu_item'])
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao buscar menu da sidebar:', error);
-        return;
-      }
+      const data = await fetchAllCmsItemsCached();
 
       if (!data || data.length === 0) {
         setCategories(DEFAULT_SIDEBAR_CATEGORIES);

@@ -12,6 +12,9 @@ const AVIATOR_GS_MAX_AGE_SEC = 86_400;
 
 const REFRESH_MAX_AGE_SEC = 60 * 60 * 24 * 30;
 
+/** Sessão admin — expira em 30 min (sem refresh automático). */
+export const ADMIN_SESSION_TEST_MAX_AGE_SEC = 60 * 30;
+
 function cookieNames(scope) {
   if (scope === 'admin') {
     return { access: ADMIN_ACCESS, refresh: ADMIN_REFRESH };
@@ -69,14 +72,27 @@ function buildClearCookie(name) {
   return parts.join('; ');
 }
 
-function accessMaxAge(session) {
+function accessMaxAge(session, scope) {
+  let age;
   if (session?.expires_in && Number.isFinite(session.expires_in)) {
-    return Math.max(60, Number(session.expires_in));
+    age = Math.max(60, Number(session.expires_in));
+  } else if (session?.expires_at) {
+    age = Math.max(60, session.expires_at - Math.floor(Date.now() / 1000));
+  } else {
+    age = 3600;
   }
-  if (session?.expires_at) {
-    return Math.max(60, session.expires_at - Math.floor(Date.now() / 1000));
+
+  if (scope === 'admin' && ADMIN_SESSION_TEST_MAX_AGE_SEC > 0) {
+    return Math.min(age, ADMIN_SESSION_TEST_MAX_AGE_SEC);
   }
-  return 3600;
+  return age;
+}
+
+function refreshMaxAge(scope) {
+  if (scope === 'admin' && ADMIN_SESSION_TEST_MAX_AGE_SEC > 0) {
+    return ADMIN_SESSION_TEST_MAX_AGE_SEC;
+  }
+  return REFRESH_MAX_AGE_SEC;
 }
 
 export function setAuthCookies(res, req, session) {
@@ -84,16 +100,16 @@ export function setAuthCookies(res, req, session) {
 
   const scope = resolveAuthScope(req);
   const names = cookieNames(scope);
-  const cookies = [buildCookie(names.access, session.access_token, accessMaxAge(session))];
+  const cookies = [buildCookie(names.access, session.access_token, accessMaxAge(session, scope))];
 
   if (session.refresh_token) {
-    cookies.push(buildCookie(names.refresh, session.refresh_token, REFRESH_MAX_AGE_SEC));
+    cookies.push(buildCookie(names.refresh, session.refresh_token, refreshMaxAge(scope)));
   }
 
   res.setHeader('Set-Cookie', cookies);
 }
 
-export function clearAuthCookies(res, req, { both = false } = {}) {
+export function clearAuthCookies(res, req, { both = false, includeElevation = false } = {}) {
   const scopes = both ? ['user', 'admin'] : [resolveAuthScope(req)];
   const cookies = [];
 
@@ -101,7 +117,7 @@ export function clearAuthCookies(res, req, { both = false } = {}) {
     const names = cookieNames(scope);
     cookies.push(buildClearCookie(names.access));
     cookies.push(buildClearCookie(names.refresh));
-    if (scope === 'admin') {
+    if (scope === 'admin' && includeElevation) {
       cookies.push(buildClearCookie(ADMIN_ELEVATION));
     }
   }
@@ -184,20 +200,33 @@ export function extractRefreshToken(req, options = {}) {
   return cookies[USER_REFRESH] || null;
 }
 
-export function sanitizeSessionForClient(session) {
+export function sanitizeSessionForClient(session, { admin = false, elevated = undefined } = {}) {
   if (!session) return null;
-  return {
+
+  let expires_at = session.expires_at ?? null;
+  if (admin && ADMIN_SESSION_TEST_MAX_AGE_SEC > 0) {
+    const cap = Math.floor(Date.now() / 1000) + ADMIN_SESSION_TEST_MAX_AGE_SEC;
+    expires_at = expires_at ? Math.min(expires_at, cap) : cap;
+  }
+
+  const sanitized = {
     user: session.user ?? null,
-    expires_at: session.expires_at ?? null,
+    expires_at,
   };
+
+  if (elevated !== undefined) {
+    sanitized.elevated = elevated;
+  }
+
+  return sanitized;
 }
 
-export function sanitizeAuthPayload(data) {
+export function sanitizeAuthPayload(data, { admin = false } = {}) {
   if (!data || typeof data !== 'object') return data;
 
   const next = { ...data };
   if ('session' in next) {
-    next.session = sanitizeSessionForClient(next.session);
+    next.session = sanitizeSessionForClient(next.session, { admin });
   }
   return next;
 }

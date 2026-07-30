@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { fetchAllCmsItemsCached } from '../lib/cmsItemsLoader';
 
 export type HomeQuickNavLinkTipo = 'href' | 'game';
 
@@ -48,19 +48,19 @@ export function useHomeQuickNav() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('cms_items')
-        .select('id, titulo, imagem_url, link_tipo, href, game_name, ordem, ativo')
-        .eq('secao', 'quick_nav')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao buscar atalhos da home:', error);
-        return;
-      }
-
-      const nextItems = (data ?? []) as HomeQuickNavItem[];
+      const data = await fetchAllCmsItemsCached();
+      const nextItems = data
+        .filter((row) => row.secao === 'quick_nav')
+        .map((row) => ({
+          id: String(row.id),
+          titulo: String(row.titulo ?? ''),
+          imagem_url: String(row.imagem_url ?? ''),
+          link_tipo: row.link_tipo === 'game' ? 'game' : 'href',
+          href: row.href ? String(row.href) : null,
+          game_name: row.game_name ? String(row.game_name) : null,
+          ordem: Number(row.ordem) || 0,
+          ativo: Boolean(row.ativo),
+        })) as HomeQuickNavItem[];
       setItems(nextItems);
       persistItems(nextItems);
     } catch (err) {

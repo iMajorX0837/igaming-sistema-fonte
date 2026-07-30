@@ -198,8 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Proxy dispara INITIAL_SESSION=null antes do validateSession no F5 — não é logout.
-      if (event === 'INITIAL_SESSION' && !session?.user) {
+      // INITIAL_SESSION vem do validateSession no bootstrap — initializeAuth cuida disso.
+      if (event === 'INITIAL_SESSION') {
         return;
       }
 
@@ -223,9 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTwoFactorReady(false);
       }
 
-      if (event !== 'INITIAL_SESSION' || session?.user) {
-        finishInitialLoading();
-      }
+      finishInitialLoading();
     });
 
     return () => {

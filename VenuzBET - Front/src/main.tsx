@@ -10,7 +10,7 @@ import { applyBrandToDocument } from './lib/siteBrand';
 import { preloadAuthModalImages } from './lib/authModalImages';
 import './index.css';
 
-// Hidrata tema do cache imediatamente; SiteConfigProvider é o único fetch de site_config.
+// Hidrata tema do cache imediatamente; SiteConfigProvider consolida site_config (tema, top banner, popup).
 const initialTheme = getInitialSiteTheme();
 hydrateDocumentTheme(initialTheme);
 applyBrandToDocument(initialTheme.brand);

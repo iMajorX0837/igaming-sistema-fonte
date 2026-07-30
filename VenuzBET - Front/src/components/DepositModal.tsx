@@ -55,7 +55,7 @@ interface DepositModalProps {
 
 export default function DepositModal({ isOpen, onClose }: DepositModalProps) {
   const { isAuthenticated, user } = useAuth();
-  const { config } = usePlataformaConfig();
+  const { config } = usePlataformaConfig(isOpen);
   const { config: homeConfig } = useHomeConfig();
   const { t, language, locale } = useTranslation();
   const { config: authModalsConfig } = useAuthModalsConfig();

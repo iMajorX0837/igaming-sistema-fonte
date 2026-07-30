@@ -36,6 +36,7 @@ type Session = {
   access_token?: string;
   refresh_token?: string;
   expires_at?: number;
+  elevated?: boolean;
   user: {
     id: string;
     email?: string;
@@ -57,7 +58,9 @@ export type SupabaseProxyClientOptions = {
 const DEFAULT_STORAGE_KEY = 'venuz-auth-session';
 
 const AUTH_ERROR_CODES = new Set(['PGRST301', 'PGRST302', 'PGRST303']);
-const REFRESH_MARGIN_SEC = 60;
+/** Alinhar com ADMIN_SESSION_TEST_MAX_AGE_SEC na API. */
+const SESSION_TEST_MAX_AGE_SEC = 60 * 30;
+const REFRESH_MARGIN_SEC = SESSION_TEST_MAX_AGE_SEC > 0 ? 0 : 60;
 
 function purgeLegacyTokenStorage(storageKey: string): void {
   if (typeof window === 'undefined') return;
@@ -79,6 +82,12 @@ function isAuthError(error: unknown): boolean {
   if (err.code && AUTH_ERROR_CODES.has(err.code)) return true;
   const message = String(err.message ?? '').toLowerCase();
   return message.includes('jwt expired') || message.includes('invalid jwt') || message.includes('jwt malformed');
+}
+
+function is2FARequiredError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const message = String((error as { message?: string }).message ?? '');
+  return message.includes('2FA necessário');
 }
 
 /** Monta URL legível no DevTools → Network (ex.: select/usuarios/saldo.single) */
@@ -345,6 +354,7 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   let pollInFlight = false;
   let refreshPromise: Promise<Session | null> | null = null;
   let memorySession: Session | null = null;
+  let sessionExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   function onVisibilityChange(): void {
     if (typeof document !== 'undefined' && !document.hidden) {
@@ -445,10 +455,35 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   }
 
   function writeSession(session: Session | null): void {
+    if (sessionExpiryTimer) {
+      clearTimeout(sessionExpiryTimer);
+      sessionExpiryTimer = null;
+    }
+
     memorySession = session;
+
+    if (session?.expires_at) {
+      const delayMs = session.expires_at * 1000 - Date.now() + 500;
+      if (delayMs > 0) {
+        sessionExpiryTimer = setTimeout(() => {
+          void (async () => {
+            try {
+              const response = await apiFetch('/auth/session');
+              const payload = await response.json();
+              if (!payload.data?.session?.user) {
+                clearSession();
+              }
+            } catch {
+              clearSession();
+            }
+          })();
+        }, delayMs);
+      }
+    }
   }
 
   function sessionNeedsRefresh(session: Session | null): boolean {
+    if (SESSION_TEST_MAX_AGE_SEC > 0) return false;
     if (!hasSessionUser(session)) return false;
     if (!session.expires_at) return false;
     const nowSec = Math.floor(Date.now() / 1000);
@@ -522,21 +557,48 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     });
   }
 
+  async function syncSessionFromServer(): Promise<Session | null> {
+    const response = await apiFetch('/auth/session');
+    const payload = await response.json();
+
+    if (!payload.data?.session?.user) {
+      clearSession();
+      return null;
+    }
+
+    const merged: Session = {
+      ...(readSessionRaw() ?? {}),
+      ...payload.data.session,
+      user: payload.data.session.user,
+    };
+    writeSession(merged);
+    return merged;
+  }
+
+  async function executeProxyQuery(spec: QuerySpec) {
+    const path = buildQueryPath(spec);
+    const response = await apiFetch(path, {
+      method: 'POST',
+      body: JSON.stringify(
+        spec.operation === 'rpc' ? { params: spec.params ?? {} } : { query: spec }
+      ),
+    });
+    const payload = await response.json();
+    return { response, payload };
+  }
+
   async function runQuery(spec: QuerySpec): Promise<QueryResult<unknown>> {
     const cacheKey = JSON.stringify(spec);
     const inflight = inflightQueries.get(cacheKey);
     if (inflight) return inflight;
 
     const promise = (async () => {
-      const path = buildQueryPath(spec);
-      const response = await apiFetch(path, {
-        method: 'POST',
-        body: JSON.stringify(
-          spec.operation === 'rpc' ? { params: spec.params ?? {} } : { query: spec }
-        ),
-      });
+      let { response, payload } = await executeProxyQuery(spec);
 
-      const payload = await response.json();
+      if (response.status === 403 && is2FARequiredError(payload.error)) {
+        await syncSessionFromServer();
+        ({ response, payload } = await executeProxyQuery(spec));
+      }
 
       if (response.status === 401 || isAuthError(payload.error)) {
         clearSession();
@@ -566,20 +628,11 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
     /** Valida token no servidor — use só quando precisar confirmar sessão remotamente. */
     async validateSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
-      const response = await apiFetch('/auth/session');
-      const payload = await response.json();
-
-      if (!payload.data?.session?.user) {
-        clearSession();
-        return { data: { session: null }, error: payload.error ?? null };
+      const merged = await syncSessionFromServer();
+      if (!merged) {
+        return { data: { session: null }, error: null };
       }
 
-      const merged: Session = {
-        ...(readSessionRaw() ?? {}),
-        ...payload.data.session,
-        user: payload.data.session.user,
-      };
-      writeSession(merged);
       notifyAuth('INITIAL_SESSION', merged);
 
       if (sessionNeedsRefresh(merged)) {

@@ -4,13 +4,14 @@ import { X } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
 
-import { usePrizeWheel } from '../hooks/usePrizeWheel';
-
 import {
   formatPrizeMessage,
+  getDefaultWheelImages,
   getPrizeWheelErrorMessage,
   girarRoleta,
   type GirarRoletaResult,
+  type PrizeWheelSegment,
+  type PrizeWheelStatus,
 } from '../lib/prizeWheel';
 import { grantPrizeWheelBonus } from '../lib/freeBonus';
 import { resolveFreeBonusGameBySlug } from '../utils/resolveGameBySlug';
@@ -69,23 +70,26 @@ function computeTargetRotation(
 
 
 interface PrizeWheelModalProps {
-
   isOpen: boolean;
-
   onClose: () => void;
-
+  segments: PrizeWheelSegment[];
+  status: PrizeWheelStatus | null;
+  images: ReturnType<typeof getDefaultWheelImages>;
+  refreshStatus: () => Promise<void>;
 }
 
-
-
-export default function PrizeWheelModal({ isOpen, onClose }: PrizeWheelModalProps) {
-
+export default function PrizeWheelModal({
+  isOpen,
+  onClose,
+  segments,
+  status,
+  images,
+  refreshStatus,
+}: PrizeWheelModalProps) {
   const { isAuthenticated, user } = useAuth();
   const { t, language } = useTranslation();
   const nav = t.navigation;
   const prizeWheel = t.prizeWheel;
-
-  const { segments, status, images, refreshStatus } = usePrizeWheel(isAuthenticated);
 
   const [rotation, setRotation] = useState(0);
 

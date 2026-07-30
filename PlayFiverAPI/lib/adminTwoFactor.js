@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import {
   parseCookies,
   ADMIN_ELEVATION,
+  ADMIN_SESSION_TEST_MAX_AGE_SEC,
   setAdminElevationCookie,
   clearAdminElevationCookie,
 } from './authCookies.js';
@@ -11,7 +12,10 @@ import {
 const ISSUER = 'VenuzBET Admin';
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 /** Sessão elevada (2FA ok no painel) — acompanha sessão admin (refresh token). */
-const ELEVATION_TTL_MS = 60 * 60 * 24 * 30 * 1000;
+const ELEVATION_TTL_MS =
+  ADMIN_SESSION_TEST_MAX_AGE_SEC > 0
+    ? ADMIN_SESSION_TEST_MAX_AGE_SEC * 1000
+    : 60 * 60 * 24 * 30 * 1000;
 const USER_ELEV_PREFIX = 'u.';
 
 /** @type {Map<string, { session: object; expires: number }>} */
@@ -214,13 +218,17 @@ export function consume2FAChallenge(challengeToken) {
 export function markAdminSessionElevated(accessToken, ttlMs = ELEVATION_TTL_MS, res = null, userId = null) {
   cleanupElevations();
 
+  if (userId) {
+    persistUserElevationCookie(res, userId, ttlMs);
+    if (accessToken) {
+      elevatedAdminTokens.set(hashToken(accessToken), Date.now() + ttlMs);
+    }
+    return;
+  }
+
   if (accessToken) {
     elevatedAdminTokens.set(hashToken(accessToken), Date.now() + ttlMs);
     persistElevationCookie(res, accessToken, ttlMs);
-  }
-
-  if (userId) {
-    persistUserElevationCookie(res, userId, ttlMs);
   }
 }
 

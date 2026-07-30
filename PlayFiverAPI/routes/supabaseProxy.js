@@ -20,6 +20,7 @@ import {
   extractAccessToken,
   extractRefreshToken,
   isAdminClient,
+  ADMIN_SESSION_TEST_MAX_AGE_SEC,
   sanitizeAuthPayload,
   sanitizeSessionForClient,
   setAuthCookies,
@@ -316,7 +317,7 @@ export function createSupabaseProxyRouter({
             return res.json({
               data: {
                 user: data.user,
-                session: sanitizeSessionForClient(data.session),
+                session: sanitizeSessionForClient(data.session, { admin: isAdminClient(req) }),
                 requires2FASetup: true,
               },
               error: null,
@@ -331,7 +332,7 @@ export function createSupabaseProxyRouter({
         setAuthCookies(res, req, data.session);
       }
 
-      res.json({ data: sanitizeAuthPayload(data), error: null });
+      res.json({ data: sanitizeAuthPayload(data, { admin: isAdminClient(req) }), error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-in:', err);
       res.status(500).json({
@@ -387,10 +388,13 @@ export function createSupabaseProxyRouter({
         setAuthCookies(res, req, pendingSession.session);
       }
       res.json({
-        data: sanitizeAuthPayload({
-          user: pendingSession.user,
-          session: pendingSession.session,
-        }),
+        data: sanitizeAuthPayload(
+          {
+            user: pendingSession.user,
+            session: pendingSession.session,
+          },
+          { admin: isAdminClient(req) }
+        ),
         error: null,
       });
     } catch (err) {
@@ -585,7 +589,7 @@ export function createSupabaseProxyRouter({
         setAuthCookies(res, req, data.session);
       }
 
-      res.json({ data: sanitizeAuthPayload(data), error: null });
+      res.json({ data: sanitizeAuthPayload(data, { admin: isAdminClient(req) }), error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-up:', err);
       res.status(500).json({
@@ -608,11 +612,11 @@ export function createSupabaseProxyRouter({
         }
       }
 
-      clearAuthCookies(res, req, { both: true });
+      clearAuthCookies(res, req, { both: true, includeElevation: true });
       res.json({ error: null });
     } catch (err) {
       console.error('[supabase-proxy] sign-out:', err);
-      clearAuthCookies(res, req, { both: true });
+      clearAuthCookies(res, req, { both: true, includeElevation: true });
       res.status(500).json({ error: { message: 'Erro ao encerrar sessão' } });
     }
   });
@@ -625,7 +629,7 @@ export function createSupabaseProxyRouter({
 
       if (!auth) {
         const refreshToken = extractRefreshToken(req, { preferAdmin: adminClient });
-        if (refreshToken) {
+        if (refreshToken && !(adminClient && ADMIN_SESSION_TEST_MAX_AGE_SEC > 0)) {
           const { data, error } = await authClient.auth.refreshSession({
             refresh_token: refreshToken,
           });
@@ -652,7 +656,7 @@ export function createSupabaseProxyRouter({
             }
             setAuthCookies(res, req, data.session);
             return res.json({
-              data: { session: sanitizeSessionForClient(data.session) },
+              data: { session: sanitizeSessionForClient(data.session, { admin: adminClient }) },
               error: null,
             });
           }
@@ -669,22 +673,37 @@ export function createSupabaseProxyRouter({
       const { data, error } = await userClient.auth.getSession();
 
       if (error || !data?.session) {
+        const elevated = isAdminSessionElevated(auth.token, req, auth.user.id);
+        if (adminClient && auth.user?.id && elevated) {
+          markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
+        }
         return res.json({
-          data: { session: sanitizeSessionForClient({ user: auth.user }) },
+          data: {
+            session: sanitizeSessionForClient(
+              { user: auth.user },
+              { admin: adminClient, elevated: adminClient ? elevated : undefined }
+            ),
+          },
           error: null,
         });
       }
 
-      if (
-        adminClient &&
-        auth.user?.id &&
-        isAdminSessionElevated(auth.token, req, auth.user.id)
-      ) {
+      const elevated =
+        adminClient && auth.user?.id
+          ? isAdminSessionElevated(auth.token, req, auth.user.id)
+          : false;
+
+      if (adminClient && auth.user?.id && elevated) {
         markAdminSessionElevated(auth.token, undefined, res, auth.user.id);
       }
 
       res.json({
-        data: { session: sanitizeSessionForClient(data.session) },
+        data: {
+          session: sanitizeSessionForClient(data.session, {
+            admin: adminClient,
+            elevated: adminClient ? elevated : undefined,
+          }),
+        },
         error: null,
       });
     } catch (err) {
@@ -700,6 +719,13 @@ export function createSupabaseProxyRouter({
   router.post('/auth/refresh', authRefreshRateLimit, async (req, res) => {
     try {
       const adminClient = isAdminClient(req);
+      if (adminClient && ADMIN_SESSION_TEST_MAX_AGE_SEC > 0) {
+        return res.status(401).json({
+          data: { session: null },
+          error: null,
+        });
+      }
+
       const refreshToken = extractRefreshToken(req, { preferAdmin: adminClient });
       if (!refreshToken) {
         return res.status(401).json({
@@ -745,7 +771,7 @@ export function createSupabaseProxyRouter({
         setAuthCookies(res, req, data.session);
       }
 
-      res.json({ data: sanitizeAuthPayload(data), error: null });
+      res.json({ data: sanitizeAuthPayload(data, { admin: adminClient }), error: null });
     } catch (err) {
       console.error('[supabase-proxy] refresh:', err);
       res.status(500).json({

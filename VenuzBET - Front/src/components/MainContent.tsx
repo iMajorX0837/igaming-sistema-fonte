@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Banner from './Banner';
 import SearchBar from './SearchBar';
 import HomeQuickNav from './HomeQuickNav';
@@ -13,6 +13,7 @@ import { homePageContainerClass } from '../constants/homeLayout';
 import { fetchProvidersCached, isPlayFiverEnabledProvider } from '../api/playfiversCache';
 import { useHomeSections, type HomeSection } from '../hooks/useHomeSections';
 import { useHomeSectionGames } from '../hooks/useHomeSectionGames';
+import type { HomeSectionGameDisplay } from '../lib/homeSectionGames';
 import { useHomeSectionProviders } from '../hooks/useHomeSectionProviders';
 import { useHomeConfig } from '../hooks/useHomeConfig';
 import { getProviderSlug } from '../lib/homeSectionGames';
@@ -57,6 +58,20 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
   const { providersBySectionId } = useHomeSectionProviders();
   const { config: homeConfig } = useHomeConfig();
   const [fallbackProviders, setFallbackProviders] = useState<Provider[]>([]);
+
+  const winnerPoolGames = useMemo(() => {
+    const seen = new Set<string>();
+    const pool: HomeSectionGameDisplay[] = [];
+    for (const games of Object.values(gamesBySectionId)) {
+      for (const game of games) {
+        const key = `${game.game_code}:${game.provider}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        pool.push(game);
+      }
+    }
+    return pool;
+  }, [gamesBySectionId]);
 
   const fetchFallbackProviders = useCallback(async () => {
     try {
@@ -195,7 +210,7 @@ export default function MainContent({ onGameSelect }: MainContentProps) {
           </div>
 
           <div className="mt-4">
-            <WinnerSlider onGameSelect={onGameSelect} />
+            <WinnerSlider onGameSelect={onGameSelect} poolGames={winnerPoolGames} />
           </div>
 
           {homeSections.map((section) => {

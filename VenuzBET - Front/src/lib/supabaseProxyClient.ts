@@ -332,6 +332,10 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
   let pollIntervalId: ReturnType<typeof setInterval> | null = null;
   let pollInFlight = false;
   let refreshPromise: Promise<Session | null> | null = null;
+  let sessionProbeInflight: Promise<{
+    session: Session | null;
+    error: { message: string } | null;
+  }> | null = null;
   let memorySession: Session | null = null;
 
   function onVisibilityChange(): void {
@@ -580,18 +584,43 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
     }
   }
 
+  async function probeSessionFromServer(): Promise<{
+    session: Session | null;
+    error: { message: string } | null;
+  }> {
+    if (sessionProbeInflight) return sessionProbeInflight;
+
+    sessionProbeInflight = (async () => {
+      try {
+        const response = await apiFetch('/auth/session');
+        const payload = await response.json();
+
+        if (!payload.data?.session?.user) {
+          return { session: null, error: payload.error ?? null };
+        }
+
+        const merged: Session = {
+          ...(readSession() ?? {}),
+          ...payload.data.session,
+          user: payload.data.session.user,
+        };
+
+        return { session: merged, error: null };
+      } finally {
+        sessionProbeInflight = null;
+      }
+    })();
+
+    return sessionProbeInflight;
+  }
+
   const auth = {
     /** Lê sessão local; renova o token automaticamente se estiver perto de expirar. */
     async getSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
       if (!hasSessionUser(readSession())) {
-        const response = await apiFetch('/auth/session');
-        const payload = await response.json();
-        if (payload.data?.session?.user) {
-          writeSession({
-            ...(readSession() ?? {}),
-            ...payload.data.session,
-            user: payload.data.session.user,
-          });
+        const probed = await probeSessionFromServer();
+        if (probed.session?.user) {
+          writeSession(probed.session);
         }
       } else if (sessionNeedsRefresh(readSession())) {
         await performSessionRefresh();
@@ -610,28 +639,22 @@ export function createSupabaseProxyClient(options: SupabaseProxyClientOptions = 
 
     /** Valida/renova sessão no servidor — use na inicialização do app. */
     async validateSession(): Promise<{ data: { session: Session | null }; error: null | { message: string } }> {
-      const response = await apiFetch('/auth/session');
-      const payload = await response.json();
+      const probed = await probeSessionFromServer();
 
-      if (!payload.data?.session?.user) {
+      if (!probed.session?.user) {
         clearSessionAndNotify();
-        return { data: { session: null }, error: payload.error ?? null };
+        return { data: { session: null }, error: probed.error ?? null };
       }
 
-      const merged: Session = {
-        ...(readSession() ?? {}),
-        ...payload.data.session,
-        user: payload.data.session.user,
-      };
-      writeSession(merged);
-      notifyAuth('INITIAL_SESSION', merged);
+      writeSession(probed.session);
+      notifyAuth('INITIAL_SESSION', probed.session);
 
-      if (sessionNeedsRefresh(merged)) {
+      if (sessionNeedsRefresh(probed.session)) {
         const refreshed = await performSessionRefresh();
-        return { data: { session: refreshed ?? merged }, error: null };
+        return { data: { session: refreshed ?? probed.session }, error: null };
       }
 
-      return { data: { session: merged }, error: null };
+      return { data: { session: probed.session }, error: null };
     },
 
     async signInWithPassword(params: { email: string; password: string }) {

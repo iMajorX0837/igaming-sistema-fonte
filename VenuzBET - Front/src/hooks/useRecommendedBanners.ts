@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import {
   getInitialRecommendedBannersCache,
   persistRecommendedBannersCache,
   type RecommendedBanner,
 } from '../lib/cmsBannersCache';
+import { fetchAllCmsItemsCached } from '../lib/cmsItemsLoader';
 
 export type { RecommendedBanner };
 
@@ -26,19 +26,19 @@ export function useRecommendedBanners() {
 
   const fetchBanners = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('cms_items')
-        .select('id, titulo, imagem_url, imagem_mobile_url, href, link_tipo, ordem, ativo')
-        .eq('secao', 'recommended')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao buscar recomendados:', error);
-        return;
-      }
-
-      const next = (data ?? []) as RecommendedBanner[];
+      const data = await fetchAllCmsItemsCached();
+      const next = data
+        .filter((row) => row.secao === 'recommended')
+        .map((row) => ({
+          id: String(row.id),
+          titulo: row.titulo ? String(row.titulo) : null,
+          imagem_url: String(row.imagem_url ?? ''),
+          imagem_mobile_url: row.imagem_mobile_url ? String(row.imagem_mobile_url) : null,
+          href: row.href ? String(row.href) : null,
+          link_tipo: (row.link_tipo ?? 'href') as RecommendedBanner['link_tipo'],
+          ordem: Number(row.ordem) || 0,
+          ativo: Boolean(row.ativo),
+        })) as RecommendedBanner[];
       setBanners((prev) => (bannersEqual(prev, next) ? prev : next));
       persistRecommendedBannersCache(next);
     } catch (err) {
