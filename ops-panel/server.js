@@ -23,6 +23,9 @@ if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
 /** @type {{ id: string, label: string, running: boolean, output: string, code: number|null, startedAt: string, endedAt?: string }} */
 let activeJob = null;
 
+/** @type {import('child_process').ChildProcess | null} */
+let activeLogStream = null;
+
 const app = express();
 app.use(express.json({ limit: '32kb' }));
 
@@ -310,6 +313,65 @@ app.get('/api/logs/:tenant', async (req, res) => {
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
+});
+
+app.get('/api/logs/:tenant/live', (req, res) => {
+  let slug;
+  try {
+    slug = req.params.tenant;
+    assertTenant(slug);
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+    return;
+  }
+
+  if (activeLogStream) {
+    activeLogStream.kill('SIGTERM');
+    activeLogStream = null;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  res.write(`data: ${JSON.stringify({ line: `==> Logs ao vivo: api-${slug}\n` })}\n\n`);
+
+  const child = spawn('docker', ['logs', '-f', '--tail', '150', `api-${slug}`], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  activeLogStream = child;
+
+  const sendChunk = (chunk) => {
+    for (const line of chunk.toString().split('\n')) {
+      if (!line) continue;
+      res.write(`data: ${JSON.stringify({ line: `${line}\n` })}\n\n`);
+    }
+  };
+
+  child.stdout.on('data', sendChunk);
+  child.stderr.on('data', sendChunk);
+
+  const cleanup = () => {
+    if (activeLogStream === child) activeLogStream = null;
+    if (!child.killed) child.kill('SIGTERM');
+  };
+
+  child.on('close', () => {
+    res.write(`data: ${JSON.stringify({ line: '\n==> Stream encerrado\n', done: true })}\n\n`);
+    cleanup();
+    res.end();
+  });
+
+  child.on('error', (err) => {
+    res.write(`data: ${JSON.stringify({ line: `\nErro: ${err.message}\n`, done: true })}\n\n`);
+    cleanup();
+    res.end();
+  });
+
+  req.on('close', cleanup);
 });
 
 app.get('*', (_req, res) => {

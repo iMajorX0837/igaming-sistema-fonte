@@ -21,10 +21,13 @@
 
       <section id="job-box" class="job-box hidden">
         <div class="job-head">
-          <strong id="job-label">Operação</strong>
-          <span id="job-status" class="badge">...</span>
+          <div class="job-head-left">
+            <strong id="job-label">Operação</strong>
+            <span id="job-status" class="badge">...</span>
+          </div>
+          <button id="btn-stop-live" class="btn btn-stop btn-sm hidden" type="button">Parar logs</button>
         </div>
-        <pre id="job-output" class="log"></pre>
+        <pre id="job-output" class="log log-live"></pre>
       </section>
 
       <section id="tenants" class="tenants"></section>
