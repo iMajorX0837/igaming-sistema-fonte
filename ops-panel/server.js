@@ -134,8 +134,8 @@ app.get('/api/tenants', (_req, res) => {
 app.get('/api/status', async (_req, res) => {
   try {
     const filters = tenants
-      .map((t) => `--filter name=^api-${t.slug}$`)
-      .concat(['--filter name=^venuz-nginx$'])
+      .map((t) => `--filter name=api-${t.slug}`)
+      .concat(['--filter name=venuz-nginx'])
       .join(' ');
 
     const ps = await runShell(`docker ps -a --format '{{json .}}' ${filters}`, 60000);
@@ -193,8 +193,8 @@ app.post('/api/restart/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    const out = await runShell(`docker restart api-${slug} venuz-nginx`, 120000);
-    res.json({ ok: true, output: out });
+    await runShell(`docker restart api-${slug} venuz-nginx`, 120000);
+    res.json({ ok: true, message: `Reiniciado: api-${slug} e venuz-nginx` });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }

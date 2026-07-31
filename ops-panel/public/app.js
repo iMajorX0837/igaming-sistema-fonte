@@ -1,5 +1,6 @@
 const tenantsEl = document.getElementById('tenants');
 const globalLog = document.getElementById('global-log');
+globalLog.textContent = '';
 const jobBox = document.getElementById('job-box');
 const jobLabel = document.getElementById('job-label');
 const jobStatus = document.getElementById('job-status');
@@ -117,8 +118,8 @@ tenantsEl.addEventListener('click', async (ev) => {
   try {
     if (action === 'restart') {
       log(`Reiniciando ${slug}...`);
-      const res = await api(`/api/restart/${slug}`, { method: 'POST' });
-      log(res.output || 'Reiniciado.');
+      await api(`/api/restart/${slug}`, { method: 'POST' });
+      log(`${slug}: reiniciado (api-${slug} + nginx).`);
       await refresh();
     }
 
