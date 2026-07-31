@@ -57,6 +57,8 @@ function renderTenants(tenants, status) {
             <span class="badge ${healthOk ? 'ok' : 'err'}">${healthOk ? 'Health OK' : 'Health falhou'}</span>
           </div>
           <div class="actions">
+            <button class="btn btn-start" data-action="start" data-slug="${t.slug}" ${c.ok ? 'disabled' : ''}>Iniciar</button>
+            <button class="btn btn-stop" data-action="stop" data-slug="${t.slug}" ${c.ok ? '' : 'disabled'}>Parar</button>
             <button class="btn btn-ghost" data-action="restart" data-slug="${t.slug}">Reiniciar</button>
             <button class="btn btn-warn" data-action="deploy" data-slug="${t.slug}">Deploy CLEAN</button>
             <button class="btn btn-ghost" data-action="logs" data-slug="${t.slug}">Ver logs</button>
@@ -116,6 +118,20 @@ tenantsEl.addEventListener('click', async (ev) => {
   btn.disabled = true;
 
   try {
+    if (action === 'stop') {
+      log(`Parando ${slug}...`);
+      await api(`/api/stop/${slug}`, { method: 'POST' });
+      log(`${slug}: API parada (site/admin desta casa ficam offline).`);
+      await refresh();
+    }
+
+    if (action === 'start') {
+      log(`Iniciando ${slug}...`);
+      await api(`/api/start/${slug}`, { method: 'POST' });
+      log(`${slug}: API iniciada.`);
+      await refresh();
+    }
+
     if (action === 'restart') {
       log(`Reiniciando ${slug}...`);
       await api(`/api/restart/${slug}`, { method: 'POST' });

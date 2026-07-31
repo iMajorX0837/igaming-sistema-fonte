@@ -135,6 +135,16 @@ body {
   color: #111;
 }
 
+.btn-stop {
+  background: var(--red);
+  color: white;
+}
+
+.btn-start {
+  background: var(--green);
+  color: #052e16;
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text);

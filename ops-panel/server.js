@@ -189,6 +189,28 @@ app.get('/api/job', (_req, res) => {
   res.json({ job: activeJob });
 });
 
+app.post('/api/stop/:tenant', async (req, res) => {
+  try {
+    assertTenant(req.params.tenant);
+    const slug = req.params.tenant;
+    await runShell(`docker stop api-${slug}`, 120000);
+    res.json({ ok: true, message: `Parado: api-${slug}` });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.post('/api/start/:tenant', async (req, res) => {
+  try {
+    assertTenant(req.params.tenant);
+    const slug = req.params.tenant;
+    await runShell(`docker start api-${slug}`, 120000);
+    res.json({ ok: true, message: `Iniciado: api-${slug}` });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
 app.post('/api/restart/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
