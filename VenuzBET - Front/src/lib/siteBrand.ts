@@ -2,6 +2,7 @@ export const DEFAULT_NOME_BET = 'RoyalBet';
 export const DEFAULT_SITE_TITULO = `${DEFAULT_NOME_BET} | Apostas Online com Saques Rápidos`;
 export const DEFAULT_SITE_DOMINIO = 'royall.bet';
 export const DEFAULT_SITE_FAVICON = '/headline.png';
+export const DEFAULT_LOGO_URL = '/assets/logo.png';
 
 export const PROPRIETARY_PROVIDER_SLUGS = new Set(['venuzbet', 'venuz']);
 

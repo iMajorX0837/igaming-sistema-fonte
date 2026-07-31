@@ -1,4 +1,4 @@
-import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, DEFAULT_SITE_FAVICON, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio, normalizeSiteFavicon } from './siteBrand';
+import { DEFAULT_NOME_BET, DEFAULT_SITE_TITULO, DEFAULT_SITE_DOMINIO, DEFAULT_SITE_FAVICON, DEFAULT_LOGO_URL, normalizeNomeBet, normalizeSiteTitulo, normalizeSiteDominio, normalizeSiteFavicon } from './siteBrand';
 import {
   applyBrandColorsToDocument,
   DEFAULT_BRAND_COLORS,
@@ -62,7 +62,7 @@ export const DEFAULT_AUTH_MODAL_IMAGE = '';
 
 export const DEFAULT_HEADER_CONFIG: HeaderConfig = {
   fundo: '#121319',
-  logo_url: '/assets/logo.svg',
+  logo_url: DEFAULT_LOGO_URL,
 };
 
 export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
