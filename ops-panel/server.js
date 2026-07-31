@@ -124,6 +124,48 @@ function assertTenant(slug) {
   }
 }
 
+function stopTenantCommand(slug) {
+  return `
+    docker stop api-${slug} 2>/dev/null || true
+    if [ -f nginx/conf.d/${slug}.conf ]; then
+      mv nginx/conf.d/${slug}.conf nginx/conf.d/${slug}.conf.stopped
+    fi
+    docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
+  `;
+}
+
+function startTenantCommand(slug) {
+  return `
+    if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
+      mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
+    elif [ ! -f nginx/conf.d/${slug}.conf ]; then
+      bash scripts/ensure-tenant-compose.sh ${slug}
+    fi
+    docker start api-${slug}
+    sleep 2
+    docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
+  `;
+}
+
+function restartTenantCommand(slug) {
+  return `
+    if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
+      mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
+    fi
+    docker restart api-${slug}
+    docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
+  `;
+}
+
+async function isTenantNginxEnabled(slug) {
+  try {
+    await runShell(`test -f nginx/conf.d/${slug}.conf`, 10000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 app.use(auth);
 app.use(express.static(path.join(ROOT, 'public')));
 
@@ -154,8 +196,15 @@ app.get('/api/status', async (_req, res) => {
       });
 
     const health = {};
+    const nginxEnabled = {};
     for (const tenant of tenants) {
+      nginxEnabled[tenant.slug] = await isTenantNginxEnabled(tenant.slug);
+
       const service = `api-${tenant.slug}`;
+      if (!nginxEnabled[tenant.slug]) {
+        health[tenant.slug] = { ok: false, error: 'Casa desligada (nginx offline)' };
+        continue;
+      }
       try {
         const out = await runShell(
           `docker exec venuz-nginx wget -qO- http://${service}:3000/health`,
@@ -170,6 +219,7 @@ app.get('/api/status', async (_req, res) => {
     res.json({
       containers: lines,
       health,
+      nginxEnabled,
       job: activeJob
         ? {
             id: activeJob.id,
@@ -193,8 +243,12 @@ app.post('/api/stop/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    await runShell(`docker stop api-${slug}`, 120000);
-    res.json({ ok: true, message: `Parado: api-${slug}` });
+    await runShell(stopTenantCommand(slug), 120000);
+    const domain = tenants.find((t) => t.slug === slug)?.domain || slug;
+    res.json({
+      ok: true,
+      message: `Casa ${slug} desligada: ${domain}, admin.${domain}, api.${domain}`,
+    });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -204,8 +258,9 @@ app.post('/api/start/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    await runShell(`docker start api-${slug}`, 120000);
-    res.json({ ok: true, message: `Iniciado: api-${slug}` });
+    await runShell(startTenantCommand(slug), 120000);
+    const domain = tenants.find((t) => t.slug === slug)?.domain || slug;
+    res.json({ ok: true, message: `Casa ${slug} no ar: ${domain}, admin.${domain}, api.${domain}` });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -215,8 +270,8 @@ app.post('/api/restart/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    await runShell(`docker restart api-${slug} venuz-nginx`, 120000);
-    res.json({ ok: true, message: `Reiniciado: api-${slug} e venuz-nginx` });
+    await runShell(restartTenantCommand(slug), 120000);
+    res.json({ ok: true, message: `Casa ${slug} reiniciada (API + nginx da casa)` });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }

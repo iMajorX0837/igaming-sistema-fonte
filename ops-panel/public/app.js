@@ -42,6 +42,8 @@ function renderTenants(tenants, status) {
   tenantsEl.innerHTML = tenants
     .map((t) => {
       const c = containerStatus(containers, t.slug);
+      const nginxOn = status.nginxEnabled?.[t.slug] !== false;
+      const houseOn = c.ok && nginxOn;
       const h = status.health?.[t.slug];
       const healthOk = h?.ok;
       return `
@@ -53,12 +55,14 @@ function renderTenants(tenants, status) {
             </div>
           </div>
           <div class="badges">
-            <span class="badge ${c.ok ? 'ok' : 'err'}">${c.label}</span>
+            <span class="badge ${houseOn ? 'ok' : 'err'}">${houseOn ? 'Casa no ar' : 'Casa desligada'}</span>
+            <span class="badge ${c.ok ? 'ok' : 'err'}">${c.ok ? 'API online' : 'API parada'}</span>
+            <span class="badge ${nginxOn ? 'ok' : 'err'}">${nginxOn ? 'Nginx ativo' : 'Nginx off'}</span>
             <span class="badge ${healthOk ? 'ok' : 'err'}">${healthOk ? 'Health OK' : 'Health falhou'}</span>
           </div>
           <div class="actions">
-            <button class="btn btn-start" data-action="start" data-slug="${t.slug}" ${c.ok ? 'disabled' : ''}>Iniciar</button>
-            <button class="btn btn-stop" data-action="stop" data-slug="${t.slug}" ${c.ok ? '' : 'disabled'}>Parar</button>
+            <button class="btn btn-start" data-action="start" data-slug="${t.slug}" ${houseOn ? 'disabled' : ''}>Iniciar casa</button>
+            <button class="btn btn-stop" data-action="stop" data-slug="${t.slug}" ${houseOn ? '' : 'disabled'}>Parar casa</button>
             <button class="btn btn-ghost" data-action="restart" data-slug="${t.slug}">Reiniciar</button>
             <button class="btn btn-warn" data-action="deploy" data-slug="${t.slug}">Deploy CLEAN</button>
             <button class="btn btn-ghost" data-action="logs" data-slug="${t.slug}">Ver logs</button>
@@ -119,23 +123,23 @@ tenantsEl.addEventListener('click', async (ev) => {
 
   try {
     if (action === 'stop') {
-      log(`Parando ${slug}...`);
+      log(`Desligando casa ${slug} (API + domínios)...`);
       await api(`/api/stop/${slug}`, { method: 'POST' });
-      log(`${slug}: API parada (site/admin desta casa ficam offline).`);
+      log(`${slug}: casa inteira offline (site, admin, api).`);
       await refresh();
     }
 
     if (action === 'start') {
-      log(`Iniciando ${slug}...`);
+      log(`Ligando casa ${slug}...`);
       await api(`/api/start/${slug}`, { method: 'POST' });
-      log(`${slug}: API iniciada.`);
+      log(`${slug}: casa inteira no ar.`);
       await refresh();
     }
 
     if (action === 'restart') {
       log(`Reiniciando ${slug}...`);
       await api(`/api/restart/${slug}`, { method: 'POST' });
-      log(`${slug}: reiniciado (api-${slug} + nginx).`);
+      log(`${slug}: reiniciada.`);
       await refresh();
     }
 
