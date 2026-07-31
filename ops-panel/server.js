@@ -133,40 +133,32 @@ app.get('/api/tenants', (_req, res) => {
 
 app.get('/api/status', async (_req, res) => {
   try {
-    let lines = [];
-    try {
-      const ps = await runShell('docker compose ps --format json', 60000);
-      lines = ps
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((line) => {
-          try {
-            return JSON.parse(line);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-    } catch {
-      const ps = await runShell('docker compose ps', 60000);
-      lines = ps
-        .split('\n')
-        .slice(2)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [name,, service] = line.split(/\s+/);
-          return { Name: name, Service: service, State: line.includes('Up') ? 'running' : 'exited' };
-        });
-    }
+    const filters = tenants
+      .map((t) => `--filter name=^api-${t.slug}$`)
+      .concat(['--filter name=^venuz-nginx$'])
+      .join(' ');
+
+    const ps = await runShell(`docker ps -a --format '{{json .}}' ${filters}`, 60000);
+    const lines = ps
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const j = JSON.parse(line);
+        return {
+          Name: j.Names,
+          Service: j.Names,
+          State: j.State,
+          Status: j.Status,
+        };
+      });
 
     const health = {};
     for (const tenant of tenants) {
       const service = `api-${tenant.slug}`;
       try {
         const out = await runShell(
-          `docker compose exec -T nginx wget -qO- http://${service}:3000/health`,
+          `docker exec venuz-nginx wget -qO- http://${service}:3000/health`,
           30000
         );
         health[tenant.slug] = { ok: true, body: out };
@@ -201,10 +193,7 @@ app.post('/api/restart/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    const out = await runShell(
-      `docker compose --profile ${slug} restart api-${slug} nginx`,
-      120000
-    );
+    const out = await runShell(`docker restart api-${slug} venuz-nginx`, 120000);
     res.json({ ok: true, output: out });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -239,7 +228,7 @@ app.get('/api/logs/:tenant', async (req, res) => {
     assertTenant(req.params.tenant);
     const lines = Math.min(Number(req.query.lines || 80), 300);
     const slug = req.params.tenant;
-    const out = await runShell(`docker compose logs --tail=${lines} api-${slug}`, 60000);
+    const out = await runShell(`docker logs api-${slug} --tail=${lines}`, 60000);
     res.json({ ok: true, output: out });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
