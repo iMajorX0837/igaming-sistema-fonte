@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Venuz Ops</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="header">
+        <div>
+          <h1>Venuz Ops</h1>
+          <p>Painel da VPS — deploy e restart das casas</p>
+        </div>
+        <div class="header-actions">
+          <button id="btn-refresh" class="btn btn-ghost">Atualizar</button>
+          <button id="btn-deploy-all" class="btn btn-primary">Deploy das 2 casas</button>
+        </div>
+      </header>
+
+      <section id="job-box" class="job-box hidden">
+        <div class="job-head">
+          <strong id="job-label">Operação</strong>
+          <span id="job-status" class="badge">...</span>
+        </div>
+        <pre id="job-output" class="log"></pre>
+      </section>
+
+      <section id="tenants" class="tenants"></section>
+
+      <section class="panel">
+        <h2>Log global</h2>
+        <pre id="global-log" class="log">Carregando...</pre>
+      </section>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

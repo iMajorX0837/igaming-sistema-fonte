@@ -1,0 +1,14 @@
+name: venuz-ops
+
+services:
+  ops-panel:
+    build: .
+    container_name: venuz-ops-panel
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/venuzbet:/opt/venuzbet

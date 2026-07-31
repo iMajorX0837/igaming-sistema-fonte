@@ -1,0 +1,255 @@
+const express = require('express');
+const { execFile, spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const ROOT = __dirname;
+const REPO_ROOT = process.env.REPO_ROOT || '/opt/venuzbet';
+const DEPLOY_DIR = process.env.DEPLOY_DIR || path.join(REPO_ROOT, 'deploy');
+const PORT = Number(process.env.OPS_PORT || 9090);
+const OPS_USER = process.env.OPS_USER || 'admin';
+const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
+
+const tenants = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'tenants.json'), 'utf8')
+);
+const tenantSlugs = new Set(tenants.map((t) => t.slug));
+
+if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
+  console.warn('[ops-panel] AVISO: defina OPS_PASSWORD no arquivo .env');
+}
+
+/** @type {{ id: string, label: string, running: boolean, output: string, code: number|null, startedAt: string, endedAt?: string }} */
+let activeJob = null;
+
+const app = express();
+app.use(express.json({ limit: '32kb' }));
+
+function unauthorized(res) {
+  res.set('WWW-Authenticate', 'Basic realm="Venuz Ops"');
+  return res.status(401).send('Autenticação necessária');
+}
+
+function auth(req, res, next) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Basic ')) return unauthorized(res);
+
+  let decoded = '';
+  try {
+    decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+  } catch {
+    return unauthorized(res);
+  }
+
+  const sep = decoded.indexOf(':');
+  const user = sep >= 0 ? decoded.slice(0, sep) : decoded;
+  const pass = sep >= 0 ? decoded.slice(sep + 1) : '';
+
+  if (user !== OPS_USER || pass !== OPS_PASSWORD) return unauthorized(res);
+  return next();
+}
+
+function runShell(command, timeoutMs = 120000) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'bash',
+      ['-lc', command],
+      {
+        cwd: DEPLOY_DIR,
+        timeout: timeoutMs,
+        maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, PATH: process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
+      },
+      (error, stdout, stderr) => {
+        const output = [stdout, stderr].filter(Boolean).join('\n').trim();
+        if (error) {
+          const err = new Error(output || error.message);
+          err.code = error.code;
+          reject(err);
+          return;
+        }
+        resolve(output);
+      }
+    );
+  });
+}
+
+function startJob(label, command) {
+  if (activeJob?.running) {
+    const err = new Error('Já existe uma operação em andamento. Aguarde terminar.');
+    err.status = 409;
+    throw err;
+  }
+
+  const id = crypto.randomBytes(6).toString('hex');
+  activeJob = {
+    id,
+    label,
+    running: true,
+    output: `==> ${label}\n`,
+    code: null,
+    startedAt: new Date().toISOString(),
+  };
+
+  const child = spawn('bash', ['-lc', command], {
+    cwd: DEPLOY_DIR,
+    env: process.env,
+  });
+
+  const append = (chunk) => {
+    activeJob.output += chunk.toString();
+    if (activeJob.output.length > 500000) {
+      activeJob.output = activeJob.output.slice(-400000);
+    }
+  };
+
+  child.stdout.on('data', append);
+  child.stderr.on('data', append);
+  child.on('close', (code) => {
+    activeJob.running = false;
+    activeJob.code = code;
+    activeJob.endedAt = new Date().toISOString();
+    activeJob.output += `\n==> Finalizado (exit ${code})\n`;
+  });
+
+  return id;
+}
+
+function assertTenant(slug) {
+  if (!tenantSlugs.has(slug)) {
+    const err = new Error(`Tenant inválido: ${slug}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+app.use(auth);
+app.use(express.static(path.join(ROOT, 'public')));
+
+app.get('/api/tenants', (_req, res) => {
+  res.json({ tenants });
+});
+
+app.get('/api/status', async (_req, res) => {
+  try {
+    let lines = [];
+    try {
+      const ps = await runShell('docker compose ps --format json', 60000);
+      lines = ps
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((line) => {
+          try {
+            return JSON.parse(line);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+    } catch {
+      const ps = await runShell('docker compose ps', 60000);
+      lines = ps
+        .split('\n')
+        .slice(2)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [name,, service] = line.split(/\s+/);
+          return { Name: name, Service: service, State: line.includes('Up') ? 'running' : 'exited' };
+        });
+    }
+
+    const health = {};
+    for (const tenant of tenants) {
+      const service = `api-${tenant.slug}`;
+      try {
+        const out = await runShell(
+          `docker compose exec -T nginx wget -qO- http://${service}:3000/health`,
+          30000
+        );
+        health[tenant.slug] = { ok: true, body: out };
+      } catch (e) {
+        health[tenant.slug] = { ok: false, error: e.message };
+      }
+    }
+
+    res.json({
+      containers: lines,
+      health,
+      job: activeJob
+        ? {
+            id: activeJob.id,
+            label: activeJob.label,
+            running: activeJob.running,
+            code: activeJob.code,
+          }
+        : null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/job', (_req, res) => {
+  if (!activeJob) return res.json({ job: null });
+  res.json({ job: activeJob });
+});
+
+app.post('/api/restart/:tenant', async (req, res) => {
+  try {
+    assertTenant(req.params.tenant);
+    const slug = req.params.tenant;
+    const out = await runShell(
+      `docker compose --profile ${slug} restart api-${slug} nginx`,
+      120000
+    );
+    res.json({ ok: true, output: out });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.post('/api/deploy/:tenant', (req, res) => {
+  try {
+    assertTenant(req.params.tenant);
+    const slug = req.params.tenant;
+    const cmd = `chmod +x scripts/*.sh && CLEAN=1 ./scripts/deploy-tenant.sh ${slug}`;
+    const id = startJob(`Deploy ${slug}`, cmd);
+    res.json({ ok: true, jobId: id, message: 'Deploy iniciado' });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.post('/api/deploy-all', (_req, res) => {
+  try {
+    const cmd =
+      'chmod +x scripts/*.sh && CLEAN=1 ./scripts/deploy-tenant.sh stewgaming && CLEAN=1 ./scripts/deploy-tenant.sh pixnarede';
+    const id = startJob('Deploy stewgaming + pixnarede', cmd);
+    res.json({ ok: true, jobId: id, message: 'Deploy das duas casas iniciado' });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.get('/api/logs/:tenant', async (req, res) => {
+  try {
+    assertTenant(req.params.tenant);
+    const lines = Math.min(Number(req.query.lines || 80), 300);
+    const slug = req.params.tenant;
+    const out = await runShell(`docker compose logs --tail=${lines} api-${slug}`, 60000);
+    res.json({ ok: true, output: out });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(ROOT, 'public', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[ops-panel] http://0.0.0.0:${PORT} (deploy: ${DEPLOY_DIR})`);
+});
