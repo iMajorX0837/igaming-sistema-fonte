@@ -77,46 +77,26 @@ body {
 }
 
 .sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 10px 22px;
+  padding: 4px 6px 22px;
 }
 
 .brand-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: block;
   text-decoration: none;
-  color: inherit;
   border-radius: var(--radius-sm);
   transition: opacity var(--transition);
 }
 
 .brand-link:hover {
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
-.brand-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 13px;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.35);
-}
-
-.sidebar-brand strong {
+.brand-logo {
   display: block;
-  font-size: 0.98rem;
-  letter-spacing: -0.01em;
-}
-
-.sidebar-brand span {
-  color: var(--muted);
-  font-size: 0.76rem;
+  width: 100%;
+  max-width: 168px;
+  height: auto;
+  object-fit: contain;
 }
 
 .sidebar-nav {

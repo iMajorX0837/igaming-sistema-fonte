@@ -146,7 +146,7 @@ function routePath(view, slug = null) {
 function updatePageMeta(route) {
   if (route.view === 'console') {
     pageTitle.textContent = 'Console';
-    document.title = 'Console — Venuz Ops';
+    document.title = 'Console — Stew Gaming';
     return;
   }
 
@@ -154,12 +154,12 @@ function updatePageMeta(route) {
     const tenant = knownTenants.find((t) => t.slug === route.slug);
     const label = tenant?.label || route.slug;
     pageTitle.textContent = label;
-    document.title = `${label} — Venuz Ops`;
+    document.title = `${label} — Stew Gaming`;
     return;
   }
 
   pageTitle.textContent = 'Visão geral';
-  document.title = 'Visão geral — Venuz Ops';
+  document.title = 'Visão geral — Stew Gaming';
 }
 
 function applyView(view) {

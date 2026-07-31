@@ -31,7 +31,7 @@ const app = express();
 app.use(express.json({ limit: '32kb' }));
 
 function unauthorized(res) {
-  res.set('WWW-Authenticate', 'Basic realm="Venuz Ops"');
+  res.set('WWW-Authenticate', 'Basic realm="Stew Gaming Ops"');
   return res.status(401).send('Autenticação necessária');
 }
 
