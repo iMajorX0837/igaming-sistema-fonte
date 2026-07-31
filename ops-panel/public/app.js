@@ -1,11 +1,16 @@
 const tenantsEl = document.getElementById('tenants');
+const sidebarTenantsEl = document.getElementById('sidebar-tenants');
+const statsEl = document.getElementById('stats');
 const globalLog = document.getElementById('global-log');
-globalLog.textContent = '';
 const jobBox = document.getElementById('job-box');
 const jobLabel = document.getElementById('job-label');
 const jobStatus = document.getElementById('job-status');
 const jobOutput = document.getElementById('job-output');
 const btnStopLive = document.getElementById('btn-stop-live');
+const pageTitle = document.getElementById('page-title');
+const lastUpdateEl = document.getElementById('last-update');
+
+globalLog.textContent = '';
 
 let pollTimer = null;
 let liveLogsActive = false;
@@ -15,7 +20,29 @@ let liveLogsOutput = '';
 
 function log(msg) {
   const line = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
-  globalLog.textContent = `${line}\n${globalLog.textContent}`.slice(0, 8000);
+  globalLog.textContent = `${line}\n${globalLog.textContent}`.slice(0, 12000);
+}
+
+function setView(view) {
+  document.querySelectorAll('.nav-item').forEach((el) => {
+    el.classList.toggle('active', el.dataset.view === view);
+  });
+  document.querySelectorAll('.view').forEach((el) => {
+    el.classList.toggle('active', el.id === `view-${view}`);
+  });
+  pageTitle.textContent = view === 'console' ? 'Console' : 'Visão geral';
+}
+
+function scrollToTenant(slug) {
+  setView('overview');
+  const card = document.querySelector(`.tenant-card[data-slug="${slug}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.style.outline = '2px solid var(--blue)';
+    setTimeout(() => {
+      card.style.outline = '';
+    }, 1600);
+  }
 }
 
 async function api(path, options = {}) {
@@ -35,53 +62,120 @@ async function api(path, options = {}) {
 }
 
 function containerStatus(containers, slug) {
-  const api = containers.find((c) => c.Service === `api-${slug}`);
-  if (!api) return { label: 'API ausente', ok: false };
-  const state = (api.State || api.Status || '').toLowerCase();
+  const row = containers.find((c) => c.Service === `api-${slug}`);
+  if (!row) return { label: 'API ausente', ok: false };
+  const state = (row.State || row.Status || '').toLowerCase();
   const ok = state.includes('running');
-  return { label: ok ? 'API online' : api.State || api.Status || 'offline', ok };
+  return { label: ok ? 'API online' : row.State || row.Status || 'offline', ok };
+}
+
+function tenantState(t, status) {
+  const containers = status.containers || [];
+  const api = containerStatus(containers, t.slug);
+  const nginxOn = status.nginxEnabled?.[t.slug] !== false;
+  const houseOn = api.ok && nginxOn;
+  const healthOk = status.health?.[t.slug]?.ok;
+  return { api, nginxOn, houseOn, healthOk };
+}
+
+function renderStats(tenants, status) {
+  let online = 0;
+  for (const t of tenants) {
+    if (tenantState(t, status).houseOn) online += 1;
+  }
+
+  const jobRunning = status.job?.running ? 1 : 0;
+
+  statsEl.innerHTML = `
+    <article class="stat-card accent-blue">
+      <div class="label">Casas no ar</div>
+      <div class="value">${online}/${tenants.length}</div>
+      <div class="hint">API + nginx ativos</div>
+    </article>
+    <article class="stat-card accent-green">
+      <div class="label">Containers</div>
+      <div class="value">${(status.containers || []).length}</div>
+      <div class="hint">APIs + nginx monitorados</div>
+    </article>
+    <article class="stat-card accent-amber">
+      <div class="label">Operação</div>
+      <div class="value">${jobRunning ? 'Ativa' : 'Ociosa'}</div>
+      <div class="hint">${status.job?.label || 'Nenhum deploy rodando'}</div>
+    </article>
+  `;
+}
+
+function renderSidebarTenants(tenants, status) {
+  sidebarTenantsEl.innerHTML = tenants
+    .map((t) => {
+      const { houseOn } = tenantState(t, status);
+      return `
+        <button type="button" class="sidebar-tenant" data-slug="${t.slug}">
+          <div>
+            <div class="sidebar-tenant-name">${t.label}</div>
+            <div class="sidebar-tenant-domain">${t.domain}</div>
+          </div>
+          <span class="status-dot ${houseOn ? 'on' : 'off'}" title="${houseOn ? 'Online' : 'Offline'}"></span>
+        </button>
+      `;
+    })
+    .join('');
 }
 
 function renderTenants(tenants, status) {
   const containers = status.containers || [];
   tenantsEl.innerHTML = tenants
     .map((t) => {
-      const c = containerStatus(containers, t.slug);
-      const nginxOn = status.nginxEnabled?.[t.slug] !== false;
-      const houseOn = c.ok && nginxOn;
-      const h = status.health?.[t.slug];
-      const healthOk = h?.ok;
+      const { api, nginxOn, houseOn, healthOk } = tenantState(t, status);
       return `
-        <article class="card" data-slug="${t.slug}">
-          <div class="card-head">
+        <article class="tenant-card" data-slug="${t.slug}">
+          <div class="tenant-card-head">
             <div>
               <h3>${t.label}</h3>
-              <div class="meta">${t.domain}</div>
+              <div class="tenant-domain">${t.domain}</div>
             </div>
+            <span class="badge ${houseOn ? 'ok' : 'err'}">${houseOn ? 'Casa no ar' : 'Desligada'}</span>
           </div>
-          <div class="badges">
-            <span class="badge ${houseOn ? 'ok' : 'err'}">${houseOn ? 'Casa no ar' : 'Casa desligada'}</span>
-            <span class="badge ${c.ok ? 'ok' : 'err'}">${c.ok ? 'API online' : 'API parada'}</span>
-            <span class="badge ${nginxOn ? 'ok' : 'err'}">${nginxOn ? 'Nginx ativo' : 'Nginx off'}</span>
-            <span class="badge ${healthOk ? 'ok' : 'err'}">${healthOk ? 'Health OK' : 'Health falhou'}</span>
-          </div>
-          <div class="actions">
-            <button class="btn btn-start" data-action="start" data-slug="${t.slug}" ${houseOn ? 'disabled' : ''}>Iniciar casa</button>
-            <button class="btn btn-stop" data-action="stop" data-slug="${t.slug}" ${houseOn ? '' : 'disabled'}>Parar casa</button>
-            <button class="btn btn-ghost" data-action="restart" data-slug="${t.slug}">Reiniciar</button>
-            <button class="btn btn-warn" data-action="deploy" data-slug="${t.slug}">Deploy CLEAN</button>
-            <button class="btn btn-ghost" data-action="logs" data-slug="${t.slug}">Ver logs</button>
-            <button class="btn btn-ghost" data-action="logs-live" data-slug="${t.slug}">Logs ao vivo</button>
-          </div>
-          <div class="links">
-            <a href="http://${t.domain}" target="_blank" rel="noreferrer">Site</a>
-            <a href="http://admin.${t.domain}" target="_blank" rel="noreferrer">Admin</a>
-            <a href="http://api.${t.domain}/health" target="_blank" rel="noreferrer">API /health</a>
+          <div class="tenant-card-body">
+            <div class="status-grid">
+              <div class="status-pill ${api.ok ? 'ok' : 'err'}">● ${api.ok ? 'API online' : 'API parada'}</div>
+              <div class="status-pill ${nginxOn ? 'ok' : 'err'}">● ${nginxOn ? 'Nginx ativo' : 'Nginx off'}</div>
+              <div class="status-pill ${healthOk ? 'ok' : 'err'}">● ${healthOk ? 'Health OK' : 'Health falhou'}</div>
+              <div class="status-pill ${houseOn ? 'ok' : 'err'}">● ${houseOn ? 'Operacional' : 'Indisponível'}</div>
+            </div>
+
+            <div class="action-groups">
+              <div class="action-group">
+                <label>Power</label>
+                <div class="action-row">
+                  <button class="btn btn-start" data-action="start" data-slug="${t.slug}" ${houseOn ? 'disabled' : ''}>Iniciar</button>
+                  <button class="btn btn-stop" data-action="stop" data-slug="${t.slug}" ${houseOn ? '' : 'disabled'}>Parar</button>
+                  <button class="btn btn-ghost" data-action="restart" data-slug="${t.slug}">Reiniciar</button>
+                </div>
+              </div>
+              <div class="action-group">
+                <label>Deploy & logs</label>
+                <div class="action-row">
+                  <button class="btn btn-warn" data-action="deploy" data-slug="${t.slug}">Deploy CLEAN</button>
+                  <button class="btn btn-ghost" data-action="logs" data-slug="${t.slug}">Logs</button>
+                  <button class="btn btn-ghost" data-action="logs-live" data-slug="${t.slug}">Ao vivo</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="links-row">
+              <a class="link-chip" href="http://${t.domain}" target="_blank" rel="noreferrer">Site</a>
+              <a class="link-chip" href="http://admin.${t.domain}" target="_blank" rel="noreferrer">Admin</a>
+              <a class="link-chip" href="http://api.${t.domain}/health" target="_blank" rel="noreferrer">API</a>
+            </div>
           </div>
         </article>
       `;
     })
     .join('');
+
+  renderSidebarTenants(tenants, status);
+  renderStats(tenants, status);
 }
 
 function showJob(job) {
@@ -91,7 +185,10 @@ function showJob(job) {
     btnStopLive.classList.add('hidden');
     return;
   }
+
+  setView('console');
   jobBox.classList.remove('hidden');
+
   jobLabel.textContent = job.label || 'Operação';
   if (job.live) {
     jobStatus.textContent = 'Ao vivo';
@@ -122,7 +219,7 @@ async function startLiveLogs(slug) {
   liveLogsAbort = new AbortController();
 
   showJob({
-    label: `Logs ao vivo: ${slug}`,
+    label: `Logs ao vivo — ${slug}`,
     running: true,
     live: true,
     output: 'Conectando...\n',
@@ -161,22 +258,20 @@ async function startLiveLogs(slug) {
           liveLogsOutput = liveLogsOutput.slice(-150000);
         }
         showJob({
-          label: `Logs ao vivo: ${slug}`,
+          label: `Logs ao vivo — ${slug}`,
           running: !payload.done,
           live: !payload.done,
           output: liveLogsOutput,
           code: payload.done ? 0 : null,
         });
-        if (payload.done) {
-          liveLogsActive = false;
-        }
+        if (payload.done) liveLogsActive = false;
       }
     }
   } catch (e) {
     if (e.name !== 'AbortError') {
       log(`Erro logs ao vivo: ${e.message}`);
       showJob({
-        label: `Logs ao vivo: ${slug}`,
+        label: `Logs ao vivo — ${slug}`,
         running: false,
         live: false,
         output: `${liveLogsOutput}\nErro: ${e.message}`,
@@ -193,10 +288,17 @@ async function startLiveLogs(slug) {
 async function refresh() {
   const { tenants } = await api('/api/tenants');
   const status = await api('/api/status');
+  lastSnapshot = { tenants, status };
   renderTenants(tenants, status);
+  lastUpdateEl.textContent = `Atualizado ${new Date().toLocaleTimeString('pt-BR')}`;
+
   if (!liveLogsActive) {
     if (status.job) showJob(await api('/api/job').then((r) => r.job));
-    else showJob(null);
+    else if (jobBox.classList.contains('hidden') === false && !liveLogsOutput) {
+      // keep console visible if user opened it
+    } else {
+      showJob(null);
+    }
   }
 }
 
@@ -215,53 +317,56 @@ async function pollJob() {
   }
 }
 
+async function runTenantAction(action, slug) {
+  if (action === 'stop') {
+    log(`Desligando casa ${slug}...`);
+    await api(`/api/stop/${slug}`, { method: 'POST' });
+    log(`${slug}: casa offline.`);
+    await refresh();
+  }
+
+  if (action === 'start') {
+    log(`Ligando casa ${slug}...`);
+    await api(`/api/start/${slug}`, { method: 'POST' });
+    log(`${slug}: casa no ar.`);
+    await refresh();
+  }
+
+  if (action === 'restart') {
+    log(`Reiniciando ${slug}...`);
+    await api(`/api/restart/${slug}`, { method: 'POST' });
+    log(`${slug}: reiniciada.`);
+    await refresh();
+  }
+
+  if (action === 'deploy') {
+    log(`Deploy CLEAN ${slug}...`);
+    await api(`/api/deploy/${slug}`, { method: 'POST' });
+    showJob({ label: `Deploy — ${slug}`, running: true, output: 'Iniciando...\n', code: null });
+    pollJob();
+  }
+
+  if (action === 'logs') {
+    stopLiveLogs();
+    log(`Logs ${slug}...`);
+    const res = await api(`/api/logs/${slug}?lines=120`);
+    showJob({ label: `Logs — ${slug}`, running: false, output: res.output, code: 0 });
+  }
+
+  if (action === 'logs-live') {
+    log(`Logs ao vivo ${slug}...`);
+    startLiveLogs(slug);
+  }
+}
+
 tenantsEl.addEventListener('click', async (ev) => {
   const btn = ev.target.closest('button[data-action]');
   if (!btn || btn.disabled) return;
 
   const { action, slug } = btn.dataset;
   btn.disabled = true;
-
   try {
-    if (action === 'stop') {
-      log(`Desligando casa ${slug} (API + domínios)...`);
-      await api(`/api/stop/${slug}`, { method: 'POST' });
-      log(`${slug}: casa inteira offline (site, admin, api).`);
-      await refresh();
-    }
-
-    if (action === 'start') {
-      log(`Ligando casa ${slug}...`);
-      await api(`/api/start/${slug}`, { method: 'POST' });
-      log(`${slug}: casa inteira no ar.`);
-      await refresh();
-    }
-
-    if (action === 'restart') {
-      log(`Reiniciando ${slug}...`);
-      await api(`/api/restart/${slug}`, { method: 'POST' });
-      log(`${slug}: reiniciada.`);
-      await refresh();
-    }
-
-    if (action === 'deploy') {
-      log(`Deploy CLEAN ${slug} iniciado...`);
-      await api(`/api/deploy/${slug}`, { method: 'POST' });
-      showJob({ label: `Deploy ${slug}`, running: true, output: 'Iniciando...\n', code: null });
-      pollJob();
-    }
-
-    if (action === 'logs') {
-      stopLiveLogs();
-      log(`Carregando logs ${slug}...`);
-      const res = await api(`/api/logs/${slug}?lines=100`);
-      showJob({ label: `Logs ${slug}`, running: false, output: res.output, code: 0 });
-    }
-
-    if (action === 'logs-live') {
-      log(`Logs ao vivo ${slug}...`);
-      startLiveLogs(slug);
-    }
+    await runTenantAction(action, slug);
   } catch (e) {
     log(`Erro: ${e.message}`);
   } finally {
@@ -269,13 +374,27 @@ tenantsEl.addEventListener('click', async (ev) => {
   }
 });
 
+sidebarTenantsEl.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.sidebar-tenant');
+  if (!btn) return;
+  scrollToTenant(btn.dataset.slug);
+});
+
+document.querySelectorAll('.nav-item').forEach((btn) => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
 document.getElementById('btn-refresh').addEventListener('click', () => {
   refresh().catch((e) => log(e.message));
 });
 
+document.getElementById('btn-clear-log').addEventListener('click', () => {
+  globalLog.textContent = '';
+});
+
 btnStopLive.addEventListener('click', () => {
   stopLiveLogs();
-  log('Logs ao vivo parados.');
+  log('Stream de logs parado.');
   showJob({
     label: 'Logs ao vivo',
     running: false,
@@ -287,9 +406,14 @@ btnStopLive.addEventListener('click', () => {
 
 document.getElementById('btn-deploy-all').addEventListener('click', async () => {
   try {
-    log('Deploy das 2 casas iniciado...');
+    log('Deploy das 2 casas...');
     await api('/api/deploy-all', { method: 'POST' });
-    showJob({ label: 'Deploy stewgaming + pixnarede', running: true, output: 'Iniciando...\n', code: null });
+    showJob({
+      label: 'Deploy — stewgaming + pixnarede',
+      running: true,
+      output: 'Iniciando...\n',
+      code: null,
+    });
     pollJob();
   } catch (e) {
     log(`Erro: ${e.message}`);
@@ -297,8 +421,8 @@ document.getElementById('btn-deploy-all').addEventListener('click', async () => 
 });
 
 refresh()
-  .then(() => log('Painel carregado.'))
-  .catch((e) => log(`Falha ao carregar: ${e.message}`));
+  .then(() => log('Painel pronto.'))
+  .catch((e) => log(`Falha: ${e.message}`));
 
 setInterval(() => {
   refresh().catch(() => {});

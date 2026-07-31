@@ -4,38 +4,90 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Venuz Ops</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div class="wrap">
-      <header class="header">
-        <div>
-          <h1>Venuz Ops</h1>
-          <p>Painel da VPS — deploy e restart das casas</p>
-        </div>
-        <div class="header-actions">
-          <button id="btn-refresh" class="btn btn-ghost">Atualizar</button>
-          <button id="btn-deploy-all" class="btn btn-primary">Deploy das 2 casas</button>
-        </div>
-      </header>
-
-      <section id="job-box" class="job-box hidden">
-        <div class="job-head">
-          <div class="job-head-left">
-            <strong id="job-label">Operação</strong>
-            <span id="job-status" class="badge">...</span>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-icon">V</div>
+          <div>
+            <strong>Venuz Ops</strong>
+            <span>Painel VPS</span>
           </div>
-          <button id="btn-stop-live" class="btn btn-stop btn-sm hidden" type="button">Parar logs</button>
         </div>
-        <pre id="job-output" class="log log-live"></pre>
-      </section>
 
-      <section id="tenants" class="tenants"></section>
+        <nav class="sidebar-nav">
+          <button type="button" class="nav-item active" data-view="overview">
+            <span class="nav-icon">◉</span>
+            Visão geral
+          </button>
+          <button type="button" class="nav-item" data-view="console">
+            <span class="nav-icon">▣</span>
+            Console
+          </button>
+        </nav>
 
-      <section class="panel">
-        <h2>Log global</h2>
-        <pre id="global-log" class="log"></pre>
-      </section>
+        <div class="sidebar-section">
+          <p class="sidebar-label">Casas</p>
+          <div id="sidebar-tenants" class="sidebar-tenants"></div>
+        </div>
+
+        <div class="sidebar-footer">
+          <button id="btn-refresh" type="button" class="btn btn-sidebar">Atualizar status</button>
+          <button id="btn-deploy-all" type="button" class="btn btn-sidebar-primary">Deploy das 2 casas</button>
+        </div>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <div>
+            <p class="topbar-kicker">Infraestrutura</p>
+            <h1 id="page-title">Visão geral</h1>
+          </div>
+          <div class="topbar-meta">
+            <span id="last-update" class="muted">—</span>
+          </div>
+        </header>
+
+        <section id="view-overview" class="view active">
+          <div id="stats" class="stats-grid"></div>
+          <div class="section-head">
+            <h2>Casas hospedadas</h2>
+            <p>Gerencie deploy, restart e logs de cada tenant.</p>
+          </div>
+          <div id="tenants" class="tenants-grid"></div>
+        </section>
+
+        <section id="view-console" class="view">
+          <div class="section-head">
+            <h2>Console</h2>
+            <p>Deploys em andamento, logs da API e histórico de ações.</p>
+          </div>
+
+          <div id="job-box" class="console-card hidden">
+            <div class="console-card-head">
+              <div class="job-head-left">
+                <strong id="job-label">Operação</strong>
+                <span id="job-status" class="badge">...</span>
+              </div>
+              <button id="btn-stop-live" class="btn btn-stop btn-sm hidden" type="button">Parar stream</button>
+            </div>
+            <pre id="job-output" class="log log-live"></pre>
+          </div>
+
+          <div class="console-card">
+            <div class="console-card-head">
+              <strong>Atividade do painel</strong>
+              <button id="btn-clear-log" type="button" class="btn btn-ghost btn-sm">Limpar</button>
+            </div>
+            <pre id="global-log" class="log"></pre>
+          </div>
+        </section>
+      </div>
     </div>
     <script src="/app.js"></script>
   </body>
