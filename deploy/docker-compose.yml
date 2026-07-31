@@ -62,6 +62,15 @@ services:
       - stewgaming
       - all
 
+  api-pixnarede:
+    <<: *api-base
+    container_name: api-pixnarede
+    env_file:
+      - ./tenants/pixnarede/env.api
+    profiles:
+      - pixnarede
+      - all
+
 networks:
   venuznet:
     driver: bridge

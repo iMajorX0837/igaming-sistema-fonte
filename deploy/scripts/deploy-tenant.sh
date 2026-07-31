@@ -44,6 +44,9 @@ git reset --hard "origin/$BRANCH"
 cd "$ROOT_DIR"
 chmod +x "$ROOT_DIR"/scripts/*.sh 2>/dev/null || true
 
+echo "==> Garantir serviço docker-compose + nginx ($TENANT)"
+bash "$ROOT_DIR/scripts/ensure-tenant-compose.sh" "$TENANT"
+
 if [[ "${CLEAN:-}" == "1" ]]; then
   echo "==> [2/6] Parar API + nginx e limpar assets ($TENANT)"
   docker compose --profile "$TENANT" stop "$SERVICE" nginx 2>/dev/null || true
