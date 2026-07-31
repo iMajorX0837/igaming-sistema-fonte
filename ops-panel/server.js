@@ -3,6 +3,7 @@ const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { collectSystemStats } = require('./systemStats');
 
 const ROOT = __dirname;
 const REPO_ROOT = process.env.REPO_ROOT || '/opt/venuzbet';
@@ -219,10 +220,13 @@ app.get('/api/status', async (_req, res) => {
       }
     }
 
+    const system = await collectSystemStats(runShell);
+
     res.json({
       containers: lines,
       health,
       nginxEnabled,
+      system,
       job: activeJob
         ? {
             id: activeJob.id,

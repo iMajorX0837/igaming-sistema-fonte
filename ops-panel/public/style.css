@@ -299,6 +299,111 @@ body {
   color: var(--amber);
 }
 
+/* VPS metrics */
+.vps-panel {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.vps-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.vps-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.vps-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.vps-host {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: right;
+}
+
+.vps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.vps-metric {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.vps-metric .label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.vps-metric .value-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vps-metric .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.vps-metric .sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.meter {
+  height: 8px;
+  background: #0b1020;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.meter-fill.ok {
+  background: linear-gradient(90deg, #22c55e, #34d399);
+}
+
+.meter-fill.warn {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.meter-fill.crit {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.vps-unavailable {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+
 /* Tenant cards */
 .tenants-grid {
   display: grid;

@@ -1,6 +1,7 @@
 const tenantsEl = document.getElementById('tenants');
 const sidebarTenantsEl = document.getElementById('sidebar-tenants');
 const statsEl = document.getElementById('stats');
+const vpsStatsEl = document.getElementById('vps-stats');
 const globalLog = document.getElementById('global-log');
 const jobBox = document.getElementById('job-box');
 const jobLabel = document.getElementById('job-label');
@@ -76,6 +77,83 @@ function tenantState(t, status) {
   const houseOn = api.ok && nginxOn;
   const healthOk = status.health?.[t.slug]?.ok;
   return { api, nginxOn, houseOn, healthOk };
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** i;
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
+}
+
+function meterClass(percent) {
+  if (percent >= 90) return 'crit';
+  if (percent >= 75) return 'warn';
+  return 'ok';
+}
+
+function renderVpsStats(system) {
+  if (!system?.available) {
+    vpsStatsEl.innerHTML = `
+      <div class="vps-head">
+        <div>
+          <h2>Servidor (VPS)</h2>
+          <p>Métricas do host indisponíveis</p>
+        </div>
+      </div>
+      <div class="vps-unavailable">${system?.message || 'Recrie o container ops com volumes montados.'}</div>
+    `;
+    return;
+  }
+
+  const memPct = system.memory?.percent ?? 0;
+  const diskPct = system.disk?.percent ?? 0;
+  const cpuPct = system.cpu?.usagePercent;
+  const cpuDisplay = cpuPct == null ? '…' : `${cpuPct}%`;
+
+  vpsStatsEl.innerHTML = `
+    <div class="vps-head">
+      <div>
+        <h2>Servidor (VPS)</h2>
+        <p>CPU, memória e disco do host</p>
+      </div>
+      <div class="vps-host">
+        <strong>${system.hostname || 'vps'}</strong><br>
+        Uptime: ${system.uptimeHuman || '—'}
+      </div>
+    </div>
+    <div class="vps-grid">
+      <article class="vps-metric">
+        <div class="label">Processador</div>
+        <div class="value-row">
+          <span class="value">${cpuDisplay}</span>
+          <span class="sub">${system.cpu?.cores || '?'} núcleos</span>
+        </div>
+        <div class="sub" title="${system.cpu?.model || ''}">${(system.cpu?.model || 'CPU').slice(0, 42)}${(system.cpu?.model || '').length > 42 ? '…' : ''}</div>
+        ${cpuPct != null ? `<div class="meter" style="margin-top:10px"><div class="meter-fill ${meterClass(cpuPct)}" style="width:${cpuPct}%"></div></div>` : ''}
+        <div class="sub" style="margin-top:8px">Load: ${system.cpu?.load1?.toFixed(2) ?? '—'} / ${system.cpu?.load5?.toFixed(2) ?? '—'} / ${system.cpu?.load15?.toFixed(2) ?? '—'}</div>
+      </article>
+      <article class="vps-metric">
+        <div class="label">Memória RAM</div>
+        <div class="value-row">
+          <span class="value">${memPct}%</span>
+          <span class="sub">${formatBytes(system.memory?.usedBytes)} / ${formatBytes(system.memory?.totalBytes)}</span>
+        </div>
+        <div class="meter"><div class="meter-fill ${meterClass(memPct)}" style="width:${memPct}%"></div></div>
+        <div class="sub" style="margin-top:8px">Livre: ${formatBytes(system.memory?.availableBytes)}</div>
+      </article>
+      <article class="vps-metric">
+        <div class="label">Disco</div>
+        <div class="value-row">
+          <span class="value">${diskPct}%</span>
+          <span class="sub">${system.disk ? `${formatBytes(system.disk.usedBytes)} / ${formatBytes(system.disk.totalBytes)}` : '—'}</span>
+        </div>
+        ${system.disk ? `<div class="meter"><div class="meter-fill ${meterClass(diskPct)}" style="width:${diskPct}%"></div></div>` : '<div class="sub">Não foi possível ler o disco</div>'}
+        <div class="sub" style="margin-top:8px">${system.disk?.mount ? `Montagem: ${system.disk.mount}` : ''}</div>
+      </article>
+    </div>
+  `;
 }
 
 function renderStats(tenants, status) {
@@ -175,6 +253,7 @@ function renderTenants(tenants, status) {
     .join('');
 
   renderSidebarTenants(tenants, status);
+  renderVpsStats(status.system);
   renderStats(tenants, status);
 }
 
@@ -288,7 +367,6 @@ async function startLiveLogs(slug) {
 async function refresh() {
   const { tenants } = await api('/api/tenants');
   const status = await api('/api/status');
-  lastSnapshot = { tenants, status };
   renderTenants(tenants, status);
   lastUpdateEl.textContent = `Atualizado ${new Date().toLocaleTimeString('pt-BR')}`;
 

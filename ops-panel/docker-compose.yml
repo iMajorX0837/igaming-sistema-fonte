@@ -12,3 +12,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/venuzbet:/opt/venuzbet
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/rootfs:ro
