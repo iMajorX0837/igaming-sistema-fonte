@@ -83,6 +83,20 @@ body {
   padding: 6px 10px 22px;
 }
 
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--transition);
+}
+
+.brand-link:hover {
+  opacity: 0.9;
+}
+
 .brand-icon {
   width: 42px;
   height: 42px;
@@ -127,6 +141,7 @@ body {
   font-size: 0.9rem;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
 
@@ -182,12 +197,18 @@ body {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  text-decoration: none;
   transition: background var(--transition), border-color var(--transition);
 }
 
 .sidebar-tenant:hover {
   background: var(--card);
   border-color: var(--border-soft);
+}
+
+.sidebar-tenant.is-active {
+  background: var(--blue-dim);
+  border-color: rgba(96, 165, 250, 0.2);
 }
 
 .sidebar-tenant-name {
@@ -523,6 +544,11 @@ body {
 
 .tenant-card.is-online {
   border-color: rgba(52, 211, 153, 0.2);
+}
+
+.tenant-card.is-focused {
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.2), var(--shadow);
 }
 
 .tenant-card.is-online .tenant-card-head {

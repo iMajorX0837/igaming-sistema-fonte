@@ -27,6 +27,12 @@ let liveLogsAbort = null;
 let liveLogsOutput = '';
 /** @type {((value: boolean) => void) | null} */
 let modalResolve = null;
+/** @type {string | null} */
+let activeTenantSlug = null;
+/** @type {string | null} */
+let pendingTenantSlug = null;
+/** @type {{ slug: string; label: string; domain: string }[]} */
+let knownTenants = [];
 
 const ICONS = {
   start: '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
@@ -113,26 +119,127 @@ function log(msg) {
   globalLog.textContent = `${line}\n${globalLog.textContent}`.slice(0, 12000);
 }
 
-function setView(view) {
+function parseRoute(pathname) {
+  const path = pathname.replace(/\/+$/, '') || '/';
+
+  if (path === '/' || path === '/overview') {
+    return { view: 'overview', slug: null, valid: true };
+  }
+  if (path === '/console') {
+    return { view: 'console', slug: null, valid: true };
+  }
+
+  const match = path.match(/^\/casas\/([a-z0-9_-]+)$/i);
+  if (match) {
+    return { view: 'overview', slug: match[1].toLowerCase(), valid: true };
+  }
+
+  return { view: 'overview', slug: null, valid: false };
+}
+
+function routePath(view, slug = null) {
+  if (view === 'console') return '/console';
+  if (slug) return `/casas/${slug}`;
+  return '/';
+}
+
+function updatePageMeta(route) {
+  if (route.view === 'console') {
+    pageTitle.textContent = 'Console';
+    document.title = 'Console — Venuz Ops';
+    return;
+  }
+
+  if (route.slug) {
+    const tenant = knownTenants.find((t) => t.slug === route.slug);
+    const label = tenant?.label || route.slug;
+    pageTitle.textContent = label;
+    document.title = `${label} — Venuz Ops`;
+    return;
+  }
+
+  pageTitle.textContent = 'Visão geral';
+  document.title = 'Visão geral — Venuz Ops';
+}
+
+function applyView(view) {
   document.querySelectorAll('.nav-item').forEach((el) => {
     el.classList.toggle('active', el.dataset.view === view);
   });
   document.querySelectorAll('.view').forEach((el) => {
     el.classList.toggle('active', el.id === `view-${view}`);
   });
-  pageTitle.textContent = view === 'console' ? 'Console' : 'Visão geral';
+}
+
+function highlightTenantCard(slug) {
+  document.querySelectorAll('.tenant-card').forEach((card) => {
+    card.classList.toggle('is-focused', card.dataset.slug === slug);
+  });
+
+  document.querySelectorAll('.sidebar-tenant').forEach((el) => {
+    el.classList.toggle('is-active', el.dataset.slug === slug);
+  });
+}
+
+function scrollToTenantCard(slug) {
+  const card = document.querySelector(`.tenant-card[data-slug="${slug}"]`);
+  if (!card) return false;
+
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.style.outline = '2px solid var(--blue)';
+  setTimeout(() => {
+    card.style.outline = '';
+  }, 1600);
+  highlightTenantCard(slug);
+  return true;
+}
+
+function applyRoute(route, { updateUrl = false, replace = false } = {}) {
+  if (!route.valid) {
+    notify('Rota inválida', 'Redirecionando para a visão geral', 'warn', 3000);
+    navigate(routePath('overview'), { replace: true });
+    return;
+  }
+
+  if (route.slug && knownTenants.length && !knownTenants.some((t) => t.slug === route.slug)) {
+    notify('Casa não encontrada', route.slug, 'error');
+    navigate(routePath('overview'), { replace: true });
+    return;
+  }
+
+  activeTenantSlug = route.slug;
+  pendingTenantSlug = route.slug;
+  applyView(route.view);
+  updatePageMeta(route);
+
+  if (route.slug) {
+    if (!scrollToTenantCard(route.slug)) {
+      pendingTenantSlug = route.slug;
+    }
+  } else {
+    highlightTenantCard(null);
+    pendingTenantSlug = null;
+  }
+
+  if (updateUrl) {
+    const path = routePath(route.view, route.slug);
+    if (location.pathname !== path) {
+      if (replace) history.replaceState({ route }, '', path);
+      else history.pushState({ route }, '', path);
+    }
+  }
+}
+
+function navigate(path, { replace = false } = {}) {
+  applyRoute(parseRoute(path), { updateUrl: true, replace });
+}
+
+function setView(view, slug = null) {
+  applyRoute({ view, slug, valid: true }, { updateUrl: true });
 }
 
 function scrollToTenant(slug) {
-  setView('overview');
-  const card = document.querySelector(`.tenant-card[data-slug="${slug}"]`);
-  if (card) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.style.outline = '2px solid var(--blue)';
-    setTimeout(() => {
-      card.style.outline = '';
-    }, 1600);
-  }
+  navigate(routePath('overview', slug));
 }
 
 async function api(path, options = {}) {
@@ -276,14 +383,15 @@ function renderSidebarTenants(tenants, status) {
   sidebarTenantsEl.innerHTML = tenants
     .map((t) => {
       const { houseOn } = tenantState(t, status);
+      const isActive = activeTenantSlug === t.slug;
       return `
-        <button type="button" class="sidebar-tenant" data-slug="${t.slug}">
+        <a href="/casas/${t.slug}" class="sidebar-tenant ${isActive ? 'is-active' : ''}" data-slug="${t.slug}">
           <div>
             <div class="sidebar-tenant-name">${t.label}</div>
             <div class="sidebar-tenant-domain">${t.domain}</div>
           </div>
           <span class="status-dot ${houseOn ? 'on' : 'off'}" title="${houseOn ? 'Online' : 'Offline'}"></span>
-        </button>
+        </a>
       `;
     })
     .join('');
@@ -355,6 +463,10 @@ function renderTenants(tenants, status) {
   renderSidebarTenants(tenants, status);
   renderVpsStats(status.system);
   renderStats(tenants, status);
+
+  if (pendingTenantSlug) {
+    scrollToTenantCard(pendingTenantSlug);
+  }
 }
 
 function showJob(job) {
@@ -467,9 +579,13 @@ async function startLiveLogs(slug) {
 
 async function refresh() {
   const { tenants } = await api('/api/tenants');
+  knownTenants = tenants;
   const status = await api('/api/status');
   renderTenants(tenants, status);
   lastUpdateEl.textContent = `Atualizado ${new Date().toLocaleTimeString('pt-BR')}`;
+
+  const currentRoute = parseRoute(location.pathname);
+  if (currentRoute.slug) updatePageMeta(currentRoute);
 
   if (!liveLogsActive) {
     if (status.job) showJob(await api('/api/job').then((r) => r.job));
@@ -607,13 +723,26 @@ tenantsEl.addEventListener('click', async (ev) => {
 });
 
 sidebarTenantsEl.addEventListener('click', (ev) => {
-  const btn = ev.target.closest('.sidebar-tenant');
-  if (!btn) return;
-  scrollToTenant(btn.dataset.slug);
+  const link = ev.target.closest('.sidebar-tenant');
+  if (!link) return;
+  ev.preventDefault();
+  navigate(link.getAttribute('href') || routePath('overview', link.dataset.slug));
 });
 
-document.querySelectorAll('.nav-item').forEach((btn) => {
-  btn.addEventListener('click', () => setView(btn.dataset.view));
+document.querySelector('.sidebar-nav')?.addEventListener('click', (ev) => {
+  const link = ev.target.closest('a.nav-item');
+  if (!link) return;
+  ev.preventDefault();
+  navigate(link.getAttribute('href') || '/');
+});
+
+document.querySelector('.brand-link')?.addEventListener('click', (ev) => {
+  ev.preventDefault();
+  navigate('/');
+});
+
+window.addEventListener('popstate', () => {
+  applyRoute(parseRoute(location.pathname));
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async (ev) => {
@@ -680,6 +809,7 @@ document.getElementById('btn-deploy-all').addEventListener('click', async (ev) =
 
 refresh()
   .then(() => {
+    applyRoute(parseRoute(location.pathname));
     log('Painel pronto.');
     notify('Painel carregado', 'Monitoramento ativo', 'success', 3000);
   })

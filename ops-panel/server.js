@@ -378,7 +378,8 @@ app.get('/api/logs/:tenant/live', (req, res) => {
   req.on('close', cleanup);
 });
 
-app.get('*', (_req, res) => {
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(ROOT, 'public', 'index.html'));
 });
 
