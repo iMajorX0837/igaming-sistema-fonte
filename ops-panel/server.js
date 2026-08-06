@@ -8,7 +8,27 @@ const { validateNewTenantInput, parseSupabasePaste } = require('./parseSupabase'
 
 const ROOT = __dirname;
 const REPO_ROOT = process.env.REPO_ROOT || '/opt/venuzbet';
-const DEPLOY_DIR = process.env.DEPLOY_DIR || path.join(REPO_ROOT, 'Deploy-Infra');
+
+function resolveDeployDir() {
+  const candidates = [
+    process.env.DEPLOY_DIR,
+    path.join(REPO_ROOT, 'Deploy-Infra'),
+    path.join(REPO_ROOT, 'deploy'),
+  ].filter(Boolean);
+
+  const seen = new Set();
+  for (const dir of candidates) {
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    if (fs.existsSync(path.join(dir, 'scripts'))) {
+      return dir;
+    }
+  }
+
+  return process.env.DEPLOY_DIR || path.join(REPO_ROOT, 'Deploy-Infra');
+}
+
+const DEPLOY_DIR = resolveDeployDir();
 const PORT = Number(process.env.OPS_PORT || 9090);
 const OPS_USER = process.env.OPS_USER || 'admin';
 const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
@@ -45,6 +65,39 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
+function scriptsDir() {
+  return path.join(DEPLOY_DIR, 'scripts');
+}
+
+function chmodScriptsCmd() {
+  return `find ${shellQuote(scriptsDir())} -maxdepth 1 -name '*.sh' -exec chmod +x {} +`;
+}
+
+function scriptCmd(name, args = '') {
+  return `${shellQuote(path.join(scriptsDir(), name))}${args ? ` ${args}` : ''}`;
+}
+
+function assertDeployReady(scriptName) {
+  const dir = scriptsDir();
+  if (!fs.existsSync(dir)) {
+    throw Object.assign(
+      new Error(
+        `Pasta ${dir} não existe. Na VPS: cd ${REPO_ROOT} && git fetch origin && git reset --hard origin/main && cd ops-panel && docker compose up -d --build`
+      ),
+      { status: 400 }
+    );
+  }
+  if (scriptName) {
+    const scriptPath = path.join(dir, scriptName);
+    if (!fs.existsSync(scriptPath)) {
+      throw Object.assign(
+        new Error(`${scriptPath} não existe. Atualize o repo na VPS (git pull).`),
+        { status: 400 }
+      );
+    }
+  }
+}
+
 function assertTenant(slug) {
   if (!loadTenants().some((t) => t.slug === slug)) {
     const err = new Error(`Tenant inválido: ${slug}`);
@@ -69,9 +122,9 @@ function buildImportAndDeployCommand(data) {
 
   const deployCmd = [
     `cd ${shellQuote(DEPLOY_DIR)}`,
-    'chmod +x scripts/*.sh supabase-mae/import-nova-casa.sh',
-    './scripts/sync-tenants-registry.sh',
-    `./scripts/nova-casa.sh ${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`,
+    chmodScriptsCmd(),
+    scriptCmd('sync-tenants-registry.sh'),
+    `${scriptCmd('nova-casa.sh', `${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`)}`,
   ].join(' && ');
 
   return `${importCmd} && ${deployCmd}`;
@@ -80,6 +133,10 @@ function buildImportAndDeployCommand(data) {
 if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
   console.warn('[Ops-Panel] AVISO: defina OPS_PASSWORD no arquivo .env');
 }
+
+console.log(
+  `[Ops-Panel] REPO_ROOT=${REPO_ROOT} DEPLOY_DIR=${DEPLOY_DIR} scripts=${fs.existsSync(scriptsDir())}`
+);
 
 /** @type {{ id: string, label: string, running: boolean, output: string, code: number|null, startedAt: string, endedAt?: string }} */
 let activeJob = null;
@@ -143,6 +200,12 @@ function startJob(label, command) {
   if (activeJob?.running) {
     const err = new Error('Já existe uma operação em andamento. Aguarde terminar.');
     err.status = 409;
+    throw err;
+  }
+
+  if (!fs.existsSync(DEPLOY_DIR)) {
+    const err = new Error(`DEPLOY_DIR inexistente: ${DEPLOY_DIR}`);
+    err.status = 400;
     throw err;
   }
 
@@ -230,10 +293,17 @@ app.get('/api/tenants', (_req, res) => {
 });
 
 app.get('/api/platform', (_req, res) => {
+  const scripts = scriptsDir();
   res.json({
     sharedSecretsReady: fs.existsSync(SHARED_SECRETS),
-    registryPath: REGISTRY_PATH,
+    scriptsReady: fs.existsSync(scripts),
     deployDir: DEPLOY_DIR,
+    deployDirExists: fs.existsSync(DEPLOY_DIR),
+    repoRoot: REPO_ROOT,
+    registryPath: REGISTRY_PATH,
+    hint: !fs.existsSync(scripts)
+      ? `Na VPS: cd ${REPO_ROOT} && git fetch origin && git reset --hard origin/main && cd ops-panel && docker compose up -d --build`
+      : null,
   });
 });
 
@@ -243,7 +313,8 @@ app.post('/api/platform/init-secrets', (_req, res) => {
       res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
       return;
     }
-    const cmd = 'chmod +x scripts/*.sh && ./scripts/init-platform-secrets.sh stewgaming';
+    assertDeployReady('init-platform-secrets.sh');
+    const cmd = `${chmodScriptsCmd()} && ${scriptCmd('init-platform-secrets.sh', 'stewgaming')}`;
     const id = startJob('Init secrets compartilhados', cmd);
     res.json({ ok: true, jobId: id, message: 'Copiando secrets da stewgaming...' });
   } catch (e) {
@@ -435,7 +506,7 @@ app.post('/api/deploy/:tenant', (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
-    const cmd = `chmod +x scripts/*.sh && CLEAN=1 ./scripts/deploy-tenant.sh ${slug}`;
+    const cmd = `${chmodScriptsCmd()} && CLEAN=1 ${scriptCmd('deploy-tenant.sh', slug)}`;
     const id = startJob(`Deploy ${slug}`, cmd);
     res.json({ ok: true, jobId: id, message: 'Deploy iniciado' });
   } catch (e) {
@@ -446,9 +517,11 @@ app.post('/api/deploy/:tenant', (req, res) => {
 app.post('/api/deploy-all', (_req, res) => {
   try {
     const tenants = loadTenants();
-    const deploySteps = tenants.map((t) => `CLEAN=1 ./scripts/deploy-tenant.sh ${t.slug}`).join(' && ');
+    const deploySteps = tenants
+      .map((t) => `CLEAN=1 ${scriptCmd('deploy-tenant.sh', t.slug)}`)
+      .join(' && ');
     const labels = tenants.map((t) => t.slug).join(' + ');
-    const cmd = `chmod +x scripts/*.sh && ${deploySteps}`;
+    const cmd = `${chmodScriptsCmd()} && ${deploySteps}`;
     const id = startJob(`Deploy ${labels}`, cmd);
     res.json({ ok: true, jobId: id, message: `Deploy de ${tenants.length} casas iniciado` });
   } catch (e) {

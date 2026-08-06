@@ -826,6 +826,21 @@ async function loadPlatformStatus() {
 
   try {
     const platform = await api('/api/platform');
+
+    if (!platform.scriptsReady) {
+      banner.classList.remove('hidden');
+      banner.className = 'platform-banner err';
+      banner.innerHTML = `
+        <div>
+          <strong>Deploy não encontrado na VPS</strong>
+          <p>Pasta <code>${platform.deployDir}/scripts</code> não existe. Atualize o repo no servidor:</p>
+          <pre class="platform-hint">${platform.hint || ''}</pre>
+        </div>
+      `;
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
     if (platform.sharedSecretsReady) {
       banner.classList.add('hidden');
       if (submitBtn) submitBtn.disabled = false;
