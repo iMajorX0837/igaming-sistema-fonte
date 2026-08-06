@@ -23,7 +23,10 @@ PGPORT="${PGPORT:-5432}"
 PGDATABASE="${PGDATABASE:-postgres}"
 
 echo "==> [1/3] Schema (tabelas, colunas, RLS, funções)..."
-psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/schema.sql"
+# Supabase já vem com schema public — ignora CREATE SCHEMA duplicado
+sed '/^\\restrict /d; /^\\unrestrict /d; s/^CREATE SCHEMA public;$/CREATE SCHEMA IF NOT EXISTS public;/' \
+  "$ROOT/schema.sql" \
+  | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1
 
 echo "==> [2/3] Dados de config (CMS, jogos, VIP, gateways...)..."
 psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=0 -f "$ROOT/config_data.sql"
