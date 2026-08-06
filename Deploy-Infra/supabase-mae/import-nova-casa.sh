@@ -26,8 +26,8 @@ echo "==> [0/4] Limpar schema public (import limpo / retry)..."
 psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/prepare-nova-casa.sql"
 
 echo "==> [1/4] Schema (tabelas, colunas, RLS, funções)..."
-# Supabase já vem com schema public — ignora CREATE SCHEMA duplicado
-sed '/^\\restrict /d; /^\\unrestrict /d; s/^CREATE SCHEMA public;$/CREATE SCHEMA IF NOT EXISTS public;/' \
+# Supabase bloqueia ALTER DEFAULT PRIVILEGES — GRANTs explícitos no dump já bastam
+sed '/^\\restrict /d; /^\\unrestrict /d; s/^CREATE SCHEMA public;$/CREATE SCHEMA IF NOT EXISTS public;/; /^ALTER DEFAULT PRIVILEGES/d' \
   "$ROOT/schema.sql" \
   | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1
 

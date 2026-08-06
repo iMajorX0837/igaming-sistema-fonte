@@ -1,0 +1,21 @@
+---
+description: Sempre commitar e dar push após alterações no repo
+alwaysApply: true
+---
+
+# Git — subir toda alteração
+
+Após fazer mudanças no código, **sempre** commitar e dar push para `origin/main` (ou branch atual), sem esperar o usuário pedir.
+
+## Fluxo
+
+1. `git status` + `git diff` para revisar o que mudou
+2. `git add` nos arquivos relevantes (nunca `.env`, credenciais ou secrets)
+3. Commit com mensagem no estilo do repo (`fix:`, `feat:`, etc.)
+4. `git push origin <branch>`
+
+## Exceções
+
+- Não commitar se o usuário pedir explicitamente para **não** subir
+- Não commitar arquivos com secrets
+- Não fazer force push em main/master
