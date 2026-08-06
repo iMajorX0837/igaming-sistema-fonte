@@ -1128,6 +1128,25 @@ body {
   color: var(--muted);
 }
 
+.paste-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft);
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.paste-preview code {
+  font-size: 0.76rem;
+}
+
+.paste-preview .paste-err {
+  color: var(--danger, #f87171);
+}
+
 .form-section {
   margin-bottom: 20px;
   padding-top: 8px;

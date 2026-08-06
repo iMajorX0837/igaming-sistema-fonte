@@ -880,15 +880,59 @@ ncDomain?.addEventListener('blur', () => {
   }
 });
 
+const ncPaste = document.getElementById('nc-paste');
+const ncPastePreview = document.getElementById('nc-paste-preview');
+let pastePreviewTimer;
+
+async function refreshPastePreview() {
+  if (!ncPaste || !ncPastePreview) return;
+  const text = ncPaste.value.trim();
+  if (!text.includes('postgresql://') && !text.includes('postgres://')) {
+    ncPastePreview.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const info = await api('/api/tenants/parse-paste', {
+      method: 'POST',
+      body: JSON.stringify({ supabasePaste: text }),
+    });
+    const parts = [
+      info.projectRef ? `Projeto: <code>${info.projectRef}</code>` : null,
+      info.supabaseUrl ? `URL: <code>${info.supabaseUrl}</code>` : null,
+      info.host ? `Host: <code>${info.host}</code>` : null,
+      info.hasAnonKey ? 'Anon key ✓' : 'Anon key — faltando (precisa para deploy)',
+      info.hasServiceKey ? 'Service key ✓' : 'Service key — faltando (precisa para deploy)',
+    ].filter(Boolean);
+    ncPastePreview.innerHTML = parts.join(' · ');
+    ncPastePreview.classList.remove('hidden');
+  } catch (e) {
+    ncPastePreview.innerHTML = `<span class="paste-err">${e.message}</span>`;
+    ncPastePreview.classList.remove('hidden');
+  }
+}
+
+ncPaste?.addEventListener('input', () => {
+  clearTimeout(pastePreviewTimer);
+  pastePreviewTimer = setTimeout(refreshPastePreview, 400);
+});
+
+ncPaste?.addEventListener('paste', () => {
+  setTimeout(refreshPastePreview, 50);
+});
+
 document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const btn = document.getElementById('btn-nova-casa-submit');
   const form = ev.currentTarget;
   const data = Object.fromEntries(new FormData(form));
+  const deploy = document.getElementById('nc-deploy')?.checked !== false;
 
   const confirmed = await confirmAction({
     title: 'Criar nova casa?',
-    message: `Vai registrar e subir ${data.slug} (${data.domain}). Certifique-se que o Supabase já tem o schema SQL aplicado.`,
+    message: deploy
+      ? `Importa schema/config da mãe no Supabase, registra e faz deploy de ${data.slug} (${data.domain}).`
+      : `Importa schema/config da mãe e registra ${data.slug} (${data.domain}) — sem deploy.`,
     confirmText: 'Criar casa',
     variant: 'warn',
   });
@@ -900,10 +944,8 @@ document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev)
       slug: data.slug,
       domain: data.domain,
       label: data.label,
-      supabaseUrl: data.supabaseUrl,
-      supabaseAnonKey: data.supabaseAnonKey,
-      supabaseServiceKey: data.supabaseServiceKey,
-      deploy: document.getElementById('nc-deploy')?.checked !== false,
+      supabasePaste: data.supabasePaste,
+      deploy,
     };
 
     const res = await api('/api/tenants/create', {
@@ -915,12 +957,13 @@ document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev)
     notify('Casa criada', `${res.slug} (${res.domain})`, 'success');
     form.reset();
     if (ncSlugPreview) ncSlugPreview.textContent = '...';
+    if (ncPastePreview) ncPastePreview.classList.add('hidden');
 
     setView('console');
     showJob({
       label: `Nova casa — ${res.slug}`,
       running: true,
-      output: 'Iniciando deploy...\n',
+      output: 'Importando Supabase da mãe...\n',
       code: null,
     });
     pollJob();

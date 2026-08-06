@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { collectSystemStats } = require('./systemStats');
+const { validateNewTenantInput, parseSupabasePaste } = require('./parseSupabase');
 
 const ROOT = __dirname;
 const REPO_ROOT = process.env.REPO_ROOT || '/opt/venuzbet';
@@ -52,42 +53,28 @@ function assertTenant(slug) {
   }
 }
 
-function validateNewTenant(body) {
-  const slug = String(body.slug || '')
-    .trim()
-    .toLowerCase();
-  const domain = String(body.domain || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '');
-  const label = String(body.label || '').trim();
-  const supabaseUrl = String(body.supabaseUrl || body.supabase_url || '').trim();
-  const supabaseAnonKey = String(body.supabaseAnonKey || body.supabase_anon_key || '').trim();
-  const supabaseServiceKey = String(
-    body.supabaseServiceKey || body.supabase_service_key || ''
-  ).trim();
+function buildImportAndDeployCommand(data) {
+  const maeDir = path.join(DEPLOY_DIR, 'supabase-mae');
+  const pg = data.postgres;
+  const importCmd = [
+    `export PGPASSWORD=${shellQuote(pg.password)}`,
+    `export PGHOST=${shellQuote(pg.host)}`,
+    `export PGPORT=${shellQuote(pg.port)}`,
+    `export PGUSER=${shellQuote(pg.user)}`,
+    `export PGDATABASE=${shellQuote(pg.database)}`,
+    `cd ${shellQuote(maeDir)}`,
+    'chmod +x import-nova-casa.sh',
+    './import-nova-casa.sh',
+  ].join(' ');
 
-  if (!/^[a-z0-9-]+$/.test(slug)) {
-    throw Object.assign(new Error('Slug inválido (use a-z, 0-9, hífen)'), { status: 400 });
-  }
-  if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
-    throw Object.assign(new Error('Domínio inválido (ex: bandpiix.com)'), { status: 400 });
-  }
-  if (!label) {
-    throw Object.assign(new Error('Nome da casa é obrigatório'), { status: 400 });
-  }
-  if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('supabase')) {
-    throw Object.assign(new Error('SUPABASE_URL inválida'), { status: 400 });
-  }
-  if (supabaseAnonKey.length < 20) {
-    throw Object.assign(new Error('SUPABASE_ANON_KEY inválida'), { status: 400 });
-  }
-  if (supabaseServiceKey.length < 20) {
-    throw Object.assign(new Error('SUPABASE_SERVICE_KEY inválida'), { status: 400 });
-  }
+  const deployCmd = [
+    `cd ${shellQuote(DEPLOY_DIR)}`,
+    'chmod +x scripts/*.sh supabase-mae/import-nova-casa.sh',
+    './scripts/sync-tenants-registry.sh',
+    `./scripts/nova-casa.sh ${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`,
+  ].join(' && ');
 
-  return { slug, domain, label, supabaseUrl, supabaseAnonKey, supabaseServiceKey };
+  return `${importCmd} && ${deployCmd}`;
 }
 
 if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
@@ -264,6 +251,22 @@ app.post('/api/platform/init-secrets', (_req, res) => {
   }
 });
 
+app.post('/api/tenants/parse-paste', (req, res) => {
+  try {
+    const parsed = parseSupabasePaste(req.body?.supabasePaste || req.body?.paste || '');
+    res.json({
+      ok: true,
+      projectRef: parsed.projectRef,
+      supabaseUrl: parsed.supabaseUrl,
+      host: parsed.postgres.host,
+      hasAnonKey: parsed.supabaseAnonKey.length >= 20,
+      hasServiceKey: parsed.supabaseServiceKey.length >= 20,
+    });
+  } catch (e) {
+    res.status(e.status || 400).json({ error: e.message });
+  }
+});
+
 app.post('/api/tenants/create', (req, res) => {
   try {
     if (activeJob?.running) {
@@ -278,7 +281,7 @@ app.post('/api/tenants/create', (req, res) => {
       return;
     }
 
-    const data = validateNewTenant(req.body || {});
+    const data = validateNewTenantInput(req.body || {});
     const registry = loadRegistry();
     if (registry.some((t) => t.slug === data.slug)) {
       res.status(409).json({ error: `Casa "${data.slug}" já existe.` });
@@ -300,8 +303,7 @@ app.post('/api/tenants/create', (req, res) => {
     saveRegistry(registry);
     saveTenants(registry);
 
-    const deploy = req.body?.deploy !== false;
-    const cmd = `chmod +x scripts/*.sh && ./scripts/sync-tenants-registry.sh && ./scripts/nova-casa.sh ${shellQuote(data.slug)}${deploy ? ' --deploy' : ''}`;
+    const cmd = buildImportAndDeployCommand(data);
     const id = startJob(`Nova casa — ${data.slug}`, cmd);
 
     res.json({
@@ -309,7 +311,10 @@ app.post('/api/tenants/create', (req, res) => {
       jobId: id,
       slug: data.slug,
       domain: data.domain,
-      message: deploy ? 'Casa criada — deploy em andamento' : 'Casa criada — rode deploy manualmente',
+      projectRef: data.projectRef,
+      message: data.deploy
+        ? 'Importando Supabase da mãe + deploy em andamento'
+        : 'Importando Supabase da mãe (sem deploy)',
     });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });

@@ -110,21 +110,13 @@
             </div>
 
             <div class="form-section">
-              <h3>Supabase <span class="muted-inline">(projeto novo — rode supabase_nova_casa.sql antes)</span></h3>
-              <div class="form-grid">
-                <div class="form-field form-field-wide">
-                  <label for="nc-supabase-url">SUPABASE_URL</label>
-                  <input id="nc-supabase-url" name="supabaseUrl" type="url" placeholder="https://xxxxx.supabase.co" required />
-                </div>
-                <div class="form-field form-field-wide">
-                  <label for="nc-anon">SUPABASE_ANON_KEY</label>
-                  <textarea id="nc-anon" name="supabaseAnonKey" rows="2" placeholder="eyJ..." required></textarea>
-                </div>
-                <div class="form-field form-field-wide">
-                  <label for="nc-service">SUPABASE_SERVICE_KEY</label>
-                  <textarea id="nc-service" name="supabaseServiceKey" rows="2" placeholder="eyJ..." required></textarea>
-                </div>
+              <h3>Supabase <span class="muted-inline">(projeto novo — import automático da mãe)</span></h3>
+              <div class="form-field form-field-wide">
+                <label for="nc-paste">Connection string + API keys</label>
+                <textarea id="nc-paste" name="supabasePaste" rows="6" required placeholder="postgresql://postgres.SEU_REF:SENHA@aws-0-sa-east-1.pooler.supabase.com:5432/postgres&#10;&#10;SUPABASE_ANON_KEY=eyJ...&#10;SUPABASE_SERVICE_KEY=eyJ..." spellcheck="false"></textarea>
+                <span class="field-hint">Cole do Supabase → Connect (Session pooler). Para deploy, inclua também as keys de Settings → API.</span>
               </div>
+              <div id="nc-paste-preview" class="paste-preview hidden"></div>
             </div>
 
             <div class="form-check">
@@ -148,8 +140,8 @@
             <h3>Antes de criar</h3>
             <ul>
               <li>DNS na Cloudflare: <code>@</code>, <code>admin</code>, <code>api</code> → IP da VPS</li>
-              <li>Projeto Supabase criado + SQL <code>supabase_nova_casa.sql</code> executado</li>
-              <li>Admin criado no Supabase (<code>cargo = admin</code>)</li>
+              <li>Projeto Supabase <strong>vazio</strong> criado (não precisa rodar SQL manual)</li>
+              <li>Após deploy: cadastre admin no site e promova <code>cargo = admin</code></li>
             </ul>
           </div>
         </section>
