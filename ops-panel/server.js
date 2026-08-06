@@ -12,10 +12,83 @@ const PORT = Number(process.env.OPS_PORT || 9090);
 const OPS_USER = process.env.OPS_USER || 'admin';
 const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
 
-const tenants = JSON.parse(
-  fs.readFileSync(path.join(ROOT, 'tenants.json'), 'utf8')
-);
-const tenantSlugs = new Set(tenants.map((t) => t.slug));
+const REGISTRY_PATH = path.join(DEPLOY_DIR, 'tenants.registry.json');
+const TENANTS_JSON = path.join(ROOT, 'tenants.json');
+const SHARED_SECRETS = path.join(DEPLOY_DIR, 'tenants/_shared/secrets.env');
+
+function loadTenants() {
+  try {
+    return JSON.parse(fs.readFileSync(TENANTS_JSON, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveTenants(list) {
+  fs.writeFileSync(TENANTS_JSON, `${JSON.stringify(list, null, 2)}\n`, 'utf8');
+}
+
+function loadRegistry() {
+  try {
+    return JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function saveRegistry(list) {
+  fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(list, null, 2)}\n`, 'utf8');
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function assertTenant(slug) {
+  if (!loadTenants().some((t) => t.slug === slug)) {
+    const err = new Error(`Tenant inválido: ${slug}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+function validateNewTenant(body) {
+  const slug = String(body.slug || '')
+    .trim()
+    .toLowerCase();
+  const domain = String(body.domain || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '');
+  const label = String(body.label || '').trim();
+  const supabaseUrl = String(body.supabaseUrl || body.supabase_url || '').trim();
+  const supabaseAnonKey = String(body.supabaseAnonKey || body.supabase_anon_key || '').trim();
+  const supabaseServiceKey = String(
+    body.supabaseServiceKey || body.supabase_service_key || ''
+  ).trim();
+
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    throw Object.assign(new Error('Slug inválido (use a-z, 0-9, hífen)'), { status: 400 });
+  }
+  if (!domain || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
+    throw Object.assign(new Error('Domínio inválido (ex: bandpiix.com)'), { status: 400 });
+  }
+  if (!label) {
+    throw Object.assign(new Error('Nome da casa é obrigatório'), { status: 400 });
+  }
+  if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('supabase')) {
+    throw Object.assign(new Error('SUPABASE_URL inválida'), { status: 400 });
+  }
+  if (supabaseAnonKey.length < 20) {
+    throw Object.assign(new Error('SUPABASE_ANON_KEY inválida'), { status: 400 });
+  }
+  if (supabaseServiceKey.length < 20) {
+    throw Object.assign(new Error('SUPABASE_SERVICE_KEY inválida'), { status: 400 });
+  }
+
+  return { slug, domain, label, supabaseUrl, supabaseAnonKey, supabaseServiceKey };
+}
 
 if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
   console.warn('[Ops-Panel] AVISO: defina OPS_PASSWORD no arquivo .env');
@@ -28,7 +101,7 @@ let activeJob = null;
 let activeLogStream = null;
 
 const app = express();
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '128kb' }));
 
 function unauthorized(res) {
   res.set('WWW-Authenticate', 'Basic realm="Stew Gaming Ops"');
@@ -120,14 +193,6 @@ function startJob(label, command) {
   return id;
 }
 
-function assertTenant(slug) {
-  if (!tenantSlugs.has(slug)) {
-    const err = new Error(`Tenant inválido: ${slug}`);
-    err.status = 400;
-    throw err;
-  }
-}
-
 function stopTenantCommand(slug) {
   return `
     docker stop api-${slug} 2>/dev/null || true
@@ -174,11 +239,86 @@ app.use(auth);
 app.use(express.static(path.join(ROOT, 'public')));
 
 app.get('/api/tenants', (_req, res) => {
-  res.json({ tenants });
+  res.json({ tenants: loadTenants() });
+});
+
+app.get('/api/platform', (_req, res) => {
+  res.json({
+    sharedSecretsReady: fs.existsSync(SHARED_SECRETS),
+    registryPath: REGISTRY_PATH,
+    deployDir: DEPLOY_DIR,
+  });
+});
+
+app.post('/api/platform/init-secrets', (_req, res) => {
+  try {
+    if (activeJob?.running) {
+      res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
+      return;
+    }
+    const cmd = 'chmod +x scripts/*.sh && ./scripts/init-platform-secrets.sh stewgaming';
+    const id = startJob('Init secrets compartilhados', cmd);
+    res.json({ ok: true, jobId: id, message: 'Copiando secrets da stewgaming...' });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+app.post('/api/tenants/create', (req, res) => {
+  try {
+    if (activeJob?.running) {
+      res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
+      return;
+    }
+
+    if (!fs.existsSync(SHARED_SECRETS)) {
+      res.status(400).json({
+        error: 'Secrets compartilhados não configurados. Use "Preparar plataforma" na tela Nova casa.',
+      });
+      return;
+    }
+
+    const data = validateNewTenant(req.body || {});
+    const registry = loadRegistry();
+    if (registry.some((t) => t.slug === data.slug)) {
+      res.status(409).json({ error: `Casa "${data.slug}" já existe.` });
+      return;
+    }
+
+    const tenantDir = path.join(DEPLOY_DIR, 'tenants', data.slug);
+    fs.mkdirSync(tenantDir, { recursive: true });
+
+    const supabaseEnv = [
+      `SUPABASE_URL=${data.supabaseUrl}`,
+      `SUPABASE_ANON_KEY=${data.supabaseAnonKey}`,
+      `SUPABASE_SERVICE_KEY=${data.supabaseServiceKey}`,
+      '',
+    ].join('\n');
+    fs.writeFileSync(path.join(tenantDir, 'supabase.env'), supabaseEnv, { mode: 0o600 });
+
+    registry.push({ slug: data.slug, label: data.label, domain: data.domain });
+    saveRegistry(registry);
+    saveTenants(registry);
+
+    const deploy = req.body?.deploy !== false;
+    const cmd = `chmod +x scripts/*.sh && ./scripts/sync-tenants-registry.sh && ./scripts/nova-casa.sh ${shellQuote(data.slug)}${deploy ? ' --deploy' : ''}`;
+    const id = startJob(`Nova casa — ${data.slug}`, cmd);
+
+    res.json({
+      ok: true,
+      jobId: id,
+      slug: data.slug,
+      domain: data.domain,
+      message: deploy ? 'Casa criada — deploy em andamento' : 'Casa criada — rode deploy manualmente',
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
 });
 
 app.get('/api/status', async (_req, res) => {
   try {
+    const tenants = loadTenants();
     const filters = tenants
       .map((t) => `--filter name=api-${t.slug}`)
       .concat(['--filter name=venuz-nginx'])
@@ -250,6 +390,7 @@ app.post('/api/stop/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
+    const tenants = loadTenants();
     await runShell(stopTenantCommand(slug), 120000);
     const domain = tenants.find((t) => t.slug === slug)?.domain || slug;
     res.json({
@@ -265,6 +406,7 @@ app.post('/api/start/:tenant', async (req, res) => {
   try {
     assertTenant(req.params.tenant);
     const slug = req.params.tenant;
+    const tenants = loadTenants();
     await runShell(startTenantCommand(slug), 120000);
     const domain = tenants.find((t) => t.slug === slug)?.domain || slug;
     res.json({ ok: true, message: `Casa ${slug} no ar: ${domain}, admin.${domain}, api.${domain}` });
@@ -298,6 +440,7 @@ app.post('/api/deploy/:tenant', (req, res) => {
 
 app.post('/api/deploy-all', (_req, res) => {
   try {
+    const tenants = loadTenants();
     const deploySteps = tenants.map((t) => `CLEAN=1 ./scripts/deploy-tenant.sh ${t.slug}`).join(' && ');
     const labels = tenants.map((t) => t.slug).join(' + ');
     const cmd = `chmod +x scripts/*.sh && ${deploySteps}`;

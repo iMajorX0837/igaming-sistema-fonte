@@ -33,6 +33,12 @@
             </span>
             Console
           </a>
+          <a href="/nova-casa" class="nav-item" data-view="nova-casa">
+            <span class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </span>
+            Nova casa
+          </a>
         </nav>
 
         <div class="sidebar-section">
@@ -76,6 +82,76 @@
             <p>Gerencie deploy, restart e logs de cada tenant.</p>
           </div>
           <div id="tenants" class="tenants-grid"></div>
+        </section>
+
+        <section id="view-nova-casa" class="view">
+          <div class="section-head">
+            <h2>Nova casa</h2>
+            <p>Cadastre um domínio + Supabase e suba a casa na VPS em um clique.</p>
+          </div>
+
+          <div id="platform-banner" class="platform-banner hidden"></div>
+
+          <form id="form-nova-casa" class="nova-casa-form">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="nc-slug">Slug (identificador)</label>
+                <input id="nc-slug" name="slug" type="text" placeholder="bandpiix" pattern="[a-z0-9-]+" required autocomplete="off" />
+                <span class="field-hint">Container: api-<strong id="nc-slug-preview">...</strong></span>
+              </div>
+              <div class="form-field">
+                <label for="nc-domain">Domínio</label>
+                <input id="nc-domain" name="domain" type="text" placeholder="bandpiix.com" required autocomplete="off" />
+              </div>
+              <div class="form-field form-field-wide">
+                <label for="nc-label">Nome exibido</label>
+                <input id="nc-label" name="label" type="text" placeholder="Band Piix" required autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Supabase <span class="muted-inline">(projeto novo — rode supabase_nova_casa.sql antes)</span></h3>
+              <div class="form-grid">
+                <div class="form-field form-field-wide">
+                  <label for="nc-supabase-url">SUPABASE_URL</label>
+                  <input id="nc-supabase-url" name="supabaseUrl" type="url" placeholder="https://xxxxx.supabase.co" required />
+                </div>
+                <div class="form-field form-field-wide">
+                  <label for="nc-anon">SUPABASE_ANON_KEY</label>
+                  <textarea id="nc-anon" name="supabaseAnonKey" rows="2" placeholder="eyJ..." required></textarea>
+                </div>
+                <div class="form-field form-field-wide">
+                  <label for="nc-service">SUPABASE_SERVICE_KEY</label>
+                  <textarea id="nc-service" name="supabaseServiceKey" rows="2" placeholder="eyJ..." required></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-check">
+              <label>
+                <input id="nc-deploy" name="deploy" type="checkbox" checked />
+                Fazer deploy automaticamente após criar
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="btn-nova-casa-submit">
+                <span class="btn-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+                </span>
+                Criar e subir casa
+              </button>
+            </div>
+          </form>
+
+          <div class="nova-casa-checklist">
+            <h3>Antes de criar</h3>
+            <ul>
+              <li>DNS na Cloudflare: <code>@</code>, <code>admin</code>, <code>api</code> → IP da VPS</li>
+              <li>Projeto Supabase criado + SQL <code>supabase_nova_casa.sql</code> executado</li>
+              <li>Admin criado no Supabase (<code>cargo = admin</code>)</li>
+            </ul>
+          </div>
         </section>
 
         <section id="view-console" class="view">

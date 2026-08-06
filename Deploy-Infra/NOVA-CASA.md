@@ -52,7 +52,9 @@ git push
 
 ### 3. Na VPS — só Supabase + deploy
 
-```bash
+**Pelo Ops Panel (recomendado):** `http://IP:9090/nova-casa` — preencha slug, domínio e 3 keys Supabase.
+
+**Ou pelo terminal:**
 cd /opt/venuzbet && git pull
 cd Deploy-Infra
 

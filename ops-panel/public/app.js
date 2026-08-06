@@ -128,6 +128,9 @@ function parseRoute(pathname) {
   if (path === '/console') {
     return { view: 'console', slug: null, valid: true };
   }
+  if (path === '/nova-casa') {
+    return { view: 'nova-casa', slug: null, valid: true };
+  }
 
   const match = path.match(/^\/casas\/([a-z0-9_-]+)$/i);
   if (match) {
@@ -139,6 +142,7 @@ function parseRoute(pathname) {
 
 function routePath(view, slug = null) {
   if (view === 'console') return '/console';
+  if (view === 'nova-casa') return '/nova-casa';
   if (slug) return `/casas/${slug}`;
   return '/';
 }
@@ -147,6 +151,13 @@ function updatePageMeta(route) {
   if (route.view === 'console') {
     pageTitle.textContent = 'Console';
     document.title = 'Console — Stew Gaming';
+    return;
+  }
+
+  if (route.view === 'nova-casa') {
+    pageTitle.textContent = 'Nova casa';
+    document.title = 'Nova casa — Stew Gaming';
+    loadPlatformStatus();
     return;
   }
 
@@ -803,6 +814,119 @@ document.getElementById('btn-deploy-all').addEventListener('click', async (ev) =
   } catch (e) {
     log(`Erro: ${e.message}`);
     notify('Erro no deploy', e.message, 'error');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+async function loadPlatformStatus() {
+  const banner = document.getElementById('platform-banner');
+  const submitBtn = document.getElementById('btn-nova-casa-submit');
+  if (!banner) return;
+
+  try {
+    const platform = await api('/api/platform');
+    if (platform.sharedSecretsReady) {
+      banner.classList.add('hidden');
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
+
+    banner.classList.remove('hidden');
+    banner.className = 'platform-banner warn';
+    banner.innerHTML = `
+      <div>
+        <strong>Plataforma não preparada</strong>
+        <p>Secrets compartilhados (PlayFivers, pagamentos…) ainda não foram copiados. Faça isso uma vez:</p>
+      </div>
+      <button type="button" class="btn btn-warn btn-sm" id="btn-init-secrets">Preparar plataforma</button>
+    `;
+
+    document.getElementById('btn-init-secrets')?.addEventListener('click', async () => {
+      try {
+        await api('/api/platform/init-secrets', { method: 'POST' });
+        notify('Preparando plataforma', 'Copiando secrets da stewgaming…', 'info');
+        setView('console');
+        showJob({ label: 'Init secrets', running: true, output: 'Iniciando...\n', code: null });
+        pollJob();
+      } catch (e) {
+        notify('Erro', e.message, 'error');
+      }
+    });
+
+    if (submitBtn) submitBtn.disabled = true;
+  } catch {
+    banner.classList.remove('hidden');
+    banner.className = 'platform-banner err';
+    banner.textContent = 'Não foi possível verificar o status da plataforma.';
+  }
+}
+
+const ncSlug = document.getElementById('nc-slug');
+const ncSlugPreview = document.getElementById('nc-slug-preview');
+const ncDomain = document.getElementById('nc-domain');
+const ncLabel = document.getElementById('nc-label');
+
+ncSlug?.addEventListener('input', () => {
+  const slug = ncSlug.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  ncSlug.value = slug;
+  if (ncSlugPreview) ncSlugPreview.textContent = slug || '...';
+});
+
+ncDomain?.addEventListener('blur', () => {
+  if (!ncLabel?.value && ncDomain?.value) {
+    const base = ncDomain.value.split('.')[0];
+    ncLabel.value = base.charAt(0).toUpperCase() + base.slice(1);
+  }
+});
+
+document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const btn = document.getElementById('btn-nova-casa-submit');
+  const form = ev.currentTarget;
+  const data = Object.fromEntries(new FormData(form));
+
+  const confirmed = await confirmAction({
+    title: 'Criar nova casa?',
+    message: `Vai registrar e subir ${data.slug} (${data.domain}). Certifique-se que o Supabase já tem o schema SQL aplicado.`,
+    confirmText: 'Criar casa',
+    variant: 'warn',
+  });
+  if (!confirmed) return;
+
+  setButtonLoading(btn, true);
+  try {
+    const payload = {
+      slug: data.slug,
+      domain: data.domain,
+      label: data.label,
+      supabaseUrl: data.supabaseUrl,
+      supabaseAnonKey: data.supabaseAnonKey,
+      supabaseServiceKey: data.supabaseServiceKey,
+      deploy: document.getElementById('nc-deploy')?.checked !== false,
+    };
+
+    const res = await api('/api/tenants/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    log(`Nova casa ${res.slug} — ${res.message}`);
+    notify('Casa criada', `${res.slug} (${res.domain})`, 'success');
+    form.reset();
+    if (ncSlugPreview) ncSlugPreview.textContent = '...';
+
+    setView('console');
+    showJob({
+      label: `Nova casa — ${res.slug}`,
+      running: true,
+      output: 'Iniciando deploy...\n',
+      code: null,
+    });
+    pollJob();
+  } catch (e) {
+    notify('Erro ao criar casa', e.message, 'error');
+    log(`Erro nova casa: ${e.message}`);
   } finally {
     setButtonLoading(btn, false);
   }

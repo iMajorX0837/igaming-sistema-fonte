@@ -1028,6 +1028,175 @@ body {
   box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
 }
 
+/* Nova casa form */
+.platform-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.platform-banner.hidden {
+  display: none;
+}
+
+.platform-banner.warn {
+  background: var(--amber-dim);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+.platform-banner.warn strong {
+  color: var(--amber);
+}
+
+.platform-banner.warn p {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.platform-banner.err {
+  background: var(--red-dim);
+  color: var(--red);
+}
+
+.nova-casa-form {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-field input,
+.form-field textarea {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-dim);
+}
+
+.form-field textarea {
+  resize: vertical;
+  min-height: 56px;
+  font-family: 'Consolas', monospace;
+  font-size: 0.82rem;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.form-section {
+  margin-bottom: 20px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.form-section h3 {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+}
+
+.muted-inline {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.form-check {
+  margin-bottom: 18px;
+}
+
+.form-check label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.form-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--blue);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nova-casa-checklist {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.nova-casa-checklist h3 {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+}
+
+.nova-casa-checklist ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+
+.nova-casa-checklist code {
+  background: var(--bg-elevated);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--blue);
+}
+
 @media (max-width: 960px) {
   .app {
     flex-direction: column;
