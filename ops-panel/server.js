@@ -110,21 +110,17 @@ function buildImportAndDeployCommand(data) {
   const maeDir = path.join(DEPLOY_DIR, 'supabase-mae');
   const pg = data.postgres;
   const importCmd = [
-    `export PGPASSWORD=${shellQuote(pg.password)}`,
-    `export PGHOST=${shellQuote(pg.host)}`,
-    `export PGPORT=${shellQuote(pg.port)}`,
-    `export PGUSER=${shellQuote(pg.user)}`,
-    `export PGDATABASE=${shellQuote(pg.database)}`,
+    `export PGPASSWORD=${shellQuote(pg.password)} PGHOST=${shellQuote(pg.host)} PGPORT=${shellQuote(pg.port)} PGUSER=${shellQuote(pg.user)} PGDATABASE=${shellQuote(pg.database)}`,
     `cd ${shellQuote(maeDir)}`,
     'chmod +x import-nova-casa.sh',
     './import-nova-casa.sh',
-  ].join(' ');
+  ].join(' && ');
 
   const deployCmd = [
     `cd ${shellQuote(DEPLOY_DIR)}`,
     chmodScriptsCmd(),
     scriptCmd('sync-tenants-registry.sh'),
-    `${scriptCmd('nova-casa.sh', `${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`)}`,
+    scriptCmd('nova-casa.sh', `${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`),
   ].join(' && ');
 
   return `${importCmd} && ${deployCmd}`;
