@@ -22,16 +22,19 @@ fi
 PGPORT="${PGPORT:-5432}"
 PGDATABASE="${PGDATABASE:-postgres}"
 
-echo "==> [1/3] Schema (tabelas, colunas, RLS, funções)..."
+echo "==> [0/4] Limpar schema public (import limpo / retry)..."
+psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/prepare-nova-casa.sql"
+
+echo "==> [1/4] Schema (tabelas, colunas, RLS, funções)..."
 # Supabase já vem com schema public — ignora CREATE SCHEMA duplicado
 sed '/^\\restrict /d; /^\\unrestrict /d; s/^CREATE SCHEMA public;$/CREATE SCHEMA IF NOT EXISTS public;/' \
   "$ROOT/schema.sql" \
   | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1
 
-echo "==> [2/3] Dados de config (CMS, jogos, VIP, gateways...)..."
+echo "==> [2/4] Dados de config (CMS, jogos, VIP, gateways...)..."
 psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=0 -f "$ROOT/config_data.sql"
 
-echo "==> [3/3] Trigger auth.users → public.usuarios..."
+echo "==> [3/4] Trigger auth.users → public.usuarios..."
 psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/auth_trigger.sql"
 
 echo "OK: import concluído. Crie admin no Auth e promova cargo."
