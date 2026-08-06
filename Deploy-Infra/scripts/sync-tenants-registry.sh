@@ -32,13 +32,8 @@ if (!Array.isArray(registry) || registry.length === 0) {
 
 fs.writeFileSync(opsPath, `${JSON.stringify(registry, null, 2)}\n`);
 
-let compose = fs.readFileSync(composePath, 'utf8');
-for (const item of registry) {
-  const slug = item.slug;
-  const marker = `  api-${slug}:`;
-  if (compose.includes(marker)) continue;
-
-  const block =
+function apiBlock(slug) {
+  return (
     `  api-${slug}:\n` +
     `    <<: *api-base\n` +
     `    container_name: api-${slug}\n` +
@@ -46,16 +41,41 @@ for (const item of registry) {
     `      - ./tenants/${slug}/env.api\n` +
     `    profiles:\n` +
     `      - ${slug}\n` +
-    `      - all\n\n`;
-
-  if (!compose.includes('networks:')) {
-    console.error('docker-compose.yml sem seção networks:');
-    process.exit(1);
-  }
-  compose = compose.replace('networks:', `${block}networks:`, 1);
+    `      - all\n`
+  );
 }
 
-fs.writeFileSync(composePath, compose);
+let compose = fs.readFileSync(composePath, 'utf8');
+const lines = compose.split('\n');
+const kept = [];
+let skippingApi = false;
+
+for (const line of lines) {
+  if (/^  api-[a-z0-9-]+:/.test(line)) {
+    skippingApi = true;
+    continue;
+  }
+  if (skippingApi) {
+    if (line.startsWith('networks:')) {
+      skippingApi = false;
+      kept.push('');
+      for (const item of registry) {
+        kept.push(apiBlock(item.slug).trimEnd());
+        kept.push('');
+      }
+      kept.push(line);
+    }
+    continue;
+  }
+  kept.push(line);
+}
+
+if (!kept.some((l) => l.startsWith('networks:'))) {
+  console.error('docker-compose.yml sem seção networks:');
+  process.exit(1);
+}
+
+fs.writeFileSync(composePath, `${kept.join('\n').replace(/\n+$/, '\n')}`);
 console.log(`OK: ${registry.length} tenant(s) — compose + ops-panel sincronizados`);
 for (const item of registry) {
   console.log(`  - ${item.slug} (${item.domain})`);

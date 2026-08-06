@@ -32,7 +32,7 @@ sed '/^\\restrict /d; /^\\unrestrict /d; s/^CREATE SCHEMA public;$/CREATE SCHEMA
   | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1
 
 echo "==> [2/4] Dados de config (CMS, jogos, VIP, gateways...)..."
-sed '/^\\restrict /d; /^\\unrestrict /d' "$ROOT/config_data.sql" \
+sed '/^\\restrict /d; /^\\unrestrict /d; /DISABLE TRIGGER ALL/d; /ENABLE TRIGGER ALL/d' "$ROOT/config_data.sql" \
   | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=0
 
 echo "==> [3/4] Trigger auth.users → public.usuarios..."

@@ -25,34 +25,6 @@ services:
       - venuznet
     restart: unless-stopped
 
-  api-zorbybet:
-    <<: *api-base
-    container_name: api-zorbybet
-    env_file:
-      - ./tenants/zorbybet/env.api
-    profiles:
-      - zorbybet
-      - all
-
-  api-weavenbet:
-    <<: *api-base
-    container_name: api-weavenbet
-    env_file:
-      - ./tenants/weavenbet/env.api
-    profiles:
-      - weavenbet
-      - all
-
-  api-venuz:
-    <<: *api-base
-    container_name: api-venuz
-    env_file:
-      - ./tenants/venuz/env.api
-    profiles:
-      - venuz
-      - ip
-      - all
-
   api-stewgaming:
     <<: *api-base
     container_name: api-stewgaming
