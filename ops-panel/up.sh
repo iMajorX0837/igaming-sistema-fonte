@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sobe o painel ops na VPS (porta 9090).
 # Uso:
-#   cd /opt/venuzbet/ops-panel
+#   cd /opt/venuzbet/Ops-Panel
 #   cp env.example .env && nano .env
 #   ./up.sh
 set -euo pipefail

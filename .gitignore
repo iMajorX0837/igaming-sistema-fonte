@@ -12,16 +12,16 @@ build/
 !**/.env.example
 !.env.*.example
 !**/.env.*.example
-!deploy/tenants/_template/*.example
+!Deploy-Infra/tenants/_template/*.example
 
 # Tenants (configs e assets gerados na VPS)
-deploy/tenants/*/env.api
-deploy/tenants/*/env.front
-deploy/tenants/*/env.admin
-deploy/tenants/*/front/
-deploy/tenants/*/admin/
-deploy/nginx/conf.d/*.conf
-!deploy/nginx/conf.d/*.example
+Deploy-Infra/tenants/*/env.api
+Deploy-Infra/tenants/*/env.front
+Deploy-Infra/tenants/*/env.admin
+Deploy-Infra/tenants/*/front/
+Deploy-Infra/tenants/*/admin/
+Deploy-Infra/nginx/conf.d/*.conf
+!Deploy-Infra/nginx/conf.d/*.example
 
 # Logs e cache
 *.log
@@ -38,4 +38,4 @@ Thumbs.db
 .idea/
 
 # Docker volumes locais
-deploy/data/
+Deploy-Infra/data/

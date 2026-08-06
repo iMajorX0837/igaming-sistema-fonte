@@ -7,7 +7,7 @@ const { collectSystemStats } = require('./systemStats');
 
 const ROOT = __dirname;
 const REPO_ROOT = process.env.REPO_ROOT || '/opt/venuzbet';
-const DEPLOY_DIR = process.env.DEPLOY_DIR || path.join(REPO_ROOT, 'deploy');
+const DEPLOY_DIR = process.env.DEPLOY_DIR || path.join(REPO_ROOT, 'Deploy-Infra');
 const PORT = Number(process.env.OPS_PORT || 9090);
 const OPS_USER = process.env.OPS_USER || 'admin';
 const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
@@ -18,7 +18,7 @@ const tenants = JSON.parse(
 const tenantSlugs = new Set(tenants.map((t) => t.slug));
 
 if (!OPS_PASSWORD || OPS_PASSWORD === 'troque-esta-senha') {
-  console.warn('[ops-panel] AVISO: defina OPS_PASSWORD no arquivo .env');
+  console.warn('[Ops-Panel] AVISO: defina OPS_PASSWORD no arquivo .env');
 }
 
 /** @type {{ id: string, label: string, running: boolean, output: string, code: number|null, startedAt: string, endedAt?: string }} */
@@ -298,10 +298,11 @@ app.post('/api/deploy/:tenant', (req, res) => {
 
 app.post('/api/deploy-all', (_req, res) => {
   try {
-    const cmd =
-      'chmod +x scripts/*.sh && CLEAN=1 ./scripts/deploy-tenant.sh stewgaming && CLEAN=1 ./scripts/deploy-tenant.sh pixnarede';
-    const id = startJob('Deploy stewgaming + pixnarede', cmd);
-    res.json({ ok: true, jobId: id, message: 'Deploy das duas casas iniciado' });
+    const deploySteps = tenants.map((t) => `CLEAN=1 ./scripts/deploy-tenant.sh ${t.slug}`).join(' && ');
+    const labels = tenants.map((t) => t.slug).join(' + ');
+    const cmd = `chmod +x scripts/*.sh && ${deploySteps}`;
+    const id = startJob(`Deploy ${labels}`, cmd);
+    res.json({ ok: true, jobId: id, message: `Deploy de ${tenants.length} casas iniciado` });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -384,5 +385,5 @@ app.get('*', (req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[ops-panel] http://0.0.0.0:${PORT} (deploy: ${DEPLOY_DIR})`);
+  console.log(`[Ops-Panel] http://0.0.0.0:${PORT} (Deploy-Infra: ${DEPLOY_DIR})`);
 });

@@ -780,8 +780,8 @@ btnStopLive.addEventListener('click', () => {
 document.getElementById('btn-deploy-all').addEventListener('click', async (ev) => {
   const btn = ev.currentTarget;
   const confirmed = await confirmAction({
-    title: 'Deploy das 2 casas?',
-    message: 'Isso vai rebuildar e redeployar stewgaming e pixnarede. Pode levar vários minutos.',
+    title: 'Deploy de todas as casas?',
+    message: `Isso vai rebuildar e redeployar ${knownTenants.map((t) => t.slug).join(', ')}. Pode levar vários minutos.`,
     confirmText: 'Iniciar deploy',
     variant: 'warn',
   });
@@ -789,11 +789,12 @@ document.getElementById('btn-deploy-all').addEventListener('click', async (ev) =
 
   setButtonLoading(btn, true);
   try {
-    log('Deploy das 2 casas...');
-    notify('Deploy iniciado', 'stewgaming + pixnarede', 'info', 3000);
+    const slugs = knownTenants.map((t) => t.slug).join(' + ');
+    log(`Deploy de todas as casas (${slugs})...`);
+    notify('Deploy iniciado', slugs, 'info', 3000);
     await api('/api/deploy-all', { method: 'POST' });
     showJob({
-      label: 'Deploy — stewgaming + pixnarede',
+      label: `Deploy — ${slugs}`,
       running: true,
       output: 'Iniciando...\n',
       code: null,

@@ -1,5 +1,5 @@
 {
-  "name": "venuz-ops-panel",
+  "name": "ops-panel",
   "version": "1.0.0",
   "private": true,
   "description": "Painel MVP para deploy/restart das casas na VPS",
