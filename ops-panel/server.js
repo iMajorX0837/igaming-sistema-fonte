@@ -36,6 +36,7 @@ const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
 const REGISTRY_PATH = path.join(DEPLOY_DIR, 'tenants.registry.json');
 const TENANTS_JSON = path.join(REPO_ROOT, 'ops-panel', 'tenants.json');
 const SHARED_SECRETS = path.join(DEPLOY_DIR, 'tenants/_shared/secrets.env');
+const SKIP_TENANT_DIRS = new Set(['_shared', '_template']);
 
 function loadRegistry() {
   try {
@@ -45,8 +46,97 @@ function loadRegistry() {
   }
 }
 
+function titleCaseSlug(slug) {
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function domainFromPublicSiteUrl(raw) {
+  try {
+    return new URL(String(raw).trim()).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function tenantDirIsValid(slug) {
+  const dir = path.join(DEPLOY_DIR, 'tenants', slug);
+  return (
+    fs.existsSync(path.join(dir, 'env.api')) ||
+    fs.existsSync(path.join(dir, 'supabase.env'))
+  );
+}
+
+function readTenantMetaFromDisk(slug) {
+  let domain = `${slug}.com`;
+  let label = titleCaseSlug(slug);
+
+  const envApi = path.join(DEPLOY_DIR, 'tenants', slug, 'env.api');
+  if (fs.existsSync(envApi)) {
+    const content = fs.readFileSync(envApi, 'utf8');
+    const siteMatch = content.match(/^PUBLIC_SITE_URL=(.+)$/m);
+    if (siteMatch) {
+      const parsed = domainFromPublicSiteUrl(siteMatch[1]);
+      if (parsed) domain = parsed;
+    }
+  }
+
+  return { slug, label, domain };
+}
+
+function discoverTenantSlugs() {
+  const slugs = new Set();
+
+  const tenantsDir = path.join(DEPLOY_DIR, 'tenants');
+  if (fs.existsSync(tenantsDir)) {
+    for (const name of fs.readdirSync(tenantsDir)) {
+      if (SKIP_TENANT_DIRS.has(name) || name.startsWith('.')) continue;
+      const full = path.join(tenantsDir, name);
+      if (fs.statSync(full).isDirectory() && tenantDirIsValid(name)) {
+        slugs.add(name);
+      }
+    }
+  }
+
+  const nginxDir = path.join(DEPLOY_DIR, 'nginx/conf.d');
+  if (fs.existsSync(nginxDir)) {
+    for (const file of fs.readdirSync(nginxDir)) {
+      if (!file.endsWith('.conf') || file.includes('.stopped')) continue;
+      if (file === 'ip-only.conf') continue;
+      const slug = file.replace(/\.conf$/, '');
+      if (tenantDirIsValid(slug)) slugs.add(slug);
+    }
+  }
+
+  return [...slugs];
+}
+
+function syncRegistryFromDisk() {
+  const registry = loadRegistry();
+  const known = new Set(registry.map((t) => t.slug));
+  const discovered = discoverTenantSlugs().filter((slug) => !known.has(slug));
+  if (discovered.length === 0) return registry;
+
+  const merged = [
+    ...registry,
+    ...discovered.map((slug) => readTenantMetaFromDisk(slug)),
+  ].sort((a, b) => a.slug.localeCompare(b.slug));
+
+  saveRegistry(merged);
+
+  const syncScript = path.join(scriptsDir(), 'sync-tenants-registry.sh');
+  if (fs.existsSync(syncScript)) {
+    execFile('bash', [syncScript], { cwd: DEPLOY_DIR }, () => {});
+  }
+
+  console.log(
+    `[Ops-Panel] Registry auto-heal: ${discovered.map((s) => s).join(', ')} (pastas VPS, ex.: após git reset)`
+  );
+
+  return merged;
+}
+
 function loadTenants() {
-  return loadRegistry();
+  return syncRegistryFromDisk();
 }
 
 function saveRegistry(list) {
