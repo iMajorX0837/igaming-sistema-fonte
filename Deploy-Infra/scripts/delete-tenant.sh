@@ -4,7 +4,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
+# shellcheck source=lib.sh
+source "$ROOT_DIR/scripts/lib.sh"
 
 SLUG="${1:-}"
 
@@ -46,40 +47,45 @@ rm -rf "$TENANT_DIR"
 echo "==> [4/5] Remover do registry e docker-compose.yml"
 export REGISTRY_PATH="$REGISTRY" COMPOSE_PATH="$COMPOSE" DELETE_SLUG="$SLUG"
 
-python3 << 'PY'
-import json
-import os
-from pathlib import Path
+run_node << 'NODE'
+const fs = require('fs');
 
-slug = os.environ["DELETE_SLUG"]
-registry_path = Path(os.environ["REGISTRY_PATH"])
-compose_path = Path(os.environ["COMPOSE_PATH"])
+const slug = process.env.DELETE_SLUG;
+const registryPath = process.env.REGISTRY_PATH;
+const composePath = process.env.COMPOSE_PATH;
 
-registry = json.loads(registry_path.read_text(encoding="utf-8"))
-new_registry = [t for t in registry if t.get("slug") != slug]
-if len(new_registry) == len(registry):
-    print(f"Aviso: slug '{slug}' não estava em tenants.registry.json")
-registry_path.write_text(json.dumps(new_registry, indent=2) + "\n", encoding="utf-8")
-print(f"Registry: {len(new_registry)} casa(s) restante(s)")
+const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+const newRegistry = registry.filter((t) => t.slug !== slug);
+if (newRegistry.length === registry.length) {
+  console.log(`Aviso: slug '${slug}' não estava em tenants.registry.json`);
+}
+fs.writeFileSync(registryPath, `${JSON.stringify(newRegistry, null, 2)}\n`);
 
-compose = compose_path.read_text(encoding="utf-8")
-lines = compose.splitlines(keepends=True)
-out = []
-skip = False
-marker = f"  api-{slug}:"
-for line in lines:
-    if line.startswith(marker):
-        skip = True
-        continue
-    if skip:
-        if line.startswith("  api-") or line.startswith("networks:"):
-            skip = False
-            out.append(line)
-        continue
-    out.append(line)
-compose_path.write_text("".join(out), encoding="utf-8")
-print(f"Compose: serviço api-{slug} removido")
-PY
+console.log(`Registry: ${newRegistry.length} casa(s) restante(s)`);
+
+const marker = `  api-${slug}:`;
+const lines = fs.readFileSync(composePath, 'utf8').split(/(?<=\n)/);
+const out = [];
+let skip = false;
+
+for (const line of lines) {
+  if (line.startsWith(marker)) {
+    skip = true;
+    continue;
+  }
+  if (skip) {
+    if (line.startsWith('  api-') || line.startsWith('networks:')) {
+      skip = false;
+      out.push(line);
+    }
+    continue;
+  }
+  out.push(line);
+}
+
+fs.writeFileSync(composePath, out.join(''));
+console.log(`Compose: serviço api-${slug} removido`);
+NODE
 
 echo "==> [5/5] Sincronizar painel + reload nginx"
 bash "$ROOT_DIR/scripts/sync-tenants-registry.sh"

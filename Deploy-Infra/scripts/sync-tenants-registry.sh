@@ -3,7 +3,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
+# shellcheck source=lib.sh
+source "$ROOT_DIR/scripts/lib.sh"
+
 REGISTRY="$ROOT_DIR/tenants.registry.json"
 
 if [[ ! -f "$REGISTRY" ]]; then
@@ -13,44 +15,49 @@ fi
 
 export REGISTRY_ROOT="$ROOT_DIR"
 
-python3 << 'PY'
-import json
-import os
-from pathlib import Path
+run_node << 'NODE'
+const fs = require('fs');
+const path = require('path');
 
-root = Path(os.environ["REGISTRY_ROOT"])
-registry_path = root / "tenants.registry.json"
-compose_path = root / "docker-compose.yml"
-ops_path = root.parent / "ops-panel" / "tenants.json"
+const root = process.env.REGISTRY_ROOT;
+const registryPath = path.join(root, 'tenants.registry.json');
+const composePath = path.join(root, 'docker-compose.yml');
+const opsPath = path.join(root, '..', 'ops-panel', 'tenants.json');
 
-registry = json.loads(registry_path.read_text(encoding="utf-8"))
-if not isinstance(registry, list) or not registry:
-    raise SystemExit("tenants.registry.json vazio ou inválido")
+const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+if (!Array.isArray(registry) || registry.length === 0) {
+  console.error('tenants.registry.json vazio ou inválido');
+  process.exit(1);
+}
 
-ops_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+fs.writeFileSync(opsPath, `${JSON.stringify(registry, null, 2)}\n`);
 
-compose = compose_path.read_text(encoding="utf-8")
-for item in registry:
-    slug = item["slug"]
-    marker = f"  api-{slug}:"
-    if marker in compose:
-        continue
-    block = (
-        f"  api-{slug}:\n"
-        f"    <<: *api-base\n"
-        f"    container_name: api-{slug}\n"
-        f"    env_file:\n"
-        f"      - ./tenants/{slug}/env.api\n"
-        f"    profiles:\n"
-        f"      - {slug}\n"
-        f"      - all\n\n"
-    )
-    if "networks:" not in compose:
-        raise SystemExit("docker-compose.yml sem seção networks:")
-    compose = compose.replace("networks:", block + "networks:", 1)
+let compose = fs.readFileSync(composePath, 'utf8');
+for (const item of registry) {
+  const slug = item.slug;
+  const marker = `  api-${slug}:`;
+  if (compose.includes(marker)) continue;
 
-compose_path.write_text(compose, encoding="utf-8")
-print(f"OK: {len(registry)} tenant(s) — compose + ops-panel sincronizados")
-for item in registry:
-    print(f"  - {item['slug']} ({item['domain']})")
-PY
+  const block =
+    `  api-${slug}:\n` +
+    `    <<: *api-base\n` +
+    `    container_name: api-${slug}\n` +
+    `    env_file:\n` +
+    `      - ./tenants/${slug}/env.api\n` +
+    `    profiles:\n` +
+    `      - ${slug}\n` +
+    `      - all\n\n`;
+
+  if (!compose.includes('networks:')) {
+    console.error('docker-compose.yml sem seção networks:');
+    process.exit(1);
+  }
+  compose = compose.replace('networks:', `${block}networks:`, 1);
+}
+
+fs.writeFileSync(composePath, compose);
+console.log(`OK: ${registry.length} tenant(s) — compose + ops-panel sincronizados`);
+for (const item of registry) {
+  console.log(`  - ${item.slug} (${item.domain})`);
+}
+NODE

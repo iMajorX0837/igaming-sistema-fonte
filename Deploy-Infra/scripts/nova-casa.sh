@@ -77,41 +77,7 @@ fi
 export NOVA_SLUG="$SLUG" NOVA_DOMAIN="$DOMAIN" NOVA_LABEL="$LABEL" NOVA_REGISTER="$REGISTER"
 export REGISTRY_PATH="$REGISTRY"
 
-IFS=$'\t' read -r RES_DOMAIN RES_LABEL REGISTRY_UPDATED <<< "$(python3 << 'PY'
-import json, os, sys
-from pathlib import Path
-
-registry_path = Path(os.environ["REGISTRY_PATH"])
-slug = os.environ["NOVA_SLUG"]
-domain = os.environ.get("NOVA_DOMAIN", "").strip()
-label = os.environ.get("NOVA_LABEL", "").strip()
-register = os.environ.get("NOVA_REGISTER") == "1"
-
-registry = json.loads(registry_path.read_text(encoding="utf-8"))
-found = next((t for t in registry if t.get("slug") == slug), None)
-updated = "0"
-
-if found:
-    domain = domain or found.get("domain", "")
-    label = label or found.get("label", slug)
-elif register and domain:
-    label = label or slug.replace("-", " ").title()
-    registry.append({"slug": slug, "label": label, "domain": domain})
-    registry_path.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
-    updated = "1"
-else:
-    print(f"Slug '{slug}' não está em tenants.registry.json.", file=sys.stderr)
-    print("Adicione no git ou use: --domain bandpiix.com --label 'Band Piix' --register", file=sys.stderr)
-    sys.exit(1)
-
-if not domain:
-    print("Domínio não definido.", file=sys.stderr)
-    sys.exit(1)
-
-label = label or slug.replace("-", " ").title()
-print(f"{domain}\t{label}\t{updated}")
-PY
-)"
+IFS=$'\t' read -r RES_DOMAIN RES_LABEL REGISTRY_UPDATED <<< "$(export NOVA_SLUG="$SLUG" NOVA_DOMAIN="$DOMAIN" NOVA_LABEL="$LABEL" NOVA_REGISTER="$REGISTER" REGISTRY_PATH="$REGISTRY"; bash "$ROOT_DIR/scripts/resolve-tenant-registry.sh")"
 
 DOMAIN="$RES_DOMAIN"
 LABEL="$RES_LABEL"
