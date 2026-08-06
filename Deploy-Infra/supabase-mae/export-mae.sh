@@ -18,10 +18,19 @@ fi
 
 mkdir -p "$OUT"
 
-echo "==> Schema public (tabelas, RLS, funções, triggers)..."
+echo "==> Schema public (tabelas, colunas, RLS, funções, triggers, GRANTs)..."
 pg_dump -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
-  --schema=public --schema-only --no-owner --no-privileges \
+  --schema=public --schema-only --no-owner \
   --file="$OUT/schema.sql"
+
+echo "==> Privilégios (grants.sql — fix rápido em casa existente)..."
+{
+  echo "-- Privilégios extraídos da Supabase mãe (public)"
+  echo "-- Rode no SQL Editor se aparecer permission denied (42501) para anon"
+  echo "-- Gerado por export-mae.sh em $(date -Iseconds)"
+  echo
+  grep -E '^(GRANT|REVOKE|ALTER DEFAULT PRIVILEGES)' "$OUT/schema.sql" || true
+} > "$OUT/grants.sql"
 
 TABLES=$(python3 -c "import json; print(' '.join(json.load(open('$OUT/config_tables.json'))))")
 
@@ -31,5 +40,5 @@ pg_dump -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
   $(for t in $TABLES; do echo -n "-t public.$t "; done) \
   --file="$OUT/config_data.sql"
 
-echo "OK: $OUT/schema.sql + config_data.sql + auth_trigger.sql"
+echo "OK: $OUT/schema.sql + grants.sql + config_data.sql + auth_trigger.sql"
 echo "Próximo: importar em projeto novo com ./import-nova-casa.sh"

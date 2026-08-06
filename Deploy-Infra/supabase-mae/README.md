@@ -6,7 +6,8 @@ Snapshot do projeto **psoyhrnjnalroihnswoo** (Session pooler `aws-1-sa-east-1`).
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| `schema.sql` | Tabelas, colunas, índices, funções, **RLS/policies**, triggers `public` |
+| `schema.sql` | Tabelas, colunas, índices, funções, **RLS/policies**, triggers e **GRANTs** `public` |
+| `grants.sql` | Só privilégios (anon/authenticated/service_role) — fix rápido em casa existente |
 | `config_data.sql` | Dados das **18 tabelas de config** — CMS, banners, jogos, VIP, gateways |
 | `auth_trigger.sql` | Trigger `on_auth_user_created` em `auth.users` (cadastro → `public.usuarios`) |
 | `config_tables.json` | Lista das tabelas incluídas no dump de dados |
@@ -37,6 +38,30 @@ chmod +x import-nova-casa.sh
 
 ```sql
 UPDATE public.usuarios SET cargo = 'admin' WHERE email = 'seu@email.com';
+```
+
+## Casa existente com erro `permission denied` (42501)
+
+Se o front mostra erro ao buscar `cms_items`, `home_sections`, etc., faltam **GRANTs** no projeto novo.
+
+**Opção A — SQL Editor (mais rápido):** cole e execute todo o arquivo `grants.sql`.
+
+**Opção B — psql:**
+
+```bash
+cd Deploy-Infra/supabase-mae
+export PGPASSWORD='SENHA_BANDPIIX'
+export PGHOST='aws-X-sa-east-1.pooler.supabase.com'
+export PGUSER='postgres.REF_BANDPIIX'
+chmod +x fix-grants-casa.sh
+./fix-grants-casa.sh
+```
+
+Para sincronizar só o **design/conteúdo** da mãe (sem mexer em usuários):
+
+```bash
+chmod +x sync-config-data-casa.sh
+./sync-config-data-casa.sh
 ```
 
 ## Re-exportar da mãe (atualizar snapshot)

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ES373gT6X97ii3Q6oL3BtnCBE5xiuKM0wm8MmtiBQSlZtDhVObjCD2mYS9dwyBK
+\restrict 8GaHl1hRNXWtczMX0pHlnSH7nsFe2bPdlyyyS7LmHri24i52cM7V267iu2RYgyv
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -502,5 +502,5 @@ ALTER TABLE public.webhooks ENABLE TRIGGER ALL;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ES373gT6X97ii3Q6oL3BtnCBE5xiuKM0wm8MmtiBQSlZtDhVObjCD2mYS9dwyBK
+\unrestrict 8GaHl1hRNXWtczMX0pHlnSH7nsFe2bPdlyyyS7LmHri24i52cM7V267iu2RYgyv
 
