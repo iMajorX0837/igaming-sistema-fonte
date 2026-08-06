@@ -46,6 +46,7 @@ const ICONS = {
   alert: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
   info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
   x: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
 };
 
 
@@ -458,6 +459,14 @@ function renderTenants(tenants, status) {
                   </button>
                 </div>
               </div>
+              <div class="action-group action-group-danger">
+                <label>Zona perigosa</label>
+                <div class="action-row">
+                  <button class="btn btn-danger" data-action="delete" data-slug="${t.slug}">
+                    <span class="btn-icon">${ICONS.trash}</span>Excluir casa
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="links-row">
@@ -658,6 +667,15 @@ async function needsConfirmation(action, slug) {
     });
   }
 
+  if (action === 'delete') {
+    return confirmAction({
+      title: 'Excluir casa permanentemente?',
+      message: `Remove tudo de "${slug}": container Docker, nginx, pasta tenants/${slug}, registro e compose. O projeto Supabase NÃO é apagado. Não dá para desfazer.`,
+      confirmText: 'Excluir tudo',
+      variant: 'danger',
+    });
+  }
+
   return true;
 }
 
@@ -694,6 +712,18 @@ async function runTenantAction(action, slug) {
     notify('Deploy iniciado', slug, 'info', 3000);
     await api(`/api/deploy/${slug}`, { method: 'POST' });
     showJob({ label: `Deploy — ${slug}`, running: true, output: 'Iniciando...\n', code: null });
+    pollJob();
+  }
+
+  if (action === 'delete') {
+    log(`Excluindo casa ${slug}...`);
+    notify('Excluindo casa', slug, 'warn', 4000);
+    await api(`/api/delete/${slug}`, { method: 'POST' });
+    if (activeTenantSlug === slug) {
+      navigate('/');
+    }
+    setView('console');
+    showJob({ label: `Excluir casa — ${slug}`, running: true, output: 'Removendo container, nginx e arquivos...\n', code: null });
     pollJob();
   }
 

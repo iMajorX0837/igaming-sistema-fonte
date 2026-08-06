@@ -791,6 +791,22 @@ body {
   box-shadow: 0 4px 18px rgba(239, 68, 68, 0.4);
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, #991b1b, #7f1d1d);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  box-shadow: 0 2px 12px rgba(127, 29, 29, 0.35);
+}
+
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 4px 18px rgba(239, 68, 68, 0.35);
+  color: #fff;
+}
+
+.action-group-danger label {
+  color: var(--red);
+}
+
 .btn-start {
   background: linear-gradient(135deg, #34d399, #10b981);
   color: #052e16;

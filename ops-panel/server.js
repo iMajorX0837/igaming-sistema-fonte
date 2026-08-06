@@ -498,6 +498,40 @@ app.post('/api/restart/:tenant', async (req, res) => {
   }
 });
 
+app.post('/api/delete/:tenant', (req, res) => {
+  try {
+    if (activeJob?.running) {
+      res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
+      return;
+    }
+
+    const slug = req.params.tenant;
+    assertTenant(slug);
+
+    if (slug === '_shared' || slug === '_template') {
+      res.status(400).json({ error: 'Slug protegido.' });
+      return;
+    }
+
+    assertDeployReady('delete-tenant.sh');
+
+    const registry = loadRegistry().filter((t) => t.slug !== slug);
+    saveRegistry(registry);
+    saveTenants(registry);
+
+    const cmd = `${chmodScriptsCmd()} && ${scriptCmd('delete-tenant.sh', shellQuote(slug))}`;
+    const id = startJob(`Excluir casa — ${slug}`, cmd);
+    res.json({
+      ok: true,
+      jobId: id,
+      slug,
+      message: `Removendo ${slug} (container, nginx, arquivos, registry)…`,
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
 app.post('/api/deploy/:tenant', (req, res) => {
   try {
     assertTenant(req.params.tenant);
