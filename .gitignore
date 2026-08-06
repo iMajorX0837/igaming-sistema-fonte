@@ -18,6 +18,8 @@ build/
 Deploy-Infra/tenants/*/env.api
 Deploy-Infra/tenants/*/env.front
 Deploy-Infra/tenants/*/env.admin
+Deploy-Infra/tenants/*/supabase.env
+Deploy-Infra/tenants/_shared/secrets.env
 Deploy-Infra/tenants/*/front/
 Deploy-Infra/tenants/*/admin/
 Deploy-Infra/nginx/conf.d/*.conf

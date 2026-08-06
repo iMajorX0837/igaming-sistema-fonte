@@ -232,9 +232,21 @@ Depois configure SSL no nginx (montar `/etc/letsencrypt` no container ou usar Cl
 
 ---
 
-## PARTE 5 — Adicionar nova marca (2ª, 3ª…)
+## PARTE 5 — Nova casa rápida (recomendado)
 
-Para **zorbybet.com**:
+Veja **`NOVA-CASA.md`** — fluxo em 3 passos: registry no git → `supabase.env` (3 keys) → `nova-casa.sh --deploy`.
+
+Setup único na VPS:
+
+```bash
+./scripts/init-platform-secrets.sh stewgaming
+```
+
+---
+
+## PARTE 5b — Adicionar marca (manual / legado)
+
+Para **zorbybet.com** (passo a passo antigo):
 
 ```bash
 ./scripts/add-tenant.sh zorbybet zorbybet.com

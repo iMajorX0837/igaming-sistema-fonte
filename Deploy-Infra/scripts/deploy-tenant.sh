@@ -44,6 +44,8 @@ git reset --hard "origin/$BRANCH"
 cd "$ROOT_DIR"
 chmod +x "$ROOT_DIR"/scripts/*.sh 2>/dev/null || true
 
+bash "$ROOT_DIR/scripts/sync-tenants-registry.sh" 2>/dev/null || true
+
 echo "==> Garantir serviço docker-compose + nginx ($TENANT)"
 bash "$ROOT_DIR/scripts/ensure-tenant-compose.sh" "$TENANT"
 
