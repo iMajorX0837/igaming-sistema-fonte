@@ -34,20 +34,8 @@ const OPS_USER = process.env.OPS_USER || 'admin';
 const OPS_PASSWORD = process.env.OPS_PASSWORD || '';
 
 const REGISTRY_PATH = path.join(DEPLOY_DIR, 'tenants.registry.json');
-const TENANTS_JSON = path.join(ROOT, 'tenants.json');
+const TENANTS_JSON = path.join(REPO_ROOT, 'ops-panel', 'tenants.json');
 const SHARED_SECRETS = path.join(DEPLOY_DIR, 'tenants/_shared/secrets.env');
-
-function loadTenants() {
-  try {
-    return JSON.parse(fs.readFileSync(TENANTS_JSON, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function saveTenants(list) {
-  fs.writeFileSync(TENANTS_JSON, `${JSON.stringify(list, null, 2)}\n`, 'utf8');
-}
 
 function loadRegistry() {
   try {
@@ -57,8 +45,22 @@ function loadRegistry() {
   }
 }
 
+function loadTenants() {
+  return loadRegistry();
+}
+
 function saveRegistry(list) {
-  fs.writeFileSync(REGISTRY_PATH, `${JSON.stringify(list, null, 2)}\n`, 'utf8');
+  const body = `${JSON.stringify(list, null, 2)}\n`;
+  fs.writeFileSync(REGISTRY_PATH, body, 'utf8');
+  try {
+    fs.writeFileSync(TENANTS_JSON, body, 'utf8');
+  } catch {
+    // ops-panel/tenants.json no host pode não existir em dev local
+  }
+}
+
+function saveTenants(list) {
+  saveRegistry(list);
 }
 
 function shellQuote(value) {
@@ -351,7 +353,9 @@ app.post('/api/tenants/create', (req, res) => {
     const data = validateNewTenantInput(req.body || {});
     const registry = loadRegistry();
     if (registry.some((t) => t.slug === data.slug)) {
-      res.status(409).json({ error: `Casa "${data.slug}" já existe.` });
+      res.status(409).json({
+        error: `Casa "${data.slug}" já existe no registry. Use Deploy na casa existente ou exclua antes.`,
+      });
       return;
     }
 
