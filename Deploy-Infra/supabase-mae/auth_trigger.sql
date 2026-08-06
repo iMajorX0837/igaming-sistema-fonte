@@ -1,6 +1,7 @@
 -- Trigger auth.users → public.usuarios (cadastro)
 -- Rode DEPOIS de schema.sql em projetos Supabase novos.
--- O pg_dump do schema public NÃO inclui triggers do schema auth.
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
