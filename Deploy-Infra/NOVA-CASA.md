@@ -46,23 +46,35 @@ git push
 
 ### 2. Supabase (cloud)
 
-1. Criar **projeto novo** no Supabase
-2. SQL Editor → colar `Deploy-Infra/supabase_nova_casa.sql`
-3. Criar usuário admin e promover: `UPDATE public.usuarios SET cargo = 'admin' WHERE email = '...'`
+1. Criar **projeto novo** no Supabase (vazio)
+2. Importar schema + config da mãe:
+
+```bash
+cd Deploy-Infra/supabase-mae
+export PGPASSWORD='SENHA_PROJETO_NOVO'
+export PGHOST='pooler_do_dashboard'
+export PGUSER='postgres.REF_NOVO'
+chmod +x import-nova-casa.sh
+./import-nova-casa.sh
+```
+
+3. Criar usuário no site/Auth e promover: `UPDATE public.usuarios SET cargo = 'admin' WHERE email = '...'`
+
+Arquivos em `Deploy-Infra/supabase-mae/` — ver README lá.
 
 ### 3. Na VPS — só Supabase + deploy
 
 **Pelo Ops Panel (recomendado):** `http://IP:9090/nova-casa` — preencha slug, domínio e 3 keys Supabase.
 
 **Ou pelo terminal:**
+
+```bash
 cd /opt/venuzbet && git pull
 cd Deploy-Infra
 
-# Primeira vez: cria o arquivo de 3 linhas
 ./scripts/nova-casa.sh bandpiix
 nano tenants/bandpiix/supabase.env   # SUPABASE_URL, ANON_KEY, SERVICE_KEY
 
-# Subir
 ./scripts/nova-casa.sh bandpiix --deploy
 ```
 

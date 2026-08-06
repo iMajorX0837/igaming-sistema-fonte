@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Importa schema + config da mãe em um Supabase NOVO (projeto vazio).
+#
+# Uso:
+#   export PGPASSWORD='senha_do_projeto_novo'
+#   export PGHOST='aws-0-sa-east-1.pooler.supabase.com'
+#   export PGUSER='postgres.REF_DO_PROJETO_NOVO'
+#   ./import-nova-casa.sh
+#
+# Depois:
+#   CREATE TRIGGER auth (auth_trigger.sql) — este script já aplica
+#   Crie usuário no Auth e promova: UPDATE public.usuarios SET cargo='admin' WHERE email='...';
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -z "${PGPASSWORD:-}" || -z "${PGHOST:-}" || -z "${PGUSER:-}" ]]; then
+  echo "Defina PGPASSWORD, PGHOST e PGUSER do projeto NOVO."
+  exit 1
+fi
+
+PGPORT="${PGPORT:-5432}"
+PGDATABASE="${PGDATABASE:-postgres}"
+
+echo "==> [1/3] Schema (tabelas, colunas, RLS, funções)..."
+psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/schema.sql"
+
+echo "==> [2/3] Dados de config (CMS, jogos, VIP, gateways...)..."
+psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=0 -f "$ROOT/config_data.sql"
+
+echo "==> [3/3] Trigger auth.users → public.usuarios..."
+psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -f "$ROOT/auth_trigger.sql"
+
+echo "OK: import concluído. Crie admin no Auth e promova cargo."

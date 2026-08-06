@@ -1,0 +1,20 @@
+[
+  "platform_providers",
+  "platform_games",
+  "home_sections",
+  "home_section_games",
+  "home_section_providers",
+  "cupons",
+  "prize_wheel_config",
+  "prize_wheel_segments",
+  "site_config",
+  "cms_items",
+  "all_games_categories",
+  "all_games_providers",
+  "all_games_page_config",
+  "vip_niveis",
+  "aviator_config",
+  "tracking_pixels",
+  "webhooks",
+  "integration_secrets"
+]
