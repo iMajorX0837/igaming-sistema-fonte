@@ -114,16 +114,9 @@
               <div class="form-field form-field-wide">
                 <label for="nc-paste">Connection string + API keys</label>
                 <textarea id="nc-paste" name="supabasePaste" rows="6" required placeholder="postgresql://postgres.SEU_REF:SENHA@aws-0-sa-east-1.pooler.supabase.com:5432/postgres&#10;&#10;SUPABASE_ANON_KEY=eyJ...&#10;SUPABASE_SERVICE_KEY=eyJ..." spellcheck="false"></textarea>
-                <span class="field-hint">Cole do Supabase → Connect (Session pooler). Para deploy, inclua também as keys de Settings → API.</span>
+                <span class="field-hint">Cole do Supabase → Connect (Session pooler) e as keys de Settings → API. A casa sobe completa (API + site + admin + nginx).</span>
               </div>
               <div id="nc-paste-preview" class="paste-preview hidden"></div>
-            </div>
-
-            <div class="form-check">
-              <label>
-                <input id="nc-deploy" name="deploy" type="checkbox" checked />
-                Fazer deploy automaticamente após criar
-              </label>
             </div>
 
             <div class="form-actions">

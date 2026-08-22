@@ -35,11 +35,29 @@ fi
 
 TENANT_DIR="$ROOT_DIR/tenants/$TENANT"
 
-echo "==> [1/6] Atualizar código ($REPO_ROOT)"
-cd "$REPO_ROOT"
-BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-git fetch origin
-git reset --hard "origin/$BRANCH"
+if [[ "${SKIP_GIT:-}" != "1" ]]; then
+  echo "==> [1/6] Atualizar código ($REPO_ROOT)"
+  cd "$REPO_ROOT"
+  BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  REGISTRY_BACKUP="$(mktemp)"
+  cp "$ROOT_DIR/tenants.registry.json" "$REGISTRY_BACKUP" 2>/dev/null || true
+  git fetch origin
+  git reset --hard "origin/$BRANCH"
+  if [[ -f "$REGISTRY_BACKUP" ]]; then
+    REGISTRY_PATH="$ROOT_DIR/tenants.registry.json" REGISTRY_BACKUP="$REGISTRY_BACKUP" node -e '
+      const fs = require("fs");
+      const a = JSON.parse(fs.readFileSync(process.env.REGISTRY_PATH, "utf8"));
+      const b = JSON.parse(fs.readFileSync(process.env.REGISTRY_BACKUP, "utf8"));
+      const map = new Map(a.map((t) => [t.slug, t]));
+      for (const t of b) if (!map.has(t.slug)) map.set(t.slug, t);
+      const merged = [...map.values()].sort((x, y) => x.slug.localeCompare(y.slug));
+      fs.writeFileSync(process.env.REGISTRY_PATH, JSON.stringify(merged, null, 2) + "\n");
+    ' || true
+    rm -f "$REGISTRY_BACKUP"
+  fi
+else
+  echo "==> [1/6] Pulando git reset (SKIP_GIT=1)"
+fi
 
 cd "$ROOT_DIR"
 chmod +x "$ROOT_DIR"/scripts/*.sh 2>/dev/null || true
@@ -50,8 +68,8 @@ echo "==> Garantir serviço docker-compose + nginx ($TENANT)"
 bash "$ROOT_DIR/scripts/ensure-tenant-compose.sh" "$TENANT"
 
 if [[ "${CLEAN:-}" == "1" ]]; then
-  echo "==> [2/6] Parar API + nginx e limpar assets ($TENANT)"
-  docker compose --profile "$TENANT" stop "$SERVICE" nginx 2>/dev/null || true
+  echo "==> [2/6] Parar API da casa e limpar assets ($TENANT)"
+  docker compose --profile "$TENANT" stop "$SERVICE" 2>/dev/null || true
   rm -rf "$TENANT_DIR/front" "$TENANT_DIR/admin"
   mkdir -p "$TENANT_DIR/front" "$TENANT_DIR/admin"
   docker builder prune -f >/dev/null 2>&1 || true
@@ -72,13 +90,19 @@ docker compose build "${BUILD_EXTRA[@]}" "$SERVICE"
 echo "==> [$STEP_TENANT/6] Build front + admin ($TENANT)"
 bash "$ROOT_DIR/scripts/build-tenant.sh" "$TENANT"
 
-echo "==> [$STEP_UP/6] Subir API + nginx (--force-recreate)"
-docker compose --profile "$TENANT" up -d --force-recreate "$SERVICE" nginx
+echo "==> [$STEP_UP/6] Subir API e recarregar nginx"
+docker compose --profile "$TENANT" up -d --force-recreate "$SERVICE"
+if [[ -f "$ROOT_DIR/nginx/conf.d/$TENANT.conf.stopped" ]]; then
+  mv "$ROOT_DIR/nginx/conf.d/$TENANT.conf.stopped" "$ROOT_DIR/nginx/conf.d/$TENANT.conf"
+fi
+docker compose up -d nginx
+docker exec venuz-nginx nginx -t
+docker exec venuz-nginx nginx -s reload
 
 echo "==> [$STEP_HEALTH/6] Healthcheck (aguarda 20s)"
 sleep 20
 
-if docker compose exec -T nginx wget -qO- "http://${SERVICE}:3000/health" 2>/dev/null; then
+if docker exec venuz-nginx wget -qO- "http://${SERVICE}:3000/health" 2>/dev/null; then
   echo
   echo "OK: API respondeu /health na rede interna."
 else

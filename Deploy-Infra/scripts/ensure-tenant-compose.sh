@@ -28,4 +28,19 @@ if [[ -z "$DOMAIN" ]]; then
 fi
 
 bash "$ROOT_DIR/scripts/add-tenant.sh" "$TENANT" "$DOMAIN" >/dev/null
+
+TEMPLATE="$ROOT_DIR/nginx/conf.d/tenant.conf.template"
+CONF="$ROOT_DIR/nginx/conf.d/$TENANT.conf"
+TARGET="$CONF"
+if [[ -f "$CONF.stopped" && ! -f "$CONF" ]]; then
+  TARGET="$CONF.stopped"
+fi
+
+if [[ -f "$TEMPLATE" ]]; then
+  sed \
+    -e "s/___SLUG__/$TENANT/g" \
+    -e "s/___DOMAIN___/$DOMAIN/g" \
+    "$TEMPLATE" > "$TARGET"
+fi
+
 echo "OK: compose/nginx do tenant '$TENANT' ($DOMAIN) garantidos."

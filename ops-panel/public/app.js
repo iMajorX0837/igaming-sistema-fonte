@@ -649,10 +649,19 @@ async function needsConfirmation(action, slug) {
     });
   }
 
+  if (action === 'start') {
+    return confirmAction({
+      title: 'Iniciar casa?',
+      message: `Sobe "${slug}" por completo: cria o container se faltar, builda front/admin se estiverem vazios e liga o nginx.`,
+      confirmText: 'Iniciar',
+      variant: 'info',
+    });
+  }
+
   if (action === 'restart') {
     return confirmAction({
       title: 'Reiniciar API?',
-      message: `O container da API "${slug}" será reiniciado. Pode haver alguns segundos de indisponibilidade.`,
+      message: `O container da API "${slug}" será reiniciado. Se ele não existir, a casa é recriada por completo.`,
       confirmText: 'Reiniciar',
       variant: 'warn',
     });
@@ -690,21 +699,21 @@ async function runTenantAction(action, slug) {
   }
 
   if (action === 'start') {
-    log(`Ligando casa ${slug}...`);
+    log(`Ligando casa ${slug} (container + front + nginx)...`);
     notify('Iniciando casa', slug, 'info', 3000);
     await api(`/api/start/${slug}`, { method: 'POST' });
-    log(`${slug}: casa no ar.`);
-    notify('Casa no ar', `${slug} está online`, 'success');
-    await refresh();
+    setView('console');
+    showJob({ label: `Iniciar casa — ${slug}`, running: true, output: 'Criando/subindo API, front e nginx...\n', code: null });
+    pollJob();
   }
 
   if (action === 'restart') {
     log(`Reiniciando ${slug}...`);
     notify('Reiniciando', slug, 'info', 3000);
     await api(`/api/restart/${slug}`, { method: 'POST' });
-    log(`${slug}: reiniciada.`);
-    notify('Reiniciada', `${slug} foi reiniciada`, 'success');
-    await refresh();
+    setView('console');
+    showJob({ label: `Reiniciar casa — ${slug}`, running: true, output: 'Reiniciando API e nginx...\n', code: null });
+    pollJob();
   }
 
   if (action === 'deploy') {
@@ -946,8 +955,8 @@ async function refreshPastePreview() {
       info.projectRef ? `Projeto: <code>${info.projectRef}</code>` : null,
       info.supabaseUrl ? `URL: <code>${info.supabaseUrl}</code>` : null,
       info.host ? `Host: <code>${info.host}</code>` : null,
-      info.hasAnonKey ? 'Anon key ✓' : 'Anon key — faltando (precisa para deploy)',
-      info.hasServiceKey ? 'Service key ✓' : 'Service key — faltando (precisa para deploy)',
+      info.hasAnonKey ? 'Anon key ✓' : 'Anon key — faltando',
+      info.hasServiceKey ? 'Service key ✓' : 'Service key — faltando',
     ].filter(Boolean);
     ncPastePreview.innerHTML = parts.join(' · ');
     ncPastePreview.classList.remove('hidden');
@@ -971,14 +980,11 @@ document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev)
   const btn = document.getElementById('btn-nova-casa-submit');
   const form = ev.currentTarget;
   const data = Object.fromEntries(new FormData(form));
-  const deploy = document.getElementById('nc-deploy')?.checked !== false;
 
   const confirmed = await confirmAction({
     title: 'Criar nova casa?',
-    message: deploy
-      ? `Importa schema/config da mãe no Supabase, registra e faz deploy de ${data.slug} (${data.domain}).`
-      : `Importa schema/config da mãe e registra ${data.slug} (${data.domain}) — sem deploy.`,
-    confirmText: 'Criar casa',
+    message: `Importa o Supabase da mãe e sobe ${data.slug} (${data.domain}) por completo: container, front, admin e nginx.`,
+    confirmText: 'Criar e subir',
     variant: 'warn',
   });
   if (!confirmed) return;
@@ -990,7 +996,7 @@ document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev)
       domain: data.domain,
       label: data.label,
       supabasePaste: data.supabasePaste,
-      deploy,
+      deploy: true,
     };
 
     const res = await api('/api/tenants/create', {
@@ -1008,7 +1014,7 @@ document.getElementById('form-nova-casa')?.addEventListener('submit', async (ev)
     showJob({
       label: `Nova casa — ${res.slug}`,
       running: true,
-      output: 'Importando Supabase da mãe...\n',
+      output: 'Importando Supabase da mãe e subindo API + front + admin + nginx...\n',
       code: null,
     });
     pollJob();

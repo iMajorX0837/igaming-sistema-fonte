@@ -130,37 +130,30 @@ function validateNewTenantInput(body) {
   }
 
   const parsed = parseSupabasePaste(paste);
-  const deploy = body.deploy !== false;
 
-  if (deploy) {
-    if (!parsed.supabaseUrl.startsWith('https://') || !parsed.supabaseUrl.includes('supabase')) {
-      throw Object.assign(new Error('Não foi possível derivar SUPABASE_URL — use usuário postgres.PROJECT_REF'), {
-        status: 400,
-      });
-    }
-    if (parsed.supabaseAnonKey.length < 20) {
-      throw Object.assign(
-        new Error(
-          'Para deploy, adicione SUPABASE_ANON_KEY= na colagem (Supabase → Settings → API)'
-        ),
-        { status: 400 }
-      );
-    }
-    if (parsed.supabaseServiceKey.length < 20) {
-      throw Object.assign(
-        new Error(
-          'Para deploy, adicione SUPABASE_SERVICE_KEY= na colagem (Supabase → Settings → API)'
-        ),
-        { status: 400 }
-      );
-    }
+  if (!parsed.supabaseUrl.startsWith('https://') || !parsed.supabaseUrl.includes('supabase')) {
+    throw Object.assign(new Error('Não foi possível derivar SUPABASE_URL — use usuário postgres.PROJECT_REF'), {
+      status: 400,
+    });
+  }
+  if (parsed.supabaseAnonKey.length < 20) {
+    throw Object.assign(
+      new Error('Adicione SUPABASE_ANON_KEY= na colagem (Supabase → Settings → API)'),
+      { status: 400 }
+    );
+  }
+  if (parsed.supabaseServiceKey.length < 20) {
+    throw Object.assign(
+      new Error('Adicione SUPABASE_SERVICE_KEY= na colagem (Supabase → Settings → API)'),
+      { status: 400 }
+    );
   }
 
   return {
     slug,
     domain,
     label,
-    deploy,
+    deploy: true,
     ...parsed,
   };
 }

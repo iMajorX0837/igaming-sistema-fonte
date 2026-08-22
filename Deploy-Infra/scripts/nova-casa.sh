@@ -20,7 +20,7 @@ REPO_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 SLUG=""
 DOMAIN=""
 LABEL=""
-DEPLOY=0
+DEPLOY=1
 REGISTER=0
 
 usage() {
@@ -28,7 +28,8 @@ usage() {
 Uso: $0 <slug> [opções]
 
 Opções:
-  --deploy          Build + sobe a casa (deploy-tenant.sh)
+  --deploy          Sobe a casa completa (padrão)
+  --no-deploy       Só scaffold (env/nginx/compose), sem container/front
   --domain DOM      Domínio (se não estiver no tenants.registry.json)
   --label NOME      Nome exibido no painel
   --register        Adiciona ao tenants.registry.json (requer --domain)
@@ -47,6 +48,7 @@ shift
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --deploy) DEPLOY=1 ;;
+    --no-deploy) DEPLOY=0 ;;
     --domain) DOMAIN="${2:-}"; shift ;;
     --label) LABEL="${2:-}"; shift ;;
     --register) REGISTER=1 ;;
@@ -165,12 +167,12 @@ Supabase:
 EOF
 
 if [[ "$DEPLOY" -eq 1 ]]; then
-  echo "==> Deploy..."
-  bash "$ROOT_DIR/scripts/deploy-tenant.sh" "$SLUG"
+  echo "==> Subindo casa completa (container + front/admin + nginx)..."
+  bash "$ROOT_DIR/scripts/up-tenant.sh" "$SLUG"
 else
   cat <<EOF
-Subir agora:
-  ./scripts/deploy-tenant.sh $SLUG
+Scaffold pronto. Para subir de verdade:
+  ./scripts/up-tenant.sh $SLUG
 
 Ou:
   $0 $SLUG --deploy

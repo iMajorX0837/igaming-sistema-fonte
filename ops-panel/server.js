@@ -212,7 +212,7 @@ function buildImportAndDeployCommand(data) {
     `cd ${shellQuote(DEPLOY_DIR)}`,
     chmodScriptsCmd(),
     scriptCmd('sync-tenants-registry.sh'),
-    scriptCmd('nova-casa.sh', `${shellQuote(data.slug)}${data.deploy ? ' --deploy' : ''}`),
+    scriptCmd('nova-casa.sh', `${shellQuote(data.slug)} --deploy`),
   ].join(' && ');
 
   return `${importCmd} && ${deployCmd}`;
@@ -342,35 +342,11 @@ function stopTenantCommand(slug) {
 }
 
 function startTenantCommand(slug) {
-  return `
-    bash scripts/ensure-tenant-compose.sh ${slug}
-    docker compose --profile ${slug} up -d api-${slug}
-    for i in $(seq 1 30); do
-      docker inspect -f '{{.State.Running}}' api-${slug} 2>/dev/null | grep -q true && break
-      sleep 1
-    done
-    if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
-      mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
-    fi
-    sleep 1
-    docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
-  `;
+  return `${chmodScriptsCmd()} && ${scriptCmd('up-tenant.sh', shellQuote(slug))}`;
 }
 
 function restartTenantCommand(slug) {
-  return `
-    bash scripts/ensure-tenant-compose.sh ${slug}
-    if docker inspect api-${slug} >/dev/null 2>&1; then
-      docker restart api-${slug}
-    else
-      docker compose --profile ${slug} up -d api-${slug}
-    fi
-    if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
-      mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
-    fi
-    sleep 2
-    docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
-  `;
+  return `${chmodScriptsCmd()} && RESTART=1 ${scriptCmd('up-tenant.sh', shellQuote(slug))}`;
 }
 
 async function isTenantNginxEnabled(slug) {
@@ -482,9 +458,7 @@ app.post('/api/tenants/create', (req, res) => {
       slug: data.slug,
       domain: data.domain,
       projectRef: data.projectRef,
-      message: data.deploy
-        ? 'Importando Supabase da mãe + deploy em andamento'
-        : 'Importando Supabase da mãe (sem deploy)',
+      message: 'Importando Supabase da mãe e subindo a casa (API + front + admin + nginx)',
     });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -577,25 +551,39 @@ app.post('/api/stop/:tenant', async (req, res) => {
   }
 });
 
-app.post('/api/start/:tenant', async (req, res) => {
+app.post('/api/start/:tenant', (req, res) => {
   try {
+    if (activeJob?.running) {
+      res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
+      return;
+    }
     assertTenant(req.params.tenant);
+    assertDeployReady('up-tenant.sh');
     const slug = req.params.tenant;
     const tenants = loadTenants();
-    await runShell(startTenantCommand(slug), 120000);
     const domain = tenants.find((t) => t.slug === slug)?.domain || slug;
-    res.json({ ok: true, message: `Casa ${slug} no ar: ${domain}, admin.${domain}, api.${domain}` });
+    const id = startJob(`Iniciar casa — ${slug}`, startTenantCommand(slug));
+    res.json({
+      ok: true,
+      jobId: id,
+      message: `Subindo ${slug} por completo: ${domain}, admin.${domain}, api.${domain}`,
+    });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
 });
 
-app.post('/api/restart/:tenant', async (req, res) => {
+app.post('/api/restart/:tenant', (req, res) => {
   try {
+    if (activeJob?.running) {
+      res.status(409).json({ error: 'Aguarde a operação atual terminar.' });
+      return;
+    }
     assertTenant(req.params.tenant);
+    assertDeployReady('up-tenant.sh');
     const slug = req.params.tenant;
-    await runShell(restartTenantCommand(slug), 120000);
-    res.json({ ok: true, message: `Casa ${slug} reiniciada (API + nginx da casa)` });
+    const id = startJob(`Reiniciar casa — ${slug}`, restartTenantCommand(slug));
+    res.json({ ok: true, jobId: id, message: `Reiniciando ${slug} (recria se o container não existir)` });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
