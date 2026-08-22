@@ -343,23 +343,32 @@ function stopTenantCommand(slug) {
 
 function startTenantCommand(slug) {
   return `
+    bash scripts/ensure-tenant-compose.sh ${slug}
+    docker compose --profile ${slug} up -d api-${slug}
+    for i in $(seq 1 30); do
+      docker inspect -f '{{.State.Running}}' api-${slug} 2>/dev/null | grep -q true && break
+      sleep 1
+    done
     if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
       mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
-    elif [ ! -f nginx/conf.d/${slug}.conf ]; then
-      bash scripts/ensure-tenant-compose.sh ${slug}
     fi
-    docker start api-${slug}
-    sleep 2
+    sleep 1
     docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
   `;
 }
 
 function restartTenantCommand(slug) {
   return `
+    bash scripts/ensure-tenant-compose.sh ${slug}
+    if docker inspect api-${slug} >/dev/null 2>&1; then
+      docker restart api-${slug}
+    else
+      docker compose --profile ${slug} up -d api-${slug}
+    fi
     if [ -f nginx/conf.d/${slug}.conf.stopped ]; then
       mv nginx/conf.d/${slug}.conf.stopped nginx/conf.d/${slug}.conf
     fi
-    docker restart api-${slug}
+    sleep 2
     docker exec venuz-nginx nginx -t && docker exec venuz-nginx nginx -s reload
   `;
 }
